@@ -67,9 +67,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       if (authData?.user) {
         console.log('Usuário criado no auth:', authData.user.id);
         
-        // Aguardar para garantir que o usuário foi criado
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
         // Preparar dados do usuário
         const isAdmin = email === 'erik@admin.com';
         const userData = {
@@ -95,7 +92,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         if (userError) {
           console.error('Erro ao inserir na tabela usuarios_optica:', userError);
           
-          // Fazer logout do usuário se falhou
+          // Fazer logout se falhou
           await supabase.auth.signOut();
           
           throw new Error(`Erro no banco de dados: ${userError.message}`);
@@ -107,6 +104,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           title: "Sucesso!",
           description: "Conta criada com sucesso! Agora você pode fazer login.",
         });
+        
+        // Limpar formulário
+        setEmail('');
+        setPassword('');
+        setName('');
         
         onBackToLogin();
       } else {
@@ -123,8 +125,6 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         errorMessage = "Email inválido. Verifique o formato.";
       } else if (error.message?.includes('Password')) {
         errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
-      } else if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
-        errorMessage = "Erro de segurança no banco de dados. Contate o administrador.";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -234,9 +234,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           </Button>
         </div>
         
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
-          <p className="font-medium mb-2">Para acesso administrativo:</p>
-          <p>Use o email <strong>erik@admin.com</strong> para criar uma conta admin.</p>
+        <div className="mt-6 p-4 bg-green-50 rounded-lg text-sm text-green-800">
+          <p className="font-medium mb-2">✅ Sistema Pronto!</p>
+          <p>Use <strong>erik@admin.com</strong> para criar uma conta admin.</p>
+          <p className="mt-1">Qualquer outro email criará uma conta de funcionário.</p>
         </div>
       </CardContent>
     </Card>
