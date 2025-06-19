@@ -152,7 +152,7 @@ export type Database = {
           email: string
           id: string
           nome: string
-          optica_id: string
+          optica_id: string | null
           role: string
           user_id: string
         }
@@ -162,7 +162,7 @@ export type Database = {
           email: string
           id?: string
           nome: string
-          optica_id: string
+          optica_id?: string | null
           role?: string
           user_id: string
         }
@@ -172,7 +172,7 @@ export type Database = {
           email?: string
           id?: string
           nome?: string
-          optica_id?: string
+          optica_id?: string | null
           role?: string
           user_id?: string
         }
