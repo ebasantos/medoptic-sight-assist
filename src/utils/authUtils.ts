@@ -52,7 +52,7 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
         email: userData.email,
         role: userData.role as 'admin' | 'funcionario',
         opticId: userData.optica_id,
-        opticName: userData.opticas?.nome
+        opticName: userData.opticas?.nome || null
       };
       console.log('Dados do usuário processados:', userObj);
       return userObj;

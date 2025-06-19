@@ -63,31 +63,35 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       if (authData.user) {
         console.log('Usuário criado:', authData.user.id);
         
-        // Se o email for erik@admin.com, criar entrada de admin da plataforma
-        if (email === 'erik@admin.com') {
-          console.log('Criando usuário admin da plataforma...');
-          
-          // Para admin da plataforma, não vincular a uma ótica específica
-          // Criar entrada na tabela usuarios_optica com optica_id null para admin da plataforma
-          const { error: userError } = await supabase
-            .from('usuarios_optica')
-            .insert({
-              user_id: authData.user.id,
-              optica_id: null, // Admin da plataforma não está vinculado a uma ótica específica
-              nome: name,
-              email: email,
-              role: 'admin',
-              ativo: true
-            });
+        // Aguardar um pouco para garantir que o usuário foi criado no auth
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Criar entrada na tabela usuarios_optica
+        const isAdmin = email === 'erik@admin.com';
+        const userData = {
+          user_id: authData.user.id,
+          nome: name,
+          email: email,
+          role: isAdmin ? 'admin' : 'funcionario',
+          optica_id: isAdmin ? null : '00000000-0000-0000-0000-000000000000', // Placeholder para funcionários
+          ativo: true
+        };
 
-          if (userError) {
-            console.error('Erro ao criar usuário admin:', userError);
-            throw userError;
-          } else {
-            console.log('Usuário admin da plataforma criado com sucesso');
-          }
+        console.log('Inserindo dados do usuário:', userData);
+        
+        const { error: userError } = await supabase
+          .from('usuarios_optica')
+          .insert(userData);
+
+        if (userError) {
+          console.error('Erro ao criar entrada do usuário:', userError);
+          // Se falhou, tentar fazer logout do usuário criado
+          await supabase.auth.signOut();
+          throw userError;
         }
 
+        console.log('Usuário cadastrado com sucesso');
+        
         toast({
           title: "Sucesso",
           description: "Conta criada com sucesso! Você pode fazer login agora.",
@@ -105,6 +109,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         errorMessage = "Email inválido. Verifique o formato do email.";
       } else if (error.message?.includes('Password')) {
         errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
+      } else if (error.message?.includes('row-level security')) {
+        errorMessage = "Erro de segurança. Tente novamente em alguns segundos.";
       } else if (error.message) {
         errorMessage = error.message;
       }
