@@ -67,7 +67,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           )
         `)
         .eq('user_id', supabaseUser.id)
-        .maybeSingle();
+        .single();
 
       console.log('Resultado da busca:', { userData, userError });
 
@@ -162,7 +162,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       // Aguardar um pouco para garantir que o logout foi processado
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
