@@ -67,6 +67,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       if (authData?.user) {
         console.log('Usuário criado no auth:', authData.user.id);
         
+        // Aguardar um pouco para garantir que o usuário foi criado no auth
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         // Preparar dados do usuário
         const isAdmin = email === 'erik@admin.com';
         const userData = {
@@ -74,7 +77,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           nome: name,
           email: email,
           role: isAdmin ? 'admin' : 'funcionario',
-          optica_id: isAdmin ? null : '00000000-0000-0000-0000-000000000000',
+          optica_id: isAdmin ? null : undefined, // null para admin, undefined para funcionário (usará default)
           ativo: true
         };
 
