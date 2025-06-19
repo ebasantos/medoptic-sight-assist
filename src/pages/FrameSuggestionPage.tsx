@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
-  Camera, 
   Sparkles, 
   User,
   Heart,
@@ -13,11 +12,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import CameraCapture from '@/components/CameraCapture';
 
 const FrameSuggestionPage = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<'capture' | 'analysis' | 'suggestions'>('capture');
-  const [clientName, setClientName] = useState('');
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
 
   const faceAnalysis = {
     shape: 'Oval',
@@ -45,7 +45,8 @@ const FrameSuggestionPage = () => {
     ]
   };
 
-  const handleCapture = () => {
+  const handlePhotoCapture = (imageData: string) => {
+    setCapturedPhoto(imageData);
     setStep('analysis');
     setTimeout(() => setStep('suggestions'), 3000);
   };
@@ -79,7 +80,7 @@ const FrameSuggestionPage = () => {
             <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
               ['capture', 'analysis', 'suggestions'].indexOf(step) >= 0 ? 'bg-success text-white' : 'bg-gray-300'
             }`}>
-              <Camera className="h-4 w-4" />
+              <User className="h-4 w-4" />
             </div>
             <div className={`w-16 h-0.5 ${
               ['analysis', 'suggestions'].indexOf(step) >= 0 ? 'bg-success' : 'bg-gray-300'
@@ -111,25 +112,11 @@ const FrameSuggestionPage = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                <div className="aspect-video bg-gradient-to-br from-purple-900 to-pink-900 rounded-lg flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-white text-center">
-                      <Camera className="h-16 w-16 mx-auto mb-4 animate-pulse" />
-                      <p className="text-lg">Posicione o cliente sem óculos</p>
-                      <p className="text-sm opacity-80">Foto frontal, bem iluminada</p>
-                    </div>
-                  </div>
-                  
-                  {/* Guias visuais */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30 transform -translate-x-1/2"></div>
-                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/30 transform -translate-y-1/2"></div>
-                    
-                    {/* Oval facial guide */}
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
-                                    w-40 h-52 border-2 border-yellow-400/60 rounded-full"></div>
-                  </div>
-                </div>
+                <CameraCapture 
+                  onCapture={handlePhotoCapture}
+                  showGuides={true}
+                  guideType="face-analysis"
+                />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="text-center p-4 border rounded-lg">
@@ -148,13 +135,6 @@ const FrameSuggestionPage = () => {
                     <p className="text-sm text-gray-600">Para análise precisa</p>
                   </div>
                 </div>
-
-                <Button 
-                  onClick={handleCapture}
-                  className="w-full h-14 text-lg font-medium bg-success hover:bg-success/90"
-                >
-                  Capturar e Analisar
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -170,15 +150,23 @@ const FrameSuggestionPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
-              <div className="aspect-video bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg mb-6 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="relative mx-auto mb-4">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-success"></div>
-                    <Sparkles className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-success" />
-                  </div>
-                  <p className="text-lg font-medium">Análise em andamento...</p>
-                  <p className="text-sm text-gray-600">Identificando características únicas</p>
+              {capturedPhoto && (
+                <div className="aspect-video bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg mb-6 overflow-hidden">
+                  <img 
+                    src={capturedPhoto} 
+                    alt="Foto para análise facial"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
+              )}
+
+              <div className="text-center mb-6">
+                <div className="relative mx-auto mb-4">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-success"></div>
+                  <Sparkles className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-success" />
+                </div>
+                <p className="text-lg font-medium">Análise em andamento...</p>
+                <p className="text-sm text-gray-600">Identificando características únicas</p>
               </div>
 
               <div className="space-y-3 text-left max-w-md mx-auto">
@@ -225,6 +213,16 @@ const FrameSuggestionPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {capturedPhoto && (
+                    <div className="mb-4">
+                      <img 
+                        src={capturedPhoto} 
+                        alt="Foto analisada"
+                        className="w-full h-32 object-cover rounded border"
+                      />
+                    </div>
+                  )}
+                  
                   <div>
                     <p className="font-medium text-sm text-gray-600">Formato do Rosto</p>
                     <p className="text-lg font-bold text-success">{faceAnalysis.shape}</p>
@@ -299,7 +297,10 @@ const FrameSuggestionPage = () => {
 
             <div className="flex gap-4">
               <Button 
-                onClick={() => setStep('capture')}
+                onClick={() => {
+                  setStep('capture');
+                  setCapturedPhoto(null);
+                }}
                 variant="outline"
                 className="flex-1 h-12"
               >

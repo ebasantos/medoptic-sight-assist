@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Camera, 
   ArrowLeft, 
   CheckCircle, 
   AlertCircle,
@@ -15,12 +14,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import CameraCapture from '@/components/CameraCapture';
 
 const MeasurementPage = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<'setup' | 'capture' | 'measure' | 'results'>('setup');
   const [clientName, setClientName] = useState('');
   const [frameWidth, setFrameWidth] = useState('');
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState({
     dp: '',
     dnpLeft: '',
@@ -30,38 +31,35 @@ const MeasurementPage = () => {
     lensWidth: ''
   });
 
-  const [cameraActive, setCameraActive] = useState(false);
-
   const handleStartMeasurement = () => {
     if (clientName && frameWidth) {
       setStep('capture');
-      setCameraActive(true);
     }
   };
 
-  const handleCapture = () => {
+  const handlePhotoCapture = (imageData: string) => {
+    setCapturedPhoto(imageData);
     setStep('measure');
-    setCameraActive(false);
-  };
-
-  const handleMeasurementComplete = () => {
-    // Simulação de medições automáticas
-    setMeasurements({
-      dp: '62.5',
-      dnpLeft: '31.0',
-      dnpRight: '31.5',
-      heightLeft: '22.0',
-      heightRight: '22.2',
-      lensWidth: '52.0'
-    });
-    setStep('results');
+    
+    // Simular processamento das medidas
+    setTimeout(() => {
+      setMeasurements({
+        dp: '62.5',
+        dnpLeft: '31.0',
+        dnpRight: '31.5',
+        heightLeft: '22.0',
+        heightRight: '22.2',
+        lensWidth: '52.0'
+      });
+      setStep('results');
+    }, 3000);
   };
 
   const handleSaveAndPrint = () => {
-    // Aqui salvaria no banco e imprimiria
     console.log('Salvando aferição:', {
       client: clientName,
       frameWidth,
+      photo: capturedPhoto,
       measurements,
       timestamp: new Date().toISOString()
     });
@@ -105,7 +103,7 @@ const MeasurementPage = () => {
             <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
               ['capture', 'measure', 'results'].indexOf(step) >= 0 ? 'bg-primary text-white' : 'bg-gray-300'
             }`}>
-              <Camera className="h-4 w-4" />
+              <Eye className="h-4 w-4" />
             </div>
             <div className={`w-16 h-0.5 ${
               ['measure', 'results'].indexOf(step) >= 0 ? 'bg-primary' : 'bg-gray-300'
@@ -202,43 +200,13 @@ const MeasurementPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="aspect-video bg-gray-900 rounded-lg mb-6 flex items-center justify-center relative overflow-hidden">
-                {cameraActive ? (
-                  <div className="relative w-full h-full">
-                    {/* Simulação da câmera */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-gray-900"></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-white text-center">
-                        <Camera className="h-16 w-16 mx-auto mb-4 animate-pulse" />
-                        <p className="text-lg">Câmera Ativa - Posicione o Cliente</p>
-                      </div>
-                    </div>
-                    
-                    {/* Grade de alinhamento */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30 transform -translate-x-1/2"></div>
-                      <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/30 transform -translate-y-1/2"></div>
-                      <div className="absolute top-1/3 left-1/4 right-1/4 h-0.5 bg-yellow-400/50"></div>
-                      <div className="absolute top-2/3 left-1/4 right-1/4 h-0.5 bg-yellow-400/50"></div>
-                    </div>
-                    
-                    {/* Indicadores de posicionamento */}
-                    <div className="absolute top-4 left-4 text-white text-sm">
-                      <Badge variant="secondary" className="bg-green-600">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Distância: 40cm
-                      </Badge>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-white text-center">
-                    <Camera className="h-16 w-16 mx-auto mb-4" />
-                    <p>Câmera será ativada automaticamente</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <CameraCapture 
+                onCapture={handlePhotoCapture}
+                showGuides={true}
+                guideType="measurement"
+              />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                 <div className="text-center p-4 border rounded-lg">
                   <Eye className="h-8 w-8 mx-auto mb-2 text-primary" />
                   <p className="font-medium">Alinhamento dos Olhos</p>
@@ -250,14 +218,6 @@ const MeasurementPage = () => {
                   <p className="text-sm text-gray-600">40cm da câmera</p>
                 </div>
               </div>
-
-              <Button 
-                onClick={handleCapture}
-                className="w-full h-14 text-lg font-medium"
-                disabled={!cameraActive}
-              >
-                Capturar Foto
-              </Button>
             </CardContent>
           </Card>
         )}
@@ -272,12 +232,20 @@ const MeasurementPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
-              <div className="aspect-video bg-gray-100 rounded-lg mb-6 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-lg font-medium">Analisando imagem...</p>
-                  <p className="text-sm text-gray-600">Calculando distâncias pupilares</p>
+              {capturedPhoto && (
+                <div className="aspect-video bg-gray-100 rounded-lg mb-6 overflow-hidden">
+                  <img 
+                    src={capturedPhoto} 
+                    alt="Foto capturada para análise" 
+                    className="w-full h-full object-cover"
+                  />
                 </div>
+              )}
+
+              <div className="text-center mb-6">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-lg font-medium">Analisando imagem...</p>
+                <p className="text-sm text-gray-600">Calculando distâncias pupilares</p>
               </div>
 
               <div className="space-y-2 text-left max-w-md mx-auto">
@@ -294,14 +262,6 @@ const MeasurementPage = () => {
                   Cálculo das medidas: Em andamento...
                 </div>
               </div>
-
-              <Button 
-                onClick={handleMeasurementComplete}
-                className="mt-8 h-12"
-                variant="outline"
-              >
-                Simular Conclusão (Demo)
-              </Button>
             </CardContent>
           </Card>
         )}
@@ -330,6 +290,15 @@ const MeasurementPage = () => {
                     <p><strong>Horário:</strong> {new Date().toLocaleTimeString('pt-BR')}</p>
                     <p><strong>Armação:</strong> {frameWidth}mm</p>
                   </div>
+                  {capturedPhoto && (
+                    <div className="mt-4">
+                      <img 
+                        src={capturedPhoto} 
+                        alt="Foto do cliente"
+                        className="w-full h-32 object-cover rounded border"
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -382,7 +351,12 @@ const MeasurementPage = () => {
               </Button>
               <Button 
                 variant="outline"
-                onClick={() => setStep('setup')}
+                onClick={() => {
+                  setStep('setup');
+                  setCapturedPhoto(null);
+                  setClientName('');
+                  setFrameWidth('');
+                }}
                 className="h-14 px-8"
               >
                 Nova Aferição
