@@ -9,7 +9,183 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      afericoes: {
+        Row: {
+          altura_direita: number | null
+          altura_esquerda: number | null
+          created_at: string
+          dnp_direita: number | null
+          dnp_esquerda: number | null
+          dp_binocular: number | null
+          foto_url: string
+          id: string
+          largura_armacao: number
+          largura_lente: number | null
+          nome_cliente: string
+          optica_id: string
+          usuario_id: string
+        }
+        Insert: {
+          altura_direita?: number | null
+          altura_esquerda?: number | null
+          created_at?: string
+          dnp_direita?: number | null
+          dnp_esquerda?: number | null
+          dp_binocular?: number | null
+          foto_url: string
+          id?: string
+          largura_armacao: number
+          largura_lente?: number | null
+          nome_cliente: string
+          optica_id: string
+          usuario_id: string
+        }
+        Update: {
+          altura_direita?: number | null
+          altura_esquerda?: number | null
+          created_at?: string
+          dnp_direita?: number | null
+          dnp_esquerda?: number | null
+          dp_binocular?: number | null
+          foto_url?: string
+          id?: string
+          largura_armacao?: number
+          largura_lente?: number | null
+          nome_cliente?: string
+          optica_id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "afericoes_optica_id_fkey"
+            columns: ["optica_id"]
+            isOneToOne: false
+            referencedRelation: "opticas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      analises_faciais: {
+        Row: {
+          created_at: string
+          distancia_olhos: string | null
+          formato_rosto: string | null
+          foto_url: string
+          id: string
+          nome_cliente: string
+          optica_id: string
+          sugestoes: Json | null
+          tom_pele: string | null
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          distancia_olhos?: string | null
+          formato_rosto?: string | null
+          foto_url: string
+          id?: string
+          nome_cliente: string
+          optica_id: string
+          sugestoes?: Json | null
+          tom_pele?: string | null
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          distancia_olhos?: string | null
+          formato_rosto?: string | null
+          foto_url?: string
+          id?: string
+          nome_cliente?: string
+          optica_id?: string
+          sugestoes?: Json | null
+          tom_pele?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analises_faciais_optica_id_fkey"
+            columns: ["optica_id"]
+            isOneToOne: false
+            referencedRelation: "opticas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opticas: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          email: string
+          endereco: string | null
+          id: string
+          nome: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          email: string
+          endereco?: string | null
+          id?: string
+          nome: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          email?: string
+          endereco?: string | null
+          id?: string
+          nome?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      usuarios_optica: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          email: string
+          id: string
+          nome: string
+          optica_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          nome: string
+          optica_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          nome?: string
+          optica_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuarios_optica_optica_id_fkey"
+            columns: ["optica_id"]
+            isOneToOne: false
+            referencedRelation: "opticas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

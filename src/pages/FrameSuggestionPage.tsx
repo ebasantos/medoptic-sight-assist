@@ -1,318 +1,354 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Sparkles, 
-  User,
-  Heart,
-  Star,
-  Palette
-} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ArrowLeft, Save, Camera, Glasses } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import CameraCapture from '@/components/CameraCapture';
 
 const FrameSuggestionPage = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<'capture' | 'analysis' | 'suggestions'>('capture');
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  const [step, setStep] = useState<'camera' | 'analysis'>('camera');
+  const [loading, setSaving] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  
+  const [formData, setFormData] = useState({
+    nomeCliente: '',
+    formatoRosto: '',
+    tomPele: '',
+    distanciaOlhos: ''
+  });
 
-  const faceAnalysis = {
-    shape: 'Oval',
-    skinTone: 'Médio',
-    eyeDistance: 'Normal',
-    recommendations: [
-      {
-        style: 'Gatinho (Cat-eye)',
-        description: 'Realça a elegância natural do rosto oval',
-        colors: ['Preto', 'Tartaruga', 'Dourado'],
-        confidence: 95
-      },
-      {
-        style: 'Aviador',
-        description: 'Complementa bem as proporções faciais',
-        colors: ['Dourado', 'Prata', 'Preto'],
-        confidence: 88
-      },
-      {
-        style: 'Redondo Vintage',
-        description: 'Adiciona charme retrô ao visual',
-        colors: ['Tartaruga', 'Transparente', 'Vinho'],
-        confidence: 82
-      }
-    ]
-  };
-
-  const handlePhotoCapture = (imageData: string) => {
-    setCapturedPhoto(imageData);
+  const handleImageCapture = (imageData: string) => {
+    console.log('Imagem capturada na página de sugestão');
+    setCapturedImage(imageData);
     setStep('analysis');
-    setTimeout(() => setStep('suggestions'), 3000);
   };
+
+  const uploadImage = async (imageData: string): Promise<string | null> => {
+    try {
+      // Converter base64 para blob
+      const base64Data = imageData.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+      
+      // Gerar nome único para o arquivo
+      const fileName = `analise_${Date.now()}.jpg`;
+      
+      // Upload para Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('fotos-clientes')
+        .upload(fileName, blob);
+
+      if (error) {
+        console.error('Erro no upload:', error);
+        return null;
+      }
+
+      // Obter URL pública
+      const { data: publicData } = supabase.storage
+        .from('fotos-clientes')
+        .getPublicUrl(fileName);
+
+      return publicData.publicUrl;
+    } catch (error) {
+      console.error('Erro ao processar upload:', error);
+      return null;
+    }
+  };
+
+  const generateSuggestions = () => {
+    const suggestions = [];
+    
+    // Lógica básica de sugestões baseada no formato do rosto
+    switch (formData.formatoRosto.toLowerCase()) {
+      case 'oval':
+        suggestions.push({
+          tipo: 'Armação Quadrada',
+          motivo: 'Complementa a harmonia natural do rosto oval'
+        });
+        suggestions.push({
+          tipo: 'Armação Redonda',
+          motivo: 'Mantém o equilíbrio das proporções'
+        });
+        break;
+      case 'redondo':
+        suggestions.push({
+          tipo: 'Armação Quadrada/Angular',
+          motivo: 'Adiciona definição e estrutura ao rosto'
+        });
+        suggestions.push({
+          tipo: 'Armação Retangular',
+          motivo: 'Alonga visualmente o rosto'
+        });
+        break;
+      case 'quadrado':
+        suggestions.push({
+          tipo: 'Armação Redonda',
+          motivo: 'Suaviza os ângulos marcantes'
+        });
+        suggestions.push({
+          tipo: 'Armação Oval',
+          motivo: 'Cria harmonia com as linhas faciais'
+        });
+        break;
+      case 'coração':
+        suggestions.push({
+          tipo: 'Armação com Base Larga',
+          motivo: 'Equilibra a testa mais larga'
+        });
+        suggestions.push({
+          tipo: 'Armação Oval Pequena',
+          motivo: 'Harmoniza com o queixo mais fino'
+        });
+        break;
+      default:
+        suggestions.push({
+          tipo: 'Armação Clássica',
+          motivo: 'Versátil para diversos formatos'
+        });
+    }
+
+    return suggestions;
+  };
+
+  const handleSave = async () => {
+    if (!user || !capturedImage) return;
+
+    setSaving(true);
+    try {
+      // Upload da imagem
+      const fotoUrl = await uploadImage(capturedImage);
+      
+      if (!fotoUrl) {
+        toast({
+          title: "Erro",
+          description: "Erro ao fazer upload da imagem",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const sugestoes = generateSuggestions();
+
+      // Salvar análise no banco
+      const { error } = await supabase
+        .from('analises_faciais')
+        .insert({
+          optica_id: user.opticId!,
+          usuario_id: user.id,
+          nome_cliente: formData.nomeCliente,
+          foto_url: fotoUrl,
+          formato_rosto: formData.formatoRosto,
+          tom_pele: formData.tomPele,
+          distancia_olhos: formData.distanciaOlhos,
+          sugestoes
+        });
+
+      if (error) {
+        console.error('Erro ao salvar análise:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao salvar análise facial",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Análise facial salva com sucesso!"
+      });
+
+      navigate('/optica');
+    } catch (error) {
+      console.error('Erro:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card>
+          <CardContent className="p-6">
+            <p>Você precisa estar logado para acessar esta página.</p>
+            <Button onClick={() => navigate('/')} className="mt-4">
+              Fazer Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const sugestoes = formData.formatoRosto ? generateSuggestions() : [];
 
   return (
-    <div className="min-h-screen bg-muted">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
-            <Button 
-              variant="ghost" 
-              onClick={() => navigate('/optica')}
-              className="mr-4"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Voltar
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Sugestão Inteligente de Armação</h1>
-              <p className="text-sm text-gray-600">Análise facial e recomendações personalizadas</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Progress Indicator */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="flex items-center">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-              ['capture', 'analysis', 'suggestions'].indexOf(step) >= 0 ? 'bg-success text-white' : 'bg-gray-300'
-            }`}>
-              <User className="h-4 w-4" />
-            </div>
-            <div className={`w-16 h-0.5 ${
-              ['analysis', 'suggestions'].indexOf(step) >= 0 ? 'bg-success' : 'bg-gray-300'
-            }`} />
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-              ['analysis', 'suggestions'].indexOf(step) >= 0 ? 'bg-success text-white' : 'bg-gray-300'
-            }`}>
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div className={`w-16 h-0.5 ${
-              step === 'suggestions' ? 'bg-success' : 'bg-gray-300'
-            }`} />
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-              step === 'suggestions' ? 'bg-success text-white' : 'bg-gray-300'
-            }`}>
-              <Heart className="h-4 w-4" />
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => step === 'analysis' ? setStep('camera') : navigate('/optica')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {step === 'camera' ? 'Capturar Foto do Cliente' : 'Análise Facial'}
+          </h1>
         </div>
 
-        {/* Step: Capture */}
-        {step === 'capture' && (
-          <Card className="animate-fade-in">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Captura para Análise Facial</CardTitle>
-              <CardDescription className="text-base">
-                Tire uma foto frontal do cliente <strong>sem óculos</strong> para análise do formato facial
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <CameraCapture 
-                  onCapture={handlePhotoCapture}
-                  showGuides={true}
-                  guideType="face-analysis"
-                />
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-4 border rounded-lg">
-                    <User className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-                    <p className="font-medium">Sem Óculos</p>
-                    <p className="text-sm text-gray-600">Remover armação atual</p>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <Sparkles className="h-8 w-8 mx-auto mb-2 text-success" />
-                    <p className="font-medium">Rosto Centralizado</p>
-                    <p className="text-sm text-gray-600">Dentro do oval guia</p>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <Palette className="h-8 w-8 mx-auto mb-2 text-warning" />
-                    <p className="font-medium">Boa Iluminação</p>
-                    <p className="text-sm text-gray-600">Para análise precisa</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {step === 'camera' && (
+          <CameraCapture
+            onCapture={handleImageCapture}
+            showGuides={true}
+            guideType="face-analysis"
+          />
         )}
 
-        {/* Step: Analysis */}
         {step === 'analysis' && (
-          <Card className="animate-fade-in">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Analisando Características Faciais</CardTitle>
-              <CardDescription>
-                Nossa IA está processando formato facial, proporções e tom de pele
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              {capturedPhoto && (
-                <div className="aspect-video bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg mb-6 overflow-hidden">
-                  <img 
-                    src={capturedPhoto} 
-                    alt="Foto para análise facial"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-
-              <div className="text-center mb-6">
-                <div className="relative mx-auto mb-4">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-success"></div>
-                  <Sparkles className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-success" />
-                </div>
-                <p className="text-lg font-medium">Análise em andamento...</p>
-                <p className="text-sm text-gray-600">Identificando características únicas</p>
-              </div>
-
-              <div className="space-y-3 text-left max-w-md mx-auto">
-                <div className="flex items-center text-sm">
-                  <div className="w-4 h-4 bg-green-500 rounded-full mr-3"></div>
-                  Detecção do formato facial: Concluída
-                </div>
-                <div className="flex items-center text-sm">
-                  <div className="w-4 h-4 bg-green-500 rounded-full mr-3"></div>
-                  Análise de proporções: Concluída
-                </div>
-                <div className="flex items-center text-sm">
-                  <div className="animate-pulse w-4 h-4 bg-yellow-500 rounded-full mr-3"></div>
-                  Identificação do tom de pele: Em andamento...
-                </div>
-                <div className="flex items-center text-sm">
-                  <div className="w-4 h-4 bg-gray-300 rounded-full mr-3"></div>
-                  Geração de recomendações: Aguardando...
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step: Suggestions */}
-        {step === 'suggestions' && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Foto capturada */}
             <Card>
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl text-success">Análise Completa!</CardTitle>
-                <CardDescription>
-                  Encontramos as armações perfeitas para este cliente
-                </CardDescription>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Camera className="h-5 w-5" />
+                  Foto Capturada
+                </CardTitle>
               </CardHeader>
+              <CardContent>
+                {capturedImage && (
+                  <img 
+                    src={capturedImage} 
+                    alt="Cliente" 
+                    className="w-full h-64 object-cover rounded-lg"
+                  />
+                )}
+              </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Análise Facial */}
-              <Card className="lg:col-span-1">
+            {/* Formulário de análise */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Dados da Análise</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="nomeCliente">Nome do Cliente *</Label>
+                  <Input
+                    id="nomeCliente"
+                    value={formData.nomeCliente}
+                    onChange={(e) => setFormData({ ...formData, nomeCliente: e.target.value })}
+                    placeholder="Digite o nome do cliente"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="formatoRosto">Formato do Rosto</Label>
+                  <select
+                    id="formatoRosto"
+                    value={formData.formatoRosto}
+                    onChange={(e) => setFormData({ ...formData, formatoRosto: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Selecione o formato</option>
+                    <option value="oval">Oval</option>
+                    <option value="redondo">Redondo</option>
+                    <option value="quadrado">Quadrado</option>
+                    <option value="coração">Coração</option>
+                    <option value="losango">Losango</option>
+                    <option value="retangular">Retangular</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="tomPele">Tom de Pele</Label>
+                  <select
+                    id="tomPele"
+                    value={formData.tomPele}
+                    onChange={(e) => setFormData({ ...formData, tomPele: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Selecione o tom</option>
+                    <option value="claro">Claro</option>
+                    <option value="medio">Médio</option>
+                    <option value="escuro">Escuro</option>
+                    <option value="bronzeado">Bronzeado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="distanciaOlhos">Distância entre os Olhos</Label>
+                  <select
+                    id="distanciaOlhos"
+                    value={formData.distanciaOlhos}
+                    onChange={(e) => setFormData({ ...formData, distanciaOlhos: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Selecione a distância</option>
+                    <option value="próximos">Próximos</option>
+                    <option value="normais">Normais</option>
+                    <option value="afastados">Afastados</option>
+                  </select>
+                </div>
+
+                <Button 
+                  onClick={handleSave}
+                  disabled={loading || !formData.nomeCliente}
+                  className="w-full"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {loading ? 'Salvando...' : 'Salvar Análise'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Sugestões */}
+            {sugestoes.length > 0 && (
+              <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Análise Facial
+                    <Glasses className="h-5 w-5" />
+                    Sugestões de Armação
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {capturedPhoto && (
-                    <div className="mb-4">
-                      <img 
-                        src={capturedPhoto} 
-                        alt="Foto analisada"
-                        className="w-full h-32 object-cover rounded border"
-                      />
-                    </div>
-                  )}
-                  
-                  <div>
-                    <p className="font-medium text-sm text-gray-600">Formato do Rosto</p>
-                    <p className="text-lg font-bold text-success">{faceAnalysis.shape}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm text-gray-600">Tom de Pele</p>
-                    <p className="text-lg font-bold">{faceAnalysis.skinTone}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm text-gray-600">Distância entre Olhos</p>
-                    <p className="text-lg font-bold">{faceAnalysis.eyeDistance}</p>
-                  </div>
-                  
-                  <div className="pt-4 border-t">
-                    <p className="text-sm text-gray-600 mb-2">Características Detectadas:</p>
-                    <div className="space-y-1">
-                      <Badge variant="secondary" className="text-xs">Simetria facial excelente</Badge>
-                      <br />
-                      <Badge variant="secondary" className="text-xs">Proporções harmoniosas</Badge>
-                    </div>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {sugestoes.map((sugestao, index) => (
+                      <div key={index} className="p-4 bg-blue-50 rounded-lg">
+                        <h3 className="font-semibold text-blue-900">{sugestao.tipo}</h3>
+                        <p className="text-sm text-blue-700 mt-1">{sugestao.motivo}</p>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Recomendações */}
-              <div className="lg:col-span-2 space-y-4">
-                {faceAnalysis.recommendations.map((rec, index) => (
-                  <Card key={index} className="hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="text-xl font-bold">{rec.style}</h3>
-                            <div className="flex items-center text-yellow-500">
-                              <Star className="h-4 w-4 fill-current" />
-                              <span className="text-sm font-medium ml-1">{rec.confidence}%</span>
-                            </div>
-                          </div>
-                          <p className="text-gray-600">{rec.description}</p>
-                        </div>
-                        {index === 0 && (
-                          <Badge className="bg-success text-white">
-                            Recomendação Principal
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <p className="font-medium text-sm text-gray-600 mb-2">Cores Recomendadas:</p>
-                        <div className="flex gap-2">
-                          {rec.colors.map((color, colorIndex) => (
-                            <Badge key={colorIndex} variant="outline" className="text-xs">
-                              {color}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 flex gap-2">
-                        <Button size="sm" variant="outline" className="flex-1">
-                          Ver Modelos
-                        </Button>
-                        <Button size="sm" className="flex-1 bg-success hover:bg-success/90">
-                          Salvar Sugestão
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <Button 
-                onClick={() => {
-                  setStep('capture');
-                  setCapturedPhoto(null);
-                }}
-                variant="outline"
-                className="flex-1 h-12"
-              >
-                Nova Análise
-              </Button>
-              <Button 
-                onClick={() => navigate('/optica')}
-                className="flex-1 h-12 bg-success hover:bg-success/90"
-              >
-                Concluir
-              </Button>
-            </div>
+            )}
           </div>
         )}
       </div>

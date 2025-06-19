@@ -18,22 +18,36 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
   const startCamera = useCallback(async () => {
     try {
       setError(null);
+      console.log('Tentando iniciar câmera...');
       
+      // Verificar se getUserMedia está disponível
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('API de câmera não disponível neste navegador');
+      }
+
       // Solicitar permissão para usar a câmera
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'user', // Câmera frontal para selfies
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          facingMode: 'user',
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 }
         },
         audio: false
       });
 
+      console.log('Stream obtido:', stream);
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
-        setIsActive(true);
-        setHasPermission(true);
+        
+        // Aguardar o vídeo carregar
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Vídeo carregado, iniciando reprodução');
+          videoRef.current?.play();
+          setIsActive(true);
+          setHasPermission(true);
+        };
       }
     } catch (err) {
       console.error('Erro ao acessar a câmera:', err);
@@ -44,16 +58,25 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
           setError('Permissão para usar a câmera foi negada. Por favor, permita o acesso à câmera.');
         } else if (err.name === 'NotFoundError') {
           setError('Nenhuma câmera foi encontrada no dispositivo.');
+        } else if (err.name === 'NotReadableError') {
+          setError('A câmera está sendo usada por outro aplicativo.');
         } else {
-          setError('Erro ao acessar a câmera. Verifique se ela está disponível.');
+          setError(`Erro ao acessar a câmera: ${err.message}`);
         }
+      } else {
+        setError('Erro desconhecido ao acessar a câmera');
       }
     }
   }, []);
 
   const stopCamera = useCallback(() => {
+    console.log('Parando câmera...');
+    
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log('Track parado:', track.kind);
+      });
       streamRef.current = null;
     }
     
@@ -66,6 +89,7 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current || !isActive) {
+      console.error('Elementos não disponíveis para captura');
       return null;
     }
 
@@ -73,7 +97,12 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    if (!context) return null;
+    if (!context) {
+      console.error('Contexto do canvas não disponível');
+      return null;
+    }
+
+    console.log('Capturando foto...');
 
     // Configurar o canvas com as dimensões do vídeo
     canvas.width = video.videoWidth;
@@ -85,6 +114,8 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
     // Converter para base64
     const imageData = canvas.toDataURL('image/jpeg', 0.8);
     setCapturedImage(imageData);
+    
+    console.log('Foto capturada com sucesso');
     
     // Chamar callback se fornecido
     if (onCapture) {
