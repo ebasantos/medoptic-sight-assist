@@ -30,6 +30,22 @@ export const useAuth = () => {
   return context;
 };
 
+// Função para limpar estado de autenticação
+const cleanupAuthState = () => {
+  // Remove todas as chaves relacionadas à autenticação
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
+  
+  Object.keys(sessionStorage || {}).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      sessionStorage.removeItem(key);
+    }
+  });
+};
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,24 +93,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Monitorar mudanças de autenticação
   useEffect(() => {
-    // Verificar sessão atual
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchUserData(session.user).then(userData => {
-          setUser(userData);
-          setLoading(false);
-        });
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Escutar mudanças de autenticação
+    console.log('Configurando listeners de autenticação...');
+    
+    // Escutar mudanças de autenticação primeiro
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
         
         if (session?.user) {
+          // Buscar dados do usuário
           const userData = await fetchUserData(session.user);
           setUser(userData);
         } else {
@@ -104,6 +111,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     );
 
+    // Verificar sessão atual
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Erro ao verificar sessão:', error);
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          const userData = await fetchUserData(session.user);
+          setUser(userData);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Erro ao inicializar auth:', error);
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -112,6 +144,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(true);
       console.log('Tentando fazer login:', email);
       
+      // Limpar estado anterior
+      cleanupAuthState();
+      
+      // Tentar fazer logout global primeiro (para limpar sessões antigas)
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (err) {
+        console.log('Logout anterior ignorado:', err);
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -131,6 +173,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setLoading(false);
           return false;
         }
+        
         setUser(userData);
         console.log('Login realizado com sucesso');
         setLoading(false);
@@ -149,6 +192,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = async () => {
     try {
       console.log('Fazendo logout...');
+      cleanupAuthState();
       await supabase.auth.signOut();
       setUser(null);
     } catch (error) {

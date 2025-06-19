@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import SignupForm from '@/components/SignupForm';
+
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +30,7 @@ const LoginPage = () => {
   // Redirecionar se já estiver autenticado
   useEffect(() => {
     if (isAuthenticated && user) {
+      console.log('Usuário autenticado, redirecionando...', user.role);
       if (user.role === 'admin') {
         navigate('/admin');
       } else {
@@ -35,8 +38,10 @@ const LoginPage = () => {
       }
     }
   }, [isAuthenticated, user, navigate]);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!email || !password) {
       toast({
         title: "Erro",
@@ -45,18 +50,23 @@ const LoginPage = () => {
       });
       return;
     }
+    
     setIsLoading(true);
+    
     try {
+      console.log('Tentando login com:', email);
       const success = await login(email, password);
+      
       if (success) {
         toast({
           title: "Sucesso",
           description: "Login realizado com sucesso!"
         });
+        // O redirecionamento será feito pelo useEffect quando o user for atualizado
       } else {
         toast({
           title: "Erro de Login",
-          description: "Email ou senha incorretos",
+          description: "Email ou senha incorretos, ou usuário não encontrado no sistema",
           variant: "destructive"
         });
       }
@@ -71,20 +81,28 @@ const LoginPage = () => {
       setIsLoading(false);
     }
   };
+
   if (loading) {
-    return <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="flex items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span>Carregando...</span>
         </div>
-      </div>;
+      </div>
+    );
   }
+
   if (showSignup) {
-    return <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <SignupForm onBackToLogin={() => setShowSignup(false)} />
-      </div>;
+      </div>
+    );
   }
-  return <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-gray-900">Pupilometro PRO</CardTitle>
@@ -97,24 +115,51 @@ const LoginPage = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" required disabled={isLoading} />
+              <Input 
+                id="email" 
+                type="email" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                placeholder="seu@email.com" 
+                required 
+                disabled={isLoading} 
+              />
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Sua senha" required disabled={isLoading} />
-                <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowPassword(!showPassword)} disabled={isLoading}>
+                <Input 
+                  id="password" 
+                  type={showPassword ? 'text' : 'password'} 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  placeholder="Sua senha" 
+                  required 
+                  disabled={isLoading} 
+                />
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="absolute right-0 top-0 h-full px-3" 
+                  onClick={() => setShowPassword(!showPassword)} 
+                  disabled={isLoading}
+                >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
             
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? <>
+              {isLoading ? (
+                <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Entrando...
-                </> : 'Entrar'}
+                </>
+              ) : (
+                'Entrar'
+              )}
             </Button>
           </form>
           
@@ -126,11 +171,14 @@ const LoginPage = () => {
           
           <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
             <p className="font-medium mb-2">Para testar o sistema:</p>
-            <p>Cadastre-se com o email erik@admin.com para acesso admin.</p>
-            <p>Desenvolvido por Ebs Tech</p>
+            <p>1. Cadastre-se com <strong>erik@admin.com</strong> para acesso admin</p>
+            <p>2. Use qualquer senha com 6+ caracteres</p>
+            <p className="mt-2 text-xs">Desenvolvido por Ebs Tech</p>
           </div>
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 };
+
 export default LoginPage;

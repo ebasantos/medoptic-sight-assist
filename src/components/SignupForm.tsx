@@ -32,10 +32,21 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       return;
     }
 
+    if (password.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter pelo menos 6 caracteres",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
-      // Primeiro, fazer o signup
+      console.log('Iniciando cadastro para:', email);
+      
+      // Fazer o signup
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -45,12 +56,17 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       });
 
       if (authError) {
+        console.error('Erro no signup:', authError);
         throw authError;
       }
 
       if (authData.user) {
+        console.log('Usuário criado:', authData.user.id);
+        
         // Se o email for erik@admin.com, criar entrada de admin
         if (email === 'erik@admin.com') {
+          console.log('Criando usuário admin...');
+          
           // Buscar a ótica admin
           const { data: opticaData, error: opticaError } = await supabase
             .from('opticas')
@@ -60,6 +76,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
 
           if (opticaError) {
             console.error('Erro ao buscar ótica admin:', opticaError);
+            toast({
+              title: "Aviso",
+              description: "Conta criada, mas houve problema ao configurar admin. Entre em contato com suporte.",
+              variant: "destructive"
+            });
           } else {
             // Criar entrada na tabela usuarios_optica como admin
             const { error: userOpticaError } = await supabase
@@ -75,6 +96,13 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
 
             if (userOpticaError) {
               console.error('Erro ao criar usuário admin:', userOpticaError);
+              toast({
+                title: "Aviso",
+                description: "Conta criada, mas houve problema ao configurar admin. Entre em contato com suporte.",
+                variant: "destructive"
+              });
+            } else {
+              console.log('Usuário admin criado com sucesso');
             }
           }
         }
@@ -88,9 +116,19 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       }
     } catch (error: any) {
       console.error('Erro no signup:', error);
+      let errorMessage = "Erro inesperado. Tente novamente.";
+      
+      if (error.message?.includes('User already registered')) {
+        errorMessage = "Este email já está cadastrado. Tente fazer login.";
+      } else if (error.message?.includes('Invalid email')) {
+        errorMessage = "Email inválido. Verifique o formato do email.";
+      } else if (error.message?.includes('Password')) {
+        errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
+      }
+      
       toast({
         title: "Erro de Cadastro",
-        description: error.message || "Erro inesperado. Tente novamente.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -105,7 +143,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           Criar Conta
         </CardTitle>
         <p className="text-gray-600">
-          Cadastre-se no MedOptic Pro
+          Cadastre-se no Pupilometro PRO
         </p>
       </CardHeader>
       
@@ -145,9 +183,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Sua senha"
+                placeholder="Mínimo 6 caracteres"
                 required
                 disabled={isLoading}
+                minLength={6}
               />
               <Button
                 type="button"
@@ -190,6 +229,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           >
             Já tem uma conta? Fazer login
           </Button>
+        </div>
+        
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
+          <p className="font-medium mb-2">Para acesso administrativo:</p>
+          <p>Use o email <strong>erik@admin.com</strong> para criar uma conta admin.</p>
         </div>
       </CardContent>
     </Card>
