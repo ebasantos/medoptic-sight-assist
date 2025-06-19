@@ -67,43 +67,56 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         if (email === 'erik@admin.com') {
           console.log('Criando usuário admin...');
           
-          // Buscar a ótica admin
-          const { data: opticaData, error: opticaError } = await supabase
+          // Primeiro, garantir que a ótica admin existe
+          const { data: opticaData, error: opticaSelectError } = await supabase
             .from('opticas')
             .select('id')
             .eq('email', 'admin@medopticpro.com')
-            .single();
+            .maybeSingle();
 
-          if (opticaError) {
-            console.error('Erro ao buscar ótica admin:', opticaError);
-            toast({
-              title: "Aviso",
-              description: "Conta criada, mas houve problema ao configurar admin. Entre em contato com suporte.",
-              variant: "destructive"
-            });
-          } else {
-            // Criar entrada na tabela usuarios_optica como admin
-            const { error: userOpticaError } = await supabase
-              .from('usuarios_optica')
+          let opticaId = opticaData?.id;
+
+          // Se não existe, criar a ótica admin
+          if (!opticaId) {
+            console.log('Criando ótica admin...');
+            const { data: novaOptica, error: opticaCreateError } = await supabase
+              .from('opticas')
               .insert({
-                user_id: authData.user.id,
-                optica_id: opticaData.id,
-                nome: name,
-                email: email,
-                role: 'admin',
+                nome: 'Administração',
+                email: 'admin@medopticpro.com',
+                telefone: '(11) 99999-9999',
+                endereco: 'Sede Administrativa',
                 ativo: true
-              });
+              })
+              .select('id')
+              .single();
 
-            if (userOpticaError) {
-              console.error('Erro ao criar usuário admin:', userOpticaError);
-              toast({
-                title: "Aviso",
-                description: "Conta criada, mas houve problema ao configurar admin. Entre em contato com suporte.",
-                variant: "destructive"
-              });
-            } else {
-              console.log('Usuário admin criado com sucesso');
+            if (opticaCreateError) {
+              console.error('Erro ao criar ótica admin:', opticaCreateError);
+              throw opticaCreateError;
             }
+
+            opticaId = novaOptica.id;
+            console.log('Ótica admin criada:', opticaId);
+          }
+
+          // Criar entrada na tabela usuarios_optica como admin
+          const { error: userOpticaError } = await supabase
+            .from('usuarios_optica')
+            .insert({
+              user_id: authData.user.id,
+              optica_id: opticaId,
+              nome: name,
+              email: email,
+              role: 'admin',
+              ativo: true
+            });
+
+          if (userOpticaError) {
+            console.error('Erro ao criar usuário admin:', userOpticaError);
+            throw userOpticaError;
+          } else {
+            console.log('Usuário admin criado com sucesso');
           }
         }
 
@@ -124,6 +137,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         errorMessage = "Email inválido. Verifique o formato do email.";
       } else if (error.message?.includes('Password')) {
         errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
       toast({

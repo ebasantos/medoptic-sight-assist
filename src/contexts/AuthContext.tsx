@@ -32,6 +32,7 @@ export const useAuth = () => {
 
 // Função para limpar estado de autenticação
 const cleanupAuthState = () => {
+  console.log('Limpando estado de autenticação...');
   // Remove todas as chaves relacionadas à autenticação
   Object.keys(localStorage).forEach((key) => {
     if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
@@ -53,7 +54,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Função para buscar dados do usuário no banco
   const fetchUserData = async (supabaseUser: SupabaseUser) => {
     try {
-      console.log('Buscando dados do usuário:', supabaseUser.id);
+      console.log('Buscando dados do usuário:', supabaseUser.id, supabaseUser.email);
       
       // Buscar dados do usuário na tabela usuarios_optica
       const { data: userData, error: userError } = await supabase
@@ -66,7 +67,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           )
         `)
         .eq('user_id', supabaseUser.id)
-        .single();
+        .maybeSingle();
+
+      console.log('Resultado da busca:', { userData, userError });
 
       if (userError) {
         console.error('Erro ao buscar dados do usuário:', userError);
@@ -74,7 +77,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (userData) {
-        return {
+        const userObj = {
           id: supabaseUser.id,
           name: userData.nome,
           email: userData.email,
@@ -82,8 +85,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           opticId: userData.optica_id,
           opticName: userData.opticas?.nome
         };
+        console.log('Dados do usuário processados:', userObj);
+        return userObj;
       }
 
+      console.log('Usuário não encontrado na tabela usuarios_optica');
       return null;
     } catch (error) {
       console.error('Erro ao processar dados do usuário:', error);
@@ -150,9 +156,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Tentar fazer logout global primeiro (para limpar sessões antigas)
       try {
         await supabase.auth.signOut({ scope: 'global' });
+        console.log('Logout anterior realizado');
       } catch (err) {
         console.log('Logout anterior ignorado:', err);
       }
+
+      // Aguardar um pouco para garantir que o logout foi processado
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -166,6 +176,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (data.user) {
+        console.log('Login do Supabase realizado, buscando dados do usuário...');
         const userData = await fetchUserData(data.user);
         if (!userData) {
           console.error('Usuário não encontrado no sistema');
