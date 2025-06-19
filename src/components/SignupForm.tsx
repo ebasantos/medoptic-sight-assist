@@ -44,7 +44,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
     setIsLoading(true);
     
     try {
-      console.log('Iniciando cadastro para:', email);
+      console.log('=== INICIANDO CADASTRO ===');
+      console.log('Email:', email);
+      console.log('É admin?', email === 'erik@admin.com');
       
       // Fazer o signup
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -55,62 +57,74 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         }
       });
 
+      console.log('Resultado signup:', { authData, authError });
+
       if (authError) {
         console.error('Erro no signup:', authError);
         throw authError;
       }
 
-      if (authData.user) {
-        console.log('Usuário criado:', authData.user.id);
+      if (authData?.user) {
+        console.log('Usuário criado no auth:', authData.user.id);
         
-        // Aguardar um pouco para garantir que o usuário foi criado no auth
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Aguardar para garantir que o usuário foi criado
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Criar entrada na tabela usuarios_optica
+        // Preparar dados do usuário
         const isAdmin = email === 'erik@admin.com';
         const userData = {
           user_id: authData.user.id,
           nome: name,
           email: email,
           role: isAdmin ? 'admin' : 'funcionario',
-          optica_id: isAdmin ? null : '00000000-0000-0000-0000-000000000000', // Placeholder para funcionários
+          optica_id: isAdmin ? null : '00000000-0000-0000-0000-000000000000',
           ativo: true
         };
 
-        console.log('Inserindo dados do usuário:', userData);
+        console.log('=== INSERINDO DADOS NA TABELA ===');
+        console.log('Dados:', userData);
         
-        const { error: userError } = await supabase
+        // Tentar inserir na tabela usuarios_optica
+        const { data: insertData, error: userError } = await supabase
           .from('usuarios_optica')
-          .insert(userData);
+          .insert(userData)
+          .select();
+
+        console.log('Resultado insert:', { insertData, userError });
 
         if (userError) {
-          console.error('Erro ao criar entrada do usuário:', userError);
-          // Se falhou, tentar fazer logout do usuário criado
+          console.error('Erro ao inserir na tabela usuarios_optica:', userError);
+          
+          // Fazer logout do usuário se falhou
           await supabase.auth.signOut();
-          throw userError;
+          
+          throw new Error(`Erro no banco de dados: ${userError.message}`);
         }
 
-        console.log('Usuário cadastrado com sucesso');
+        console.log('=== CADASTRO CONCLUÍDO COM SUCESSO ===');
         
         toast({
-          title: "Sucesso",
-          description: "Conta criada com sucesso! Você pode fazer login agora.",
+          title: "Sucesso!",
+          description: "Conta criada com sucesso! Agora você pode fazer login.",
         });
         
         onBackToLogin();
+      } else {
+        throw new Error('Usuário não foi criado corretamente');
       }
     } catch (error: any) {
-      console.error('Erro no signup:', error);
+      console.error('=== ERRO NO CADASTRO ===', error);
+      
       let errorMessage = "Erro inesperado. Tente novamente.";
       
       if (error.message?.includes('User already registered')) {
         errorMessage = "Este email já está cadastrado. Tente fazer login.";
       } else if (error.message?.includes('Invalid email')) {
-        errorMessage = "Email inválido. Verifique o formato do email.";
+        errorMessage = "Email inválido. Verifique o formato.";
       } else if (error.message?.includes('Password')) {
         errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
-      } else if (error.message?.includes('row-level security')) {
-        errorMessage = "Erro de segurança. Tente novamente em alguns segundos.";
+      } else if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+        errorMessage = "Erro de segurança no banco de dados. Contate o administrador.";
       } else if (error.message) {
         errorMessage = error.message;
       }
