@@ -157,6 +157,7 @@ const LoginPage = () => {
           <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
             <p className="font-medium mb-2">Para testar o sistema:</p>
             <p>Entre em contato com o administrador para obter suas credenciais.</p>
+            <p>Desenvolvido por Ebs Tech</p>
           </div>
         </CardContent>
       </Card>
