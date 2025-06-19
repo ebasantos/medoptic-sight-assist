@@ -186,7 +186,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         
         setUser(userData);
-        console.log('Login realizado com sucesso');
+        console.log('Login realizado com sucesso para:', userData.role);
         setLoading(false);
         return true;
       }

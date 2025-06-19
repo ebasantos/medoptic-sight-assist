@@ -63,60 +63,28 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       if (authData.user) {
         console.log('Usuário criado:', authData.user.id);
         
-        // Se o email for erik@admin.com, criar entrada de admin
+        // Se o email for erik@admin.com, criar entrada de admin da plataforma
         if (email === 'erik@admin.com') {
-          console.log('Criando usuário admin...');
+          console.log('Criando usuário admin da plataforma...');
           
-          // Primeiro, garantir que a ótica admin existe
-          const { data: opticaData, error: opticaSelectError } = await supabase
-            .from('opticas')
-            .select('id')
-            .eq('email', 'admin@medopticpro.com')
-            .maybeSingle();
-
-          let opticaId = opticaData?.id;
-
-          // Se não existe, criar a ótica admin
-          if (!opticaId) {
-            console.log('Criando ótica admin...');
-            const { data: novaOptica, error: opticaCreateError } = await supabase
-              .from('opticas')
-              .insert({
-                nome: 'Administração',
-                email: 'admin@medopticpro.com',
-                telefone: '(11) 99999-9999',
-                endereco: 'Sede Administrativa',
-                ativo: true
-              })
-              .select('id')
-              .single();
-
-            if (opticaCreateError) {
-              console.error('Erro ao criar ótica admin:', opticaCreateError);
-              throw opticaCreateError;
-            }
-
-            opticaId = novaOptica.id;
-            console.log('Ótica admin criada:', opticaId);
-          }
-
-          // Criar entrada na tabela usuarios_optica como admin
-          const { error: userOpticaError } = await supabase
+          // Para admin da plataforma, não vincular a uma ótica específica
+          // Criar entrada na tabela usuarios_optica com optica_id null para admin da plataforma
+          const { error: userError } = await supabase
             .from('usuarios_optica')
             .insert({
               user_id: authData.user.id,
-              optica_id: opticaId,
+              optica_id: null, // Admin da plataforma não está vinculado a uma ótica específica
               nome: name,
               email: email,
               role: 'admin',
               ativo: true
             });
 
-          if (userOpticaError) {
-            console.error('Erro ao criar usuário admin:', userOpticaError);
-            throw userOpticaError;
+          if (userError) {
+            console.error('Erro ao criar usuário admin:', userError);
+            throw userError;
           } else {
-            console.log('Usuário admin criado com sucesso');
+            console.log('Usuário admin da plataforma criado com sucesso');
           }
         }
 
