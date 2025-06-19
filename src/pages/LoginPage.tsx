@@ -8,12 +8,14 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import SignupForm from '@/components/SignupForm';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
   
   const { login, isAuthenticated, loading, user } = useAuth();
   const navigate = useNavigate();
@@ -78,6 +80,14 @@ const LoginPage = () => {
           <Loader2 className="h-6 w-6 animate-spin" />
           <span>Carregando...</span>
         </div>
+      </div>
+    );
+  }
+
+  if (showSignup) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <SignupForm onBackToLogin={() => setShowSignup(false)} />
       </div>
     );
   }
@@ -154,9 +164,19 @@ const LoginPage = () => {
             </Button>
           </form>
           
+          <div className="mt-4 text-center">
+            <Button
+              variant="link"
+              onClick={() => setShowSignup(true)}
+              disabled={isLoading}
+            >
+              Não tem uma conta? Cadastre-se
+            </Button>
+          </div>
+          
           <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
             <p className="font-medium mb-2">Para testar o sistema:</p>
-            <p>Entre em contato com o administrador para obter suas credenciais.</p>
+            <p>Cadastre-se com o email erik@admin.com para acesso admin.</p>
             <p>Desenvolvido por Ebs Tech</p>
           </div>
         </CardContent>
