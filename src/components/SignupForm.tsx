@@ -48,12 +48,15 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       console.log('Email:', email);
       console.log('É admin?', email === 'erik@admin.com');
       
-      // Fazer o signup
+      // Fazer o signup SEM validação de email
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`
+          emailRedirectTo: undefined, // Remove redirecionamento de email
+          data: {
+            email_confirm: false // Não requer confirmação de email
+          }
         }
       });
 
@@ -77,7 +80,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           nome: name,
           email: email,
           role: isAdmin ? 'admin' : 'funcionario',
-          optica_id: isAdmin ? null : undefined, // null para admin, undefined para funcionário (usará default)
+          optica_id: isAdmin ? null : undefined,
           ativo: true
         };
 
@@ -241,6 +244,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           <p className="font-medium mb-2">✅ Sistema Pronto!</p>
           <p>Use <strong>erik@admin.com</strong> para criar uma conta admin.</p>
           <p className="mt-1">Qualquer outro email criará uma conta de funcionário.</p>
+          <p className="mt-2 text-xs font-medium">⚡ Login instantâneo - sem validação de email!</p>
         </div>
       </CardContent>
     </Card>
