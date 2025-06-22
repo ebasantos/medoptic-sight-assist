@@ -44,12 +44,12 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
     setIsLoading(true);
     
     try {
-      console.log('Iniciando cadastro para:', email);
+      console.log('Iniciando cadastro direto na tabela usuarios_optica para:', email);
       
       const isAdmin = email === 'erik@admin.com';
       console.log('É admin?', isAdmin);
       
-      // Primeiro, verificar se já existe na tabela usuarios_optica
+      // Verificar se já existe na tabela usuarios_optica
       const { data: existingUser, error: checkError } = await supabase
         .from('usuarios_optica')
         .select('email')
@@ -65,85 +65,26 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         throw new Error('Este email já está cadastrado no sistema');
       }
 
-      // Criar usuário no Supabase Auth primeiro
-      console.log('Criando usuário no Supabase Auth...');
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: name,
-            role: isAdmin ? 'admin' : 'funcionario'
-          },
-          emailRedirectTo: undefined // Não queremos confirmação de email
-        }
-      });
+      // Criar usuário diretamente na tabela usuarios_optica (sem Supabase Auth para evitar emails)
+      const { data: userData, error: insertError } = await supabase
+        .from('usuarios_optica')
+        .insert({
+          nome: name,
+          email: email,
+          role: isAdmin ? 'admin' : 'funcionario',
+          optica_id: isAdmin ? null : undefined,
+          ativo: true,
+          password_hash: password // Armazenar temporariamente para o login funcionar
+        })
+        .select()
+        .single();
 
-      if (authError) {
-        console.error('Erro no cadastro Auth:', authError);
-        
-        // Se o usuário já existe no Auth, tentar login
-        if (authError.message.includes('User already registered')) {
-          console.log('Usuário já existe no Auth, tentando login...');
-          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          });
-          
-          if (loginError) {
-            throw new Error('Email já cadastrado com senha diferente');
-          }
-          
-          if (loginData.user) {
-            // Usar o user_id do usuário autenticado
-            const userId = loginData.user.id;
-            
-            // Criar entrada na tabela usuarios_optica
-            const { error: insertError } = await supabase
-              .from('usuarios_optica')
-              .insert({
-                user_id: userId,
-                nome: name,
-                email: email,
-                role: isAdmin ? 'admin' : 'funcionario',
-                optica_id: isAdmin ? null : undefined,
-                ativo: true
-              });
-
-            if (insertError) {
-              console.error('Erro ao inserir na tabela usuarios_optica:', insertError);
-              // Fazer logout se falhou a inserção
-              await supabase.auth.signOut();
-              throw new Error('Erro ao completar o cadastro');
-            }
-          }
-        } else {
-          throw new Error(authError.message);
-        }
-      } else if (authData.user) {
-        console.log('Usuário criado no Auth com sucesso:', authData.user.id);
-        
-        // Criar entrada na tabela usuarios_optica
-        const { error: insertError } = await supabase
-          .from('usuarios_optica')
-          .insert({
-            user_id: authData.user.id,
-            nome: name,
-            email: email,
-            role: isAdmin ? 'admin' : 'funcionario',
-            optica_id: isAdmin ? null : undefined,
-            ativo: true
-          });
-
-        if (insertError) {
-          console.error('Erro ao inserir usuário na tabela:', insertError);
-          // Se falhar, remover do Auth também
-          await supabase.auth.signOut();
-          throw new Error('Erro ao completar o cadastro');
-        }
+      if (insertError) {
+        console.error('Erro ao inserir usuário na tabela:', insertError);
+        throw new Error('Erro ao criar usuário: ' + insertError.message);
       }
 
-      console.log('Cadastro concluído com sucesso!');
+      console.log('Usuário criado com sucesso na tabela usuarios_optica:', userData);
 
       toast({
         title: "Sucesso!",
@@ -276,12 +217,12 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           </Button>
         </div>
         
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-          <p className="font-medium mb-2">✅ Sistema corrigido:</p>
-          <p>• Cadastro sincronizado com autenticação</p>
+        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+          <p className="font-medium mb-2">✅ Sistema atualizado:</p>
+          <p>• Cadastro sem confirmação de email</p>
           <p>• Use <strong>erik@admin.com</strong> para acesso admin</p>
           <p>• Qualquer senha com 6+ caracteres</p>
-          <p>• Login funcionando após cadastro</p>
+          <p>• Login direto após cadastro</p>
         </div>
       </CardContent>
     </Card>
