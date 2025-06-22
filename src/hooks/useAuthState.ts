@@ -16,37 +16,34 @@ export const useAuthState = () => {
     // Função para processar mudanças de autenticação
     const handleAuthChange = async (event: string, session: any) => {
       console.log('Auth state changed:', event, session?.user?.email);
-      console.log('Email confirmado?', session?.user?.email_confirmed_at);
       
       if (!mounted) return;
 
       try {
         if (session?.user) {
-          // Buscar dados do usuário (independente de confirmação de email)
+          // Buscar dados do usuário
           const userData = await fetchUserData(session.user.email);
           if (mounted) {
             setUser(userData);
-            setLoading(false);
           }
         } else {
           if (mounted) {
             setUser(null);
-            setLoading(false);
           }
         }
       } catch (error) {
         console.error('Erro ao processar mudança de auth:', error);
         if (mounted) {
           setUser(null);
+        }
+      } finally {
+        if (mounted) {
           setLoading(false);
         }
       }
     };
 
-    // Escutar mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
-
-    // Verificar sessão atual
+    // Verificar sessão atual primeiro
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -68,6 +65,10 @@ export const useAuthState = () => {
       }
     };
 
+    // Escutar mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+
+    // Inicializar
     initializeAuth();
 
     return () => {

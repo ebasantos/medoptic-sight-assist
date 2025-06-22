@@ -22,7 +22,7 @@ const LoginPage = () => {
 
   // Redirecionar se já estiver autenticado
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (!loading && isAuthenticated && user) {
       console.log('Usuário autenticado, redirecionando...', user.role);
       if (user.role === 'admin') {
         navigate('/admin');
@@ -30,7 +30,7 @@ const LoginPage = () => {
         navigate('/optica');
       }
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, loading]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +55,6 @@ const LoginPage = () => {
           title: "Sucesso",
           description: "Login realizado com sucesso!"
         });
-        // O redirecionamento será feito pelo useEffect quando o user for atualizado
       } else {
         toast({
           title: "Erro de Login",
@@ -75,6 +74,7 @@ const LoginPage = () => {
     }
   };
 
+  // Mostrar loading apenas enquanto verifica autenticação inicial
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -98,9 +98,9 @@ const LoginPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-gray-900">Pupilometro PRO</CardTitle>
+          <CardTitle className="text-2xl font-bold text-gray-900">Pupilômetro</CardTitle>
           <p className="text-gray-600">
-            Sistema de Aferição Ocular Inteligente
+            por EBS Tecnologia
           </p>
         </CardHeader>
         
@@ -163,11 +163,11 @@ const LoginPage = () => {
           </div>
           
           <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
-            <p className="font-medium mb-2">✅ Sistema corrigido:</p>
+            <p className="font-medium mb-2">✅ Para testar o sistema:</p>
             <p>1. Crie um usuário admin com <strong>erik@admin.com</strong></p>
             <p>2. Use qualquer senha com 6+ caracteres</p>
             <p>3. Faça login com essas credenciais</p>
-            <p className="mt-2 text-xs">Desenvolvido por Ebs Tech</p>
+            <p className="mt-2 text-xs">Desenvolvido por EBS Tecnologia</p>
           </div>
         </CardContent>
       </Card>
