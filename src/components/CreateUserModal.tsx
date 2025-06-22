@@ -65,26 +65,31 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
     setIsLoading(true);
     
     try {
-      console.log('Criando novo usuário com senha:', formData.email);
-      console.log('Usuário logado:', user);
+      console.log('Criando novo usuário:', formData.email);
 
-      // Primeiro, criar o usuário no Supabase Auth
+      // Primeiro verificar se já existe
+      const { data: existingUser, error: checkError } = await supabase
+        .from('usuarios_optica')
+        .select('id')
+        .eq('email', formData.email)
+        .single();
+
+      if (existingUser) {
+        throw new Error('Este email já está cadastrado no sistema');
+      }
+
+      // Criar usuário no Supabase Auth primeiro
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: formData.email,
         password: formData.password,
         user_metadata: {
           name: formData.nome
         },
-        email_confirm: true // Confirmar email automaticamente
+        email_confirm: true
       });
 
       if (authError) {
         console.error('Erro ao criar usuário no Auth:', authError);
-        
-        if (authError.message?.includes('already registered')) {
-          throw new Error('Este email já está cadastrado no sistema');
-        }
-        
         throw new Error(`Erro na autenticação: ${authError.message}`);
       }
 
@@ -94,7 +99,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
 
       console.log('Usuário criado no Auth:', authData.user.id);
       
-      // Agora inserir na tabela usuarios_optica usando o user_id do Auth
+      // Inserir na tabela usuarios_optica
       const { data: userData, error: userError } = await supabase
         .from('usuarios_optica')
         .insert({
@@ -111,25 +116,21 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
       if (userError) {
         console.error('Erro ao criar usuário na tabela:', userError);
         
-        // Se falhou ao criar na tabela, tentar remover do Auth
+        // Limpar usuário do Auth se falhou na tabela
         try {
           await supabase.auth.admin.deleteUser(authData.user.id);
         } catch (cleanupError) {
           console.error('Erro ao limpar usuário do Auth:', cleanupError);
         }
         
-        if (userError.code === '23505') {
-          throw new Error('Este email já está cadastrado no sistema');
-        }
-        
-        throw new Error(`Erro no banco de dados: ${userError.message}`);
+        throw new Error(`Erro ao salvar dados do usuário: ${userError.message}`);
       }
 
       console.log('Usuário criado com sucesso:', userData);
 
       toast({
         title: "Sucesso!",
-        description: "Usuário criado com sucesso. A senha foi definida e o usuário pode fazer login.",
+        description: "Usuário criado com sucesso. Ele pode fazer login agora.",
       });
 
       // Limpar formulário e fechar modal
