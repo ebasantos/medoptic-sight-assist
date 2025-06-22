@@ -1,24 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import { User, UserData } from '@/types/auth';
-
-// Função para limpar estado de autenticação
-export const cleanupAuthState = () => {
-  console.log('Limpando estado de autenticação...');
-  // Remove todas as chaves relacionadas à autenticação
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      localStorage.removeItem(key);
-    }
-  });
-  
-  Object.keys(sessionStorage || {}).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      sessionStorage.removeItem(key);
-    }
-  });
-};
+import { User } from '@/types/auth';
 
 // Função para buscar dados do usuário no banco
 export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
@@ -66,25 +49,11 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
   }
 };
 
-// Função de login
+// Função de login simplificada
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
     console.log('Tentando fazer login:', email);
     
-    // Limpar estado anterior
-    cleanupAuthState();
-    
-    // Tentar fazer logout global primeiro (para limpar sessões antigas)
-    try {
-      await supabase.auth.signOut({ scope: 'global' });
-      console.log('Logout anterior realizado');
-    } catch (err) {
-      console.log('Logout anterior ignorado:', err);
-    }
-
-    // Aguardar um pouco para garantir que o logout foi processado
-    await new Promise(resolve => setTimeout(resolve, 200));
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -119,7 +88,6 @@ export const performLogin = async (email: string, password: string): Promise<{ s
 export const performLogout = async (): Promise<void> => {
   try {
     console.log('Fazendo logout...');
-    cleanupAuthState();
     await supabase.auth.signOut();
   } catch (error) {
     console.error('Erro durante logout:', error);
