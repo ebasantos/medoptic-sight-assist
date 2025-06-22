@@ -44,7 +44,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
     setIsLoading(true);
     
     try {
-      console.log('=== INICIANDO CADASTRO DIRETO ===');
+      console.log('=== INICIANDO CADASTRO ===');
       console.log('Email:', email);
       const isAdmin = email === 'erik@admin.com';
       console.log('É admin?', isAdmin);
@@ -66,107 +66,80 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         return;
       }
 
-      // Tentar criar usuário usando approach que não envia email
       console.log('Criando novo usuário...');
       
-      // Usar uma abordagem que bypassa completamente o sistema de email
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Tentar criar usuário através do signup normal
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
         email,
         password,
-        email_confirm: true, // Marcar como confirmado imediatamente
-        user_metadata: {
-          name: name
+        options: {
+          data: {
+            name: name
+          }
         }
       });
 
-      // Se não temos acesso ao admin.createUser, usar signup normal mas interceptar erro
-      if (authError && authError.message.includes('Admin API')) {
-        console.log('Tentativa admin falhou, usando signup normal...');
-        
-        const { data: signupData, error: signupError } = await supabase.auth.signUp({
-          email,
-          password
-        });
-
-        if (signupError) {
-          // Se for erro de rate limit ou email, ignorar e continuar
-          if (signupError.message.includes('rate limit') || 
-              signupError.message.includes('confirmation email') ||
-              signupError.message.includes('email')) {
-            console.log('Ignorando erro de email, continuando com criação manual...');
-            
-            // Criar entrada diretamente na tabela
-            const userData = {
-              nome: name,
-              email: email,
-              role: isAdmin ? 'admin' : 'funcionario',
-              optica_id: isAdmin ? null : undefined,
-              ativo: true
-            };
-
-            console.log('Inserindo dados diretamente na tabela...');
-            const { data: insertData, error: insertError } = await supabase
-              .from('usuarios_optica')
-              .insert(userData)
-              .select();
-
-            if (insertError) {
-              console.error('Erro ao inserir na tabela:', insertError);
-              throw new Error('Erro ao criar usuário no sistema');
-            }
-
-            toast({
-              title: "Conta criada!",
-              description: "Sua conta foi criada com sucesso. Use suas credenciais para fazer login.",
-            });
-            
-            setEmail('');
-            setPassword('');
-            setName('');
-            onBackToLogin();
-            return;
-          } else {
-            throw signupError;
-          }
-        }
-
-        if (signupData.user) {
-          console.log('Usuário criado via signup:', signupData.user.id);
+      if (signupError) {
+        // Se for erro de rate limit ou email, ainda assim continuar se temos um usuário
+        if (signupError.message.includes('rate limit') || 
+            signupError.message.includes('confirmation email') ||
+            signupError.message.includes('email')) {
+          console.log('Erro de email detectado, mas tentando continuar...');
           
-          // Continuar com inserção na tabela
-          const userData = {
-            user_id: signupData.user.id,
-            nome: name,
-            email: email,
-            role: isAdmin ? 'admin' : 'funcionario',
-            optica_id: isAdmin ? null : undefined,
-            ativo: true
-          };
-
-          const { data: insertData, error: userError } = await supabase
-            .from('usuarios_optica')
-            .insert(userData)
-            .select();
-
-          if (userError) {
-            console.error('Erro ao inserir na tabela usuarios_optica:', userError);
-            await supabase.auth.signOut();
-            throw new Error(`Erro no banco de dados: ${userError.message}`);
+          // Se mesmo assim não conseguimos criar o usuário, informar o usuário
+          if (!signupData?.user) {
+            toast({
+              title: "Limitação de Email",
+              description: "Sistema temporariamente indisponível para novos cadastros. Tente novamente mais tarde.",
+              variant: "destructive"
+            });
+            return;
           }
+        } else {
+          throw signupError;
         }
       }
 
-      console.log('=== CADASTRO CONCLUÍDO ===');
-      
-      toast({
-        title: "Sucesso!",
-        description: "Conta criada com sucesso! Agora você pode fazer login.",
-      });
-      
-      setEmail('');
-      setPassword('');
-      setName('');
-      onBackToLogin();
+      // Se conseguimos criar o usuário, inserir na tabela usuarios_optica
+      if (signupData?.user) {
+        console.log('Usuário criado:', signupData.user.id);
+        
+        const userData = {
+          user_id: signupData.user.id,
+          nome: name,
+          email: email,
+          role: isAdmin ? 'admin' : 'funcionario',
+          optica_id: isAdmin ? null : undefined,
+          ativo: true
+        };
+
+        console.log('Inserindo dados na tabela usuarios_optica...');
+        const { data: insertData, error: userError } = await supabase
+          .from('usuarios_optica')
+          .insert(userData)
+          .select();
+
+        if (userError) {
+          console.error('Erro ao inserir na tabela usuarios_optica:', userError);
+          // Limpar o usuário criado se não conseguimos inserir na tabela
+          await supabase.auth.signOut();
+          throw new Error(`Erro no banco de dados: ${userError.message}`);
+        }
+
+        console.log('=== CADASTRO CONCLUÍDO ===');
+        
+        toast({
+          title: "Sucesso!",
+          description: "Conta criada com sucesso! Agora você pode fazer login.",
+        });
+        
+        setEmail('');
+        setPassword('');
+        setName('');
+        onBackToLogin();
+      } else {
+        throw new Error('Não foi possível criar o usuário');
+      }
 
     } catch (error: any) {
       console.error('=== ERRO NO CADASTRO ===', error);
@@ -288,11 +261,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           </Button>
         </div>
         
-        <div className="mt-6 p-4 bg-green-50 rounded-lg text-sm text-green-800">
-          <p className="font-medium mb-2">✅ Sistema Pronto!</p>
+        <div className="mt-6 p-4 bg-blue-50 rounded-lg text-sm text-blue-800">
+          <p className="font-medium mb-2">ℹ️ Informação</p>
           <p>Use <strong>erik@admin.com</strong> para criar uma conta admin.</p>
           <p className="mt-1">Qualquer outro email criará uma conta de funcionário.</p>
-          <p className="mt-2 text-xs font-medium">⚡ Login instantâneo - sem validação de email!</p>
+          <p className="mt-2 text-xs">Nota: Pode haver limitações temporárias no envio de emails.</p>
         </div>
       </CardContent>
     </Card>
