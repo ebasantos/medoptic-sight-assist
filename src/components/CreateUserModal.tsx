@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Loader2 } from 'lucide-react';
+import { Users, Loader2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,9 +21,11 @@ interface CreateUserModalProps {
 const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreated }) => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
+    password: '',
     role: 'funcionario',
     optica_id: ''
   });
@@ -33,10 +35,19 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.nome || !formData.email) {
+    if (!formData.nome || !formData.email || !formData.password) {
       toast({
         title: "Erro",
-        description: "Nome e email são obrigatórios",
+        description: "Nome, email e senha são obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter pelo menos 6 caracteres",
         variant: "destructive"
       });
       return;
@@ -54,17 +65,40 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
     setIsLoading(true);
     
     try {
-      console.log('Criando novo usuário:', formData);
+      console.log('Criando novo usuário com senha:', formData.email);
       console.log('Usuário logado:', user);
 
-      // Gerar um user_id único
-      const userId = crypto.randomUUID();
+      // Primeiro, criar o usuário no Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: formData.email,
+        password: formData.password,
+        user_metadata: {
+          name: formData.nome
+        },
+        email_confirm: true // Confirmar email automaticamente
+      });
+
+      if (authError) {
+        console.error('Erro ao criar usuário no Auth:', authError);
+        
+        if (authError.message?.includes('already registered')) {
+          throw new Error('Este email já está cadastrado no sistema');
+        }
+        
+        throw new Error(`Erro na autenticação: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error('Usuário não foi criado no sistema de autenticação');
+      }
+
+      console.log('Usuário criado no Auth:', authData.user.id);
       
-      // Inserir usuário na tabela usuarios_optica
+      // Agora inserir na tabela usuarios_optica usando o user_id do Auth
       const { data: userData, error: userError } = await supabase
         .from('usuarios_optica')
         .insert({
-          user_id: userId,
+          user_id: authData.user.id,
           nome: formData.nome,
           email: formData.email,
           role: formData.role,
@@ -75,7 +109,14 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
         .single();
 
       if (userError) {
-        console.error('Erro ao criar usuário:', userError);
+        console.error('Erro ao criar usuário na tabela:', userError);
+        
+        // Se falhou ao criar na tabela, tentar remover do Auth
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('Erro ao limpar usuário do Auth:', cleanupError);
+        }
         
         if (userError.code === '23505') {
           throw new Error('Este email já está cadastrado no sistema');
@@ -88,13 +129,14 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
 
       toast({
         title: "Sucesso!",
-        description: "Usuário criado com sucesso",
+        description: "Usuário criado com sucesso. A senha foi definida e o usuário pode fazer login.",
       });
 
       // Limpar formulário e fechar modal
       setFormData({
         nome: '',
         email: '',
+        password: '',
         role: 'funcionario',
         optica_id: ''
       });
@@ -108,6 +150,8 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
       
       if (error.message?.includes('já está cadastrado')) {
         errorMessage = "Este email já está cadastrado. Use outro email.";
+      } else if (error.message?.includes('Invalid email')) {
+        errorMessage = "Email inválido. Verifique o formato.";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -162,6 +206,39 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ opticas, onUserCreate
               required
               disabled={isLoading}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Senha</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
+                required
+                disabled={isLoading}
+                minLength={6}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500">
+              O usuário poderá fazer login com esta senha
+            </p>
           </div>
 
           <div className="space-y-2">
