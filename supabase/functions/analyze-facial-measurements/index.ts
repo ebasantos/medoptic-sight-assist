@@ -24,6 +24,13 @@ serve(async (req) => {
       );
     }
 
+    if (!openAIApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Chave da API OpenAI não configurada' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('Analisando imagem com OpenAI Vision...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -33,7 +40,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -75,7 +82,8 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
               {
                 type: 'image_url',
                 image_url: {
-                  url: imageData
+                  url: imageData,
+                  detail: 'high'
                 }
               }
             ]
@@ -88,13 +96,34 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro da OpenAI:', errorText);
-      throw new Error(`Erro da OpenAI: ${response.status} - ${errorText}`);
+      console.error('Erro da OpenAI:', response.status, errorText);
+      
+      let errorMessage = 'Erro na análise da imagem';
+      if (response.status === 429) {
+        errorMessage = 'Limite de uso da API OpenAI excedido. Tente novamente mais tarde.';
+      } else if (response.status === 401) {
+        errorMessage = 'Chave da API OpenAI inválida';
+      } else if (response.status >= 500) {
+        errorMessage = 'Erro interno da OpenAI. Tente novamente.';
+      }
+      
+      return new Response(
+        JSON.stringify({ error: errorMessage }), 
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
     
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Resposta inválida da OpenAI:', data);
+      return new Response(
+        JSON.stringify({ error: 'Resposta inválida da API OpenAI' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const content = data.choices[0].message.content;
     console.log('Resposta da OpenAI:', content);
 
     // Tentar extrair JSON da resposta
@@ -110,16 +139,37 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
     } catch (parseError) {
       console.error('Erro ao parsear JSON:', parseError);
       console.error('Conteúdo recebido:', content);
-      throw new Error('Erro ao interpretar resposta da IA');
+      return new Response(
+        JSON.stringify({ error: 'Erro ao interpretar resposta da IA' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Validar se as medidas foram calculadas
     if (!measurements.dpBinocular || !measurements.dnpEsquerda || !measurements.dnpDireita) {
-      throw new Error('IA não conseguiu calcular as medidas principais');
+      console.error('Medidas principais não calculadas:', measurements);
+      return new Response(
+        JSON.stringify({ error: 'IA não conseguiu calcular as medidas principais' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
+    // Garantir que todas as medidas são números válidos
+    const validatedMeasurements = {
+      dpBinocular: Number(measurements.dpBinocular) || 0,
+      dnpEsquerda: Number(measurements.dnpEsquerda) || 0,
+      dnpDireita: Number(measurements.dnpDireita) || 0,
+      alturaEsquerda: Number(measurements.alturaEsquerda) || 0,
+      alturaDireita: Number(measurements.alturaDireita) || 0,
+      larguraLente: Number(measurements.larguraLente) || frameWidth / 2,
+      confiabilidade: Number(measurements.confiabilidade) || 0.8,
+      observacoes: measurements.observacoes || 'Medições calculadas automaticamente'
+    };
+
+    console.log('Medidas validadas:', validatedMeasurements);
+
     return new Response(
-      JSON.stringify({ measurements }), 
+      JSON.stringify({ measurements: validatedMeasurements }), 
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
@@ -127,7 +177,7 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
     console.error('Erro na análise:', error);
     return new Response(
       JSON.stringify({ 
-        error: 'Erro ao analisar imagem', 
+        error: 'Erro interno do servidor', 
         details: error.message 
       }), 
       { 

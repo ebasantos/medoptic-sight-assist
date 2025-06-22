@@ -34,11 +34,22 @@ export const useFacialMeasurements = () => {
 
       if (supabaseError) {
         console.error('Erro do Supabase:', supabaseError);
-        throw new Error(supabaseError.message || 'Erro ao chamar função de análise');
+        let errorMessage = 'Erro ao processar a análise';
+        
+        if (supabaseError.message?.includes('non-2xx status code')) {
+          errorMessage = 'Erro na comunicação com o serviço de análise. Tente novamente.';
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      if (data.error) {
+      if (data?.error) {
+        console.error('Erro da função:', data.error);
         throw new Error(data.error);
+      }
+
+      if (!data?.measurements) {
+        throw new Error('Nenhuma medição foi retornada');
       }
 
       console.log('Análise concluída:', data.measurements);
