@@ -71,18 +71,22 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
     return null;
   } catch (error) {
     if (error instanceof Error && error.message === 'TIMEOUT') {
-      console.error('⏰ Timeout na busca de dados do usuário - fazendo logout automático');
+      console.error('⏰ Timeout na busca de dados do usuário - usuário será deslogado');
       
-      // Fazer logout automático em caso de timeout
-      try {
-        await supabase.auth.signOut();
-        // Limpar cache
-        userCache.clear();
-        // Recarregar a página para ir para login
-        window.location.href = '/';
-      } catch (logoutError) {
-        console.error('❌ Erro ao fazer logout automático:', logoutError);
-      }
+      // Em vez de fazer logout aqui, apenas limpar cache e retornar null
+      // O componente vai lidar com o estado
+      userCache.set(userEmail, { user: null, timestamp: Date.now() });
+      
+      // Fazer logout de forma assíncrona sem bloquear
+      setTimeout(async () => {
+        try {
+          await supabase.auth.signOut();
+          userCache.clear();
+          window.location.href = '/';
+        } catch (logoutError) {
+          console.error('❌ Erro ao fazer logout automático:', logoutError);
+        }
+      }, 100);
       
       return null;
     }

@@ -31,21 +31,23 @@ export const useAuthState = () => {
           if (mounted) {
             console.log('✅ Dados do usuário carregados:', userData);
             setUser(userData);
+            setLoading(false); // Importante: sempre definir loading como false
           }
         } else {
           console.log('🚪 Usuário não logado');
           if (mounted) {
             setUser(null);
+            setLoading(false); // Importante: sempre definir loading como false
           }
         }
       } catch (error) {
         console.error('❌ Erro ao processar mudança de auth:', error);
         if (mounted) {
           setUser(null);
+          setLoading(false); // Importante: sempre definir loading como false mesmo com erro
         }
       } finally {
         if (mounted) {
-          setLoading(false);
           isProcessing = false;
         }
       }
@@ -58,7 +60,11 @@ export const useAuthState = () => {
         
         if (error) {
           console.error('❌ Erro ao verificar sessão:', error);
-          throw error;
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
         }
 
         console.log('📋 Sessão encontrada:', session ? 'SIM' : 'NÃO');
