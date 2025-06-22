@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Camera, Brain, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Brain, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,24 +20,20 @@ const MeasurementPage = () => {
   const [step, setStep] = useState<'camera' | 'measurements'>('camera');
   const [loading, setSaving] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [measurementCalculated, setMeasurementCalculated] = useState(false);
   
   const { isAnalyzing, measurements, error: analysisError, analyzeFacialMeasurements } = useFacialMeasurements();
   
   const [formData, setFormData] = useState({
     nomeCliente: '',
-    larguraArmacao: '',
-    dpBinocular: '',
-    dnpEsquerda: '',
-    dnpDireita: '',
-    alturaEsquerda: '',
-    alturaDireita: '',
-    larguraLente: ''
+    larguraArmacao: ''
   });
 
   const handleImageCapture = (imageData: string) => {
     console.log('Imagem capturada na página de medição');
     setCapturedImage(imageData);
     setStep('measurements');
+    setMeasurementCalculated(false);
   };
 
   const handleAutoAnalysis = async () => {
@@ -50,27 +47,17 @@ const MeasurementPage = () => {
     }
 
     try {
-      const result = await analyzeFacialMeasurements(capturedImage, parseFloat(formData.larguraArmacao));
+      await analyzeFacialMeasurements(capturedImage, parseFloat(formData.larguraArmacao));
+      setMeasurementCalculated(true);
       
-      // Atualizar formulário com os valores calculados
-      setFormData(prev => ({
-        ...prev,
-        dpBinocular: result.dpBinocular.toFixed(1),
-        dnpEsquerda: result.dnpEsquerda.toFixed(1),
-        dnpDireita: result.dnpDireita.toFixed(1),
-        alturaEsquerda: result.alturaEsquerda.toFixed(1),
-        alturaDireita: result.alturaDireita.toFixed(1),
-        larguraLente: result.larguraLente.toFixed(1)
-      }));
-
       toast({
-        title: "Análise concluída",
-        description: `Medições calculadas automaticamente (${Math.round(result.confiabilidade * 100)}% de confiança)`,
+        title: "Medições calculadas automaticamente",
+        description: `Análise concluída com ${Math.round((measurements?.confiabilidade || 0) * 100)}% de confiança`,
       });
     } catch (error) {
       toast({
         title: "Erro na análise",
-        description: "Não foi possível analisar a imagem automaticamente. Insira as medidas manualmente.",
+        description: "Não foi possível analisar a imagem automaticamente. Tente novamente.",
         variant: "destructive"
       });
     }
@@ -112,7 +99,14 @@ const MeasurementPage = () => {
   };
 
   const handleSave = async () => {
-    if (!user || !capturedImage) return;
+    if (!user || !capturedImage || !measurements) {
+      toast({
+        title: "Dados incompletos",
+        description: "É necessário ter uma foto e medições calculadas para salvar",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setSaving(true);
     try {
@@ -135,12 +129,12 @@ const MeasurementPage = () => {
           nome_cliente: formData.nomeCliente,
           foto_url: fotoUrl,
           largura_armacao: parseFloat(formData.larguraArmacao),
-          dp_binocular: formData.dpBinocular ? parseFloat(formData.dpBinocular) : null,
-          dnp_esquerda: formData.dnpEsquerda ? parseFloat(formData.dnpEsquerda) : null,
-          dnp_direita: formData.dnpDireita ? parseFloat(formData.dnpDireita) : null,
-          altura_esquerda: formData.alturaEsquerda ? parseFloat(formData.alturaEsquerda) : null,
-          altura_direita: formData.alturaDireita ? parseFloat(formData.alturaDireita) : null,
-          largura_lente: formData.larguraLente ? parseFloat(formData.larguraLente) : null
+          dp_binocular: measurements.dpBinocular,
+          dnp_esquerda: measurements.dnpEsquerda,
+          dnp_direita: measurements.dnpDireita,
+          altura_esquerda: measurements.alturaEsquerda,
+          altura_direita: measurements.alturaDireita,
+          largura_lente: measurements.larguraLente
         });
 
       if (error) {
@@ -261,124 +255,120 @@ const MeasurementPage = () => {
                 </div>
 
                 {/* Botão de análise automática */}
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <Brain className="h-5 w-5 text-blue-600 mt-0.5" />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-blue-900 mb-1">Análise Automática com IA</h4>
-                        <p className="text-sm text-blue-700 mb-3">
-                          Use inteligência artificial para calcular automaticamente as medidas faciais a partir da foto.
-                        </p>
-                        <Button 
-                          onClick={handleAutoAnalysis}
-                          disabled={isAnalyzing || !formData.larguraArmacao}
-                          variant="outline"
-                          size="sm"
-                          className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                        >
-                          <Brain className="h-4 w-4 mr-2" />
-                          {isAnalyzing ? 'Analisando...' : 'Calcular Medidas'}
-                        </Button>
+                {!measurementCalculated && (
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Brain className="h-5 w-5 text-blue-600 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="font-medium text-blue-900 mb-1">Análise Automática com IA</h4>
+                          <p className="text-sm text-blue-700 mb-3">
+                            Clique para calcular automaticamente todas as medidas faciais a partir da foto.
+                          </p>
+                          <Button 
+                            onClick={handleAutoAnalysis}
+                            disabled={isAnalyzing || !formData.larguraArmacao}
+                            variant="outline"
+                            size="sm"
+                            className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                          >
+                            <Brain className="h-4 w-4 mr-2" />
+                            {isAnalyzing ? 'Analisando...' : 'Calcular Medidas'}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    
-                    {analysisError && (
-                      <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-start gap-2">
-                        <AlertTriangle className="h-4 w-4 mt-0.5" />
-                        <span>{analysisError}</span>
+                      
+                      {analysisError && (
+                        <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5" />
+                          <span>{analysisError}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Exibição dos resultados das medições */}
+                {measurementCalculated && measurements && (
+                  <Card className="bg-green-50 border-green-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <h4 className="font-medium text-green-900">Medidas Calculadas Automaticamente</h4>
                       </div>
-                    )}
-                    
-                    {measurements && (
-                      <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
-                        <strong>Análise concluída!</strong> Confiança: {Math.round(measurements.confiabilidade * 100)}%
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <Label className="text-gray-600">DP Binocular</Label>
+                          <div className="font-mono font-semibold text-green-800">
+                            {measurements.dpBinocular.toFixed(1)} mm
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-gray-600">Largura da Lente</Label>
+                          <div className="font-mono font-semibold text-green-800">
+                            {measurements.larguraLente.toFixed(1)} mm
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-gray-600">DNP Esquerda</Label>
+                          <div className="font-mono font-semibold text-green-800">
+                            {measurements.dnpEsquerda.toFixed(1)} mm
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-gray-600">DNP Direita</Label>
+                          <div className="font-mono font-semibold text-green-800">
+                            {measurements.dnpDireita.toFixed(1)} mm
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-gray-600">Altura Esquerda</Label>
+                          <div className="font-mono font-semibold text-green-800">
+                            {measurements.alturaEsquerda.toFixed(1)} mm
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-gray-600">Altura Direita</Label>
+                          <div className="font-mono font-semibold text-green-800">
+                            {measurements.alturaDireita.toFixed(1)} mm
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 p-2 bg-white rounded border">
+                        <div className="text-xs text-gray-600 mb-1">
+                          <strong>Confiança:</strong> {Math.round(measurements.confiabilidade * 100)}%
+                        </div>
                         {measurements.observacoes && (
-                          <div className="mt-1 text-xs">{measurements.observacoes}</div>
+                          <div className="text-xs text-gray-600">
+                            <strong>Observações:</strong> {measurements.observacoes}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Campos de medidas */}
-                <div>
-                  <Label htmlFor="dpBinocular">DP Binocular (mm)</Label>
-                  <Input
-                    id="dpBinocular"
-                    type="number"
-                    step="0.1"
-                    value={formData.dpBinocular}
-                    onChange={(e) => setFormData({ ...formData, dpBinocular: e.target.value })}
-                    placeholder="Ex: 64.0"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="dnpEsquerda">DNP Esquerda (mm)</Label>
-                    <Input
-                      id="dnpEsquerda"
-                      type="number"
-                      step="0.1"
-                      value={formData.dnpEsquerda}
-                      onChange={(e) => setFormData({ ...formData, dnpEsquerda: e.target.value })}
-                      placeholder="Ex: 32.0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="dnpDireita">DNP Direita (mm)</Label>
-                    <Input
-                      id="dnpDireita"
-                      type="number"
-                      step="0.1"
-                      value={formData.dnpDireita}
-                      onChange={(e) => setFormData({ ...formData, dnpDireita: e.target.value })}
-                      placeholder="Ex: 32.0"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="alturaEsquerda">Altura Esquerda (mm)</Label>
-                    <Input
-                      id="alturaEsquerda"
-                      type="number"
-                      step="0.1"
-                      value={formData.alturaEsquerda}
-                      onChange={(e) => setFormData({ ...formData, alturaEsquerda: e.target.value })}
-                      placeholder="Ex: 28.5"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="alturaDireita">Altura Direita (mm)</Label>
-                    <Input
-                      id="alturaDireita"
-                      type="number"
-                      step="0.1"
-                      value={formData.alturaDireita}
-                      onChange={(e) => setFormData({ ...formData, alturaDireita: e.target.value })}
-                      placeholder="Ex: 28.5"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="larguraLente">Largura da Lente (mm)</Label>
-                  <Input
-                    id="larguraLente"
-                    type="number"
-                    step="0.1"
-                    value={formData.larguraLente}
-                    onChange={(e) => setFormData({ ...formData, larguraLente: e.target.value })}
-                    placeholder="Ex: 50.0"
-                  />
-                </div>
+                      
+                      <Button 
+                        onClick={() => {
+                          setMeasurementCalculated(false);
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                      >
+                        Recalcular Medidas
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Button 
                   onClick={handleSave}
-                  disabled={loading || !formData.nomeCliente || !formData.larguraArmacao}
+                  disabled={loading || !formData.nomeCliente || !formData.larguraArmacao || !measurementCalculated}
                   className="w-full"
                 >
                   <Save className="h-4 w-4 mr-2" />
