@@ -28,7 +28,7 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
     }
     
     // Executar a query com timeout de 1 segundo
-    const { data: userData, error: userError } = await withTimeout(
+    const queryResult = await withTimeout(
       supabase
         .from('usuarios_optica')
         .select(`
@@ -42,6 +42,8 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
         .maybeSingle(),
       1000
     );
+
+    const { data: userData, error: userError } = queryResult;
 
     console.log('📊 Resultado da busca por email:', { userData, userError });
 
