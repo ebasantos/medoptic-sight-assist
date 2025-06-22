@@ -10,7 +10,7 @@ export const useAuthState = () => {
 
   useEffect(() => {
     let mounted = true;
-    let isProcessing = false; // Flag para evitar processamento simultâneo
+    let isProcessing = false;
 
     console.log('🔧 Iniciando useAuthState...');
     
@@ -31,23 +31,21 @@ export const useAuthState = () => {
           if (mounted) {
             console.log('✅ Dados do usuário carregados:', userData);
             setUser(userData);
-            setLoading(false); // Importante: sempre definir loading como false
           }
         } else {
           console.log('🚪 Usuário não logado');
           if (mounted) {
             setUser(null);
-            setLoading(false); // Importante: sempre definir loading como false
           }
         }
       } catch (error) {
         console.error('❌ Erro ao processar mudança de auth:', error);
         if (mounted) {
           setUser(null);
-          setLoading(false); // Importante: sempre definir loading como false mesmo com erro
         }
       } finally {
         if (mounted) {
+          setLoading(false);
           isProcessing = false;
         }
       }

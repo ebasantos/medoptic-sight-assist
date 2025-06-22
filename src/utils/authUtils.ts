@@ -27,23 +27,20 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
       return cached.user;
     }
     
-    // Executar a query com timeout de 1 segundo
-    const queryResult = await withTimeout(
-      supabase
-        .from('usuarios_optica')
-        .select(`
-          *,
-          opticas (
-            id,
-            nome
-          )
-        `)
-        .eq('email', userEmail)
-        .maybeSingle(),
-      1000
-    );
+    // Criar a query e executá-la com timeout de 3 segundos (aumentado para ser mais robusto)
+    const query = supabase
+      .from('usuarios_optica')
+      .select(`
+        *,
+        opticas (
+          id,
+          nome
+        )
+      `)
+      .eq('email', userEmail)
+      .maybeSingle();
 
-    const { data: userData, error: userError } = queryResult;
+    const { data: userData, error: userError } = await withTimeout(query, 3000);
 
     console.log('📊 Resultado da busca por email:', { userData, userError });
 
@@ -74,23 +71,8 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
     return null;
   } catch (error) {
     if (error instanceof Error && error.message === 'TIMEOUT') {
-      console.error('⏰ Timeout na busca de dados do usuário - usuário será deslogado');
-      
-      // Em vez de fazer logout aqui, apenas limpar cache e retornar null
-      // O componente vai lidar com o estado
+      console.error('⏰ Timeout na busca de dados do usuário - retornando null');
       userCache.set(userEmail, { user: null, timestamp: Date.now() });
-      
-      // Fazer logout de forma assíncrona sem bloquear
-      setTimeout(async () => {
-        try {
-          await supabase.auth.signOut();
-          userCache.clear();
-          window.location.href = '/';
-        } catch (logoutError) {
-          console.error('❌ Erro ao fazer logout automático:', logoutError);
-        }
-      }, 100);
-      
       return null;
     }
     
