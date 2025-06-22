@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -19,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 import CreateOpticModal from '@/components/CreateOpticModal';
+import CreateUserModal from '@/components/CreateUserModal';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -129,10 +129,10 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <CreateOpticModal onOpticCreated={fetchDashboardData} />
-              <Button className="w-full justify-start h-12" variant="outline">
-                <Users className="h-4 w-4 mr-2" />
-                Adicionar Usuário
-              </Button>
+              <CreateUserModal 
+                opticas={opticas.map(o => ({ id: o.id, nome: o.nome }))} 
+                onUserCreated={fetchDashboardData} 
+              />
               <Button className="w-full justify-start h-12" variant="outline">
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Relatório de Uso
