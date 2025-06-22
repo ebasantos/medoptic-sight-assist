@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/auth';
 
@@ -27,8 +26,8 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
       return cached.user;
     }
     
-    // Criar a query
-    const query = supabase
+    // Criar e executar a query com timeout de 5 segundos
+    const queryPromise = supabase
       .from('usuarios_optica')
       .select(`
         *,
@@ -40,8 +39,7 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
       .eq('email', userEmail)
       .maybeSingle();
 
-    // Executar a query com timeout de 5 segundos
-    const { data: userData, error: userError } = await withTimeout(query, 5000);
+    const { data: userData, error: userError } = await withTimeout(queryPromise, 5000);
 
     console.log('📊 Resultado da busca por email:', { userData, userError });
 

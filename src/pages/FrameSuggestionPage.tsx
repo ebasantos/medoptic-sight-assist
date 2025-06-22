@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -287,14 +288,26 @@ const FrameSuggestionPage = () => {
         return;
       }
 
+      // Obter o user_id do auth do usuário logado
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      if (!authUser) {
+        toast({
+          title: "Erro",
+          description: "Usuário não autenticado",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const sugestoes = generateSuggestions();
 
-      // Salvar análise no banco
+      // Salvar análise no banco usando o user_id correto do auth
       const { error } = await supabase
         .from('analises_faciais')
         .insert({
           optica_id: user.opticId!,
-          usuario_id: user.id,
+          usuario_id: authUser.id, // Usar o ID do auth, não da tabela usuarios_optica
           nome_cliente: formData.nomeCliente,
           foto_url: fotoUrl,
           formato_rosto: faceAnalysis.formatoRosto,
