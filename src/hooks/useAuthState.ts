@@ -9,23 +9,41 @@ export const useAuthState = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     console.log('Configurando listeners de autenticação...');
     
-    // Escutar mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        
+    // Função para processar mudanças de autenticação
+    const handleAuthChange = async (event: string, session: any) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      
+      if (!mounted) return;
+
+      try {
         if (session?.user) {
           // Buscar dados do usuário
           const userData = await fetchUserData(session.user);
-          setUser(userData);
+          if (mounted) {
+            setUser(userData);
+            setLoading(false);
+          }
         } else {
-          setUser(null);
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+          }
         }
-        setLoading(false);
+      } catch (error) {
+        console.error('Erro ao processar mudança de auth:', error);
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+        }
       }
-    );
+    };
+
+    // Escutar mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
     // Verificar sessão atual
     const initializeAuth = async () => {
@@ -34,25 +52,27 @@ export const useAuthState = () => {
         
         if (error) {
           console.error('Erro ao verificar sessão:', error);
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+          }
           return;
         }
 
-        if (session?.user) {
-          const userData = await fetchUserData(session.user);
-          setUser(userData);
-        }
-        
-        setLoading(false);
+        await handleAuthChange('INITIAL_SESSION', session);
       } catch (error) {
         console.error('Erro ao inicializar auth:', error);
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return { user, setUser, loading, setLoading };

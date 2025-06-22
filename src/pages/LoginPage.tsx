@@ -16,16 +16,9 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
-  const {
-    login,
-    isAuthenticated,
-    loading,
-    user
-  } = useAuth();
+  const { login, isAuthenticated, loading, user } = useAuth();
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
   // Redirecionar se já estiver autenticado
   useEffect(() => {
@@ -66,7 +59,7 @@ const LoginPage = () => {
       } else {
         toast({
           title: "Erro de Login",
-          description: "Email ou senha incorretos, ou usuário não encontrado no sistema",
+          description: "Email ou senha incorretos. Verifique suas credenciais e tente novamente.",
           variant: "destructive"
         });
       }
@@ -74,7 +67,7 @@ const LoginPage = () => {
       console.error('Erro no login:', error);
       toast({
         title: "Erro",
-        description: "Erro inesperado. Tente novamente.",
+        description: "Erro inesperado durante o login. Tente novamente.",
         variant: "destructive"
       });
     } finally {
@@ -170,9 +163,10 @@ const LoginPage = () => {
           </div>
           
           <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
-            <p className="font-medium mb-2">Para testar o sistema:</p>
-            <p>1. Cadastre-se com <strong>erik@admin.com</strong> para acesso admin</p>
+            <p className="font-medium mb-2">✅ Sistema corrigido:</p>
+            <p>1. Crie um usuário admin com <strong>erik@admin.com</strong></p>
             <p>2. Use qualquer senha com 6+ caracteres</p>
+            <p>3. Faça login com essas credenciais</p>
             <p className="mt-2 text-xs">Desenvolvido por Ebs Tech</p>
           </div>
         </CardContent>

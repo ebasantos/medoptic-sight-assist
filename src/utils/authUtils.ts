@@ -8,7 +8,7 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
   try {
     console.log('Buscando dados do usuário:', supabaseUser.id, supabaseUser.email);
     
-    // Buscar dados do usuário na tabela usuarios_optica
+    // Primeiro tentar buscar por user_id
     let { data: userData, error: userError } = await supabase
       .from('usuarios_optica')
       .select(`
@@ -19,14 +19,12 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
         )
       `)
       .eq('user_id', supabaseUser.id)
-      .single();
+      .maybeSingle();
 
-    console.log('Resultado da busca:', { userData, userError });
+    console.log('Resultado da busca por user_id:', { userData, userError });
 
-    if (userError) {
-      console.error('Erro ao buscar dados do usuário:', userError);
-      
-      // Se não encontrar por user_id, tentar por email
+    // Se não encontrou por user_id, tentar por email
+    if (!userData && supabaseUser.email) {
       console.log('Tentando buscar por email:', supabaseUser.email);
       const { data: userByEmail, error: emailError } = await supabase
         .from('usuarios_optica')
@@ -38,25 +36,22 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
           )
         `)
         .eq('email', supabaseUser.email)
-        .single();
+        .maybeSingle();
 
-      if (emailError || !userByEmail) {
-        console.error('Usuário não encontrado por email também:', emailError);
-        return null;
+      if (userByEmail) {
+        console.log('Usuário encontrado por email, atualizando user_id');
+        // Atualizar o user_id na tabela
+        const { error: updateError } = await supabase
+          .from('usuarios_optica')
+          .update({ user_id: supabaseUser.id })
+          .eq('email', supabaseUser.email);
+
+        if (updateError) {
+          console.error('Erro ao atualizar user_id:', updateError);
+        }
+
+        userData = userByEmail;
       }
-
-      // Se encontrou por email, atualizar o user_id
-      console.log('Atualizando user_id para:', supabaseUser.id);
-      const { error: updateError } = await supabase
-        .from('usuarios_optica')
-        .update({ user_id: supabaseUser.id })
-        .eq('email', supabaseUser.email);
-
-      if (updateError) {
-        console.error('Erro ao atualizar user_id:', updateError);
-      }
-
-      userData = userByEmail;
     }
 
     if (userData) {
@@ -83,9 +78,9 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
 // Função de login usando Supabase Auth
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
-    console.log('Tentando fazer login com Supabase Auth...', email);
+    console.log('Iniciando processo de login para:', email);
     
-    // Primeiro, limpar qualquer sessão existente
+    // Limpar sessão existente
     await supabase.auth.signOut();
     
     // Fazer login com Supabase Auth
@@ -95,39 +90,23 @@ export const performLogin = async (email: string, password: string): Promise<{ s
     });
 
     if (error) {
-      console.error('Erro no login do Supabase:', error);
-      
-      // Se o erro for de credenciais inválidas, verificar se o usuário existe na tabela customizada
-      if (error.message.includes('Invalid login credentials')) {
-        console.log('Verificando se usuário existe na tabela customizada...');
-        
-        const { data: customUser, error: customError } = await supabase
-          .from('usuarios_optica')
-          .select('*')
-          .eq('email', email)
-          .single();
-
-        if (customUser && !customError) {
-          console.log('Usuário encontrado na tabela customizada, mas não no Auth');
-          return { 
-            success: false, 
-            userData: null 
-          };
-        }
-      }
-      
+      console.error('Erro no login do Supabase Auth:', error);
       return { success: false };
     }
 
     if (data.user) {
+      console.log('Usuário autenticado no Supabase Auth:', data.user.email);
+      
       // Buscar dados adicionais do usuário
       const userData = await fetchUserData(data.user);
       
       if (userData) {
-        console.log('Login realizado com sucesso:', userData.role);
+        console.log('Login realizado com sucesso:', userData);
         return { success: true, userData };
       } else {
-        console.log('Usuário autenticado mas não encontrado na tabela usuarios_optica');
+        console.error('Usuário autenticado mas não encontrado na tabela usuarios_optica');
+        // Fazer logout se não encontrar dados do usuário
+        await supabase.auth.signOut();
         return { success: false };
       }
     }
