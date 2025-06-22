@@ -49,26 +49,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       const isAdmin = email === 'erik@admin.com';
       console.log('É admin?', isAdmin);
       
-      // Primeiro, verificar se o usuário já existe tentando fazer login
-      const { data: existingUser, error: loginError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (existingUser.user && !loginError) {
-        console.log('Usuário já existe com essa senha');
-        toast({
-          title: "Usuário já existe",
-          description: "Este email e senha já estão cadastrados. Redirecionando para login...",
-          variant: "destructive"
-        });
-        onBackToLogin();
-        return;
-      }
-
-      console.log('Criando novo usuário...');
-      
-      // Tentar criar usuário através do signup normal
+      // Tentar criar usuário através do signup
       const { data: signupData, error: signupError } = await supabase.auth.signUp({
         email,
         password,
@@ -79,31 +60,50 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         }
       });
 
-      if (signupError) {
-        // Se for erro de rate limit ou email, ainda assim continuar se temos um usuário
+      console.log('Resultado do signup:', { signupData, signupError });
+
+      // Se houve erro mas conseguimos o usuário, continuar
+      if (signupError && !signupData?.user) {
+        // Se for erro de rate limit ou similar, tentar abordagem alternativa
         if (signupError.message.includes('rate limit') || 
-            signupError.message.includes('confirmation email') ||
-            signupError.message.includes('email')) {
-          console.log('Erro de email detectado, mas tentando continuar...');
+            signupError.message.includes('email') ||
+            signupError.message.includes('confirmation')) {
           
-          // Se mesmo assim não conseguimos criar o usuário, informar o usuário
-          if (!signupData?.user) {
+          console.log('Erro de email detectado, tentando abordagem alternativa...');
+          
+          // Verificar se o usuário já existe tentando fazer login
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (loginData.user && !loginError) {
+            console.log('Usuário já existe e senha confere');
             toast({
-              title: "Limitação de Email",
-              description: "Sistema temporariamente indisponível para novos cadastros. Tente novamente mais tarde.",
-              variant: "destructive"
+              title: "Usuário já existe",
+              description: "Este email já está cadastrado. Redirecionando para login...",
             });
+            onBackToLogin();
             return;
           }
+
+          // Se não conseguiu fazer login, mostrar erro mais amigável
+          toast({
+            title: "Cadastro Temporariamente Indisponível",
+            description: "Devido a limitações do sistema de email, novos cadastros estão temporariamente suspensos. Tente novamente em alguns minutos ou contate o suporte.",
+            variant: "destructive"
+          });
+          return;
         } else {
           throw signupError;
         }
       }
 
-      // Se conseguimos criar o usuário, inserir na tabela usuarios_optica
+      // Se conseguimos criar o usuário (mesmo com warning de email)
       if (signupData?.user) {
         console.log('Usuário criado:', signupData.user.id);
         
+        // Inserir dados na tabela usuarios_optica
         const userData = {
           user_id: signupData.user.id,
           nome: name,
@@ -113,7 +113,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           ativo: true
         };
 
-        console.log('Inserindo dados na tabela usuarios_optica...');
+        console.log('Inserindo dados na tabela usuarios_optica:', userData);
         const { data: insertData, error: userError } = await supabase
           .from('usuarios_optica')
           .insert(userData)
@@ -121,24 +121,21 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
 
         if (userError) {
           console.error('Erro ao inserir na tabela usuarios_optica:', userError);
-          // Limpar o usuário criado se não conseguimos inserir na tabela
-          await supabase.auth.signOut();
           throw new Error(`Erro no banco de dados: ${userError.message}`);
         }
 
         console.log('=== CADASTRO CONCLUÍDO ===');
+        console.log('Dados inseridos:', insertData);
         
         toast({
           title: "Sucesso!",
-          description: "Conta criada com sucesso! Agora você pode fazer login.",
+          description: "Conta criada com sucesso! Você pode fazer login agora (não é necessário confirmar o email).",
         });
         
         setEmail('');
         setPassword('');
         setName('');
         onBackToLogin();
-      } else {
-        throw new Error('Não foi possível criar o usuário');
       }
 
     } catch (error: any) {
@@ -152,6 +149,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         errorMessage = "Email inválido. Verifique o formato.";
       } else if (error.message?.includes('Password')) {
         errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
+      } else if (error.message?.includes('rate limit') || error.message?.includes('email')) {
+        errorMessage = "Sistema temporariamente indisponível para novos cadastros devido a limitações de email. Tente novamente em alguns minutos.";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -261,11 +260,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           </Button>
         </div>
         
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg text-sm text-blue-800">
-          <p className="font-medium mb-2">ℹ️ Informação</p>
-          <p>Use <strong>erik@admin.com</strong> para criar uma conta admin.</p>
-          <p className="mt-1">Qualquer outro email criará uma conta de funcionário.</p>
-          <p className="mt-2 text-xs">Nota: Pode haver limitações temporárias no envio de emails.</p>
+        <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <p className="font-medium mb-2">⚠️ Limitação Temporária</p>
+          <p>O sistema está com limitações no envio de emails.</p>
+          <p className="mt-1">Novos cadastros podem funcionar, mas a confirmação por email não é necessária.</p>
+          <p className="mt-2"><strong>erik@admin.com</strong> cria conta admin.</p>
         </div>
       </CardContent>
     </Card>
