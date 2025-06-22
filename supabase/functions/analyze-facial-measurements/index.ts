@@ -33,21 +33,27 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           {
             role: 'system',
-            content: `Você é um especialista em medições óticas faciais. Analise a imagem fornecida e meça as seguintes distâncias em pixels:
+            content: `Você é um especialista em medições óticas faciais para óculos. Analise a imagem fornecida e calcule as seguintes medidas com precisão:
 
-1. Distância pupilar binocular (distância entre as pupilas)
-2. DNP esquerda (distância do centro do nariz à pupila esquerda)
-3. DNP direita (distância do centro do nariz à pupila direita)
-4. Altura dos olhos (altura da pupila até a parte inferior da armação)
-5. Largura da lente (largura horizontal de cada lente)
+1. Distância pupilar binocular (DP): distância entre as pupilas dos dois olhos
+2. DNP esquerda: distância do centro do nariz (ponte nasal) à pupila esquerda
+3. DNP direita: distância do centro do nariz (ponte nasal) à pupila direita
+4. Altura esquerda: altura da pupila esquerda até a parte inferior da armação/lente
+5. Altura direita: altura da pupila direita até a parte inferior da armação/lente
+6. Largura da lente: largura horizontal de cada lente da armação
 
-IMPORTANTE: A largura da armação fornecida é ${frameWidth}mm. Use esta medida como referência para converter pixels em milímetros.
+IMPORTANTE: 
+- A largura da armação informada é ${frameWidth}mm
+- Use esta medida como referência de escala para converter pixels em milímetros
+- Seja preciso na identificação das pupilas e pontos de referência
+- Considere a perspectiva e possível distorção da câmera
+- Se a pessoa não estiver usando óculos, estime onde seria a posição da armação
 
-Retorne APENAS um JSON válido com as medidas em milímetros, seguindo exatamente este formato:
+Retorne APENAS um JSON válido com as medidas em milímetros:
 {
   "dpBinocular": número,
   "dnpEsquerda": número,
@@ -56,7 +62,7 @@ Retorne APENAS um JSON válido com as medidas em milímetros, seguindo exatament
   "alturaDireita": número,
   "larguraLente": número,
   "confiabilidade": número_entre_0_e_1,
-  "observacoes": "string_com_observacoes"
+  "observacoes": "string_com_observacoes_sobre_a_qualidade_da_medicao"
 }`
           },
           {
@@ -64,7 +70,7 @@ Retorne APENAS um JSON válido com as medidas em milímetros, seguindo exatament
             content: [
               {
                 type: 'text',
-                text: `Analise esta foto para medições óticas. A largura da armação é ${frameWidth}mm. Meça as distâncias pupilares e alturas conforme solicitado.`
+                text: `Analise esta foto para medições óticas precisas. A largura da armação é ${frameWidth}mm. Calcule todas as distâncias pupilares e alturas necessárias para a montagem de óculos.`
               },
               {
                 type: 'image_url',
@@ -75,7 +81,7 @@ Retorne APENAS um JSON válido com as medidas em milímetros, seguindo exatament
             ]
           }
         ],
-        max_tokens: 500,
+        max_tokens: 800,
         temperature: 0.1
       }),
     });
@@ -83,7 +89,7 @@ Retorne APENAS um JSON válido com as medidas em milímetros, seguindo exatament
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Erro da OpenAI:', errorText);
-      throw new Error(`Erro da OpenAI: ${response.status}`);
+      throw new Error(`Erro da OpenAI: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -103,7 +109,13 @@ Retorne APENAS um JSON válido com as medidas em milímetros, seguindo exatament
       }
     } catch (parseError) {
       console.error('Erro ao parsear JSON:', parseError);
+      console.error('Conteúdo recebido:', content);
       throw new Error('Erro ao interpretar resposta da IA');
+    }
+
+    // Validar se as medidas foram calculadas
+    if (!measurements.dpBinocular || !measurements.dnpEsquerda || !measurements.dnpDireita) {
+      throw new Error('IA não conseguiu calcular as medidas principais');
     }
 
     return new Response(
