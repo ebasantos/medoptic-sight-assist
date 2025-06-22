@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,19 +49,43 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       const isAdmin = email === 'erik@admin.com';
       console.log('É admin?', isAdmin);
       
-      // Fazer o signup SEM validação de email
+      // Tentar criar usuário com confirmação automática
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: undefined, // Remove redirecionamento de email
+          emailRedirectTo: undefined,
           data: {
-            email_confirm: false // Não requer confirmação de email
+            email_confirm: !isAdmin // Para admin não requer confirmação
           }
         }
       });
 
       console.log('Resultado signup:', { authData, authError });
+
+      // Se deu erro de email, vamos tentar uma abordagem diferente
+      if (authError && authError.message.includes('confirmation email')) {
+        console.log('Erro de email detectado, tentando abordagem alternativa...');
+        
+        // Verificar se usuário já existe
+        const { data: existingUser } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        if (existingUser.user) {
+          console.log('Usuário já existe, direcionando para login...');
+          toast({
+            title: "Usuário já existe",
+            description: "Este email já está cadastrado. Faça login.",
+            variant: "destructive"
+          });
+          onBackToLogin();
+          return;
+        }
+        
+        throw authError;
+      }
 
       if (authError) {
         console.error('Erro no signup:', authError);
@@ -148,6 +173,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
       } else if (error.message?.includes('Email rate limit exceeded')) {
         errorMessage = "Muitas tentativas. Aguarde alguns minutos.";
+      } else if (error.message?.includes('confirmation email')) {
+        errorMessage = "Sistema configurado sem validação de email. Tente novamente.";
       } else if (error.message) {
         errorMessage = error.message;
       }
