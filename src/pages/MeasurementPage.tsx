@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -75,6 +74,12 @@ const MeasurementPage = () => {
   const uploadImage = async (imageData: string): Promise<string | null> => {
     try {
       console.log('Iniciando upload da imagem...');
+      console.log('Usuário atual:', user);
+      
+      if (!user?.id) {
+        console.error('Usuário não autenticado');
+        throw new Error('Usuário não autenticado');
+      }
       
       // Converter base64 para blob
       const base64Data = imageData.split(',')[1];
@@ -88,20 +93,38 @@ const MeasurementPage = () => {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
       
-      const fileName = `afericao_${user?.id}_${Date.now()}.jpg`;
+      const fileName = `afericao_${user.id}_${Date.now()}.jpg`;
       console.log('Nome do arquivo:', fileName);
+      console.log('Tamanho do arquivo:', blob.size, 'bytes');
+      
+      // Verificar se o usuário está autenticado
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Sessão atual:', session ? 'Ativa' : 'Não encontrada');
+      
+      if (!session) {
+        throw new Error('Sessão não encontrada. Faça login novamente.');
+      }
       
       // Fazer upload para o storage
+      console.log('Fazendo upload para o bucket fotos-clientes...');
       const { data, error } = await supabase.storage
         .from('fotos-clientes')
         .upload(fileName, blob, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: 'image/jpeg'
         });
 
       if (error) {
-        console.error('Erro no upload:', error);
-        return null;
+        console.error('Erro detalhado no upload:', error);
+        console.error('Código do erro:', error.statusCode);
+        console.error('Mensagem do erro:', error.message);
+        
+        if (error.message?.includes('row-level security')) {
+          throw new Error('Erro de permissão no storage. Verifique as políticas RLS.');
+        }
+        
+        throw new Error(`Erro no upload: ${error.message}`);
       }
 
       console.log('Upload realizado com sucesso:', data);
@@ -115,7 +138,7 @@ const MeasurementPage = () => {
       return publicData.publicUrl;
     } catch (error) {
       console.error('Erro ao processar upload:', error);
-      return null;
+      throw error;
     }
   };
 
@@ -153,6 +176,20 @@ const MeasurementPage = () => {
       }
 
       console.log('Salvando aferição no banco de dados...');
+      console.log('Dados para inserir:', {
+        optica_id: user.opticId,
+        usuario_id: user.id,
+        nome_cliente: formData.nomeCliente.trim(),
+        foto_url: fotoUrl,
+        largura_armacao: parseFloat(formData.larguraArmacao),
+        dp_binocular: measurements.dpBinocular,
+        dnp_esquerda: measurements.dnpEsquerda,
+        dnp_direita: measurements.dnpDireita,
+        altura_esquerda: measurements.alturaEsquerda,
+        altura_direita: measurements.alturaDireita,
+        largura_lente: measurements.larguraLente
+      });
+
       const { error } = await supabase
         .from('afericoes')
         .insert({
@@ -187,9 +224,10 @@ const MeasurementPage = () => {
       navigate('/optica');
     } catch (error) {
       console.error('Erro:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro inesperado ao salvar aferição';
       toast({
         title: "Erro",
-        description: "Erro inesperado ao salvar aferição",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -287,7 +325,6 @@ const MeasurementPage = () => {
                   />
                 </div>
 
-                {/* Botão de análise automática */}
                 {!measurementCalculated && (
                   <Card className="bg-blue-50 border-blue-200">
                     <CardContent className="p-4">
@@ -321,7 +358,6 @@ const MeasurementPage = () => {
                   </Card>
                 )}
 
-                {/* Exibição dos resultados das medições */}
                 {measurementCalculated && measurements && (
                   <Card className="bg-green-50 border-green-200">
                     <CardContent className="p-4">
