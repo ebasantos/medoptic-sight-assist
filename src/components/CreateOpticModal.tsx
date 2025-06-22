@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreateOpticModalProps {
   onOpticCreated: () => void;
@@ -22,6 +23,7 @@ const CreateOpticModal: React.FC<CreateOpticModalProps> = ({ onOpticCreated }) =
     endereco: ''
   });
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,29 +37,29 @@ const CreateOpticModal: React.FC<CreateOpticModalProps> = ({ onOpticCreated }) =
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para criar uma ótica",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (user.role !== 'admin') {
+      toast({
+        title: "Erro",
+        description: "Apenas administradores podem criar óticas",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
       console.log('Criando nova ótica:', formData);
-      
-      // Verificar se o usuário está autenticado
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log('Usuário atual:', user);
-      console.log('Erro de auth:', authError);
-      
-      if (!user) {
-        throw new Error('Usuário não autenticado');
-      }
-
-      // Verificar role do usuário
-      const { data: userRole, error: roleError } = await supabase
-        .from('usuarios_optica')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-      
-      console.log('Role do usuário:', userRole);
-      console.log('Erro ao buscar role:', roleError);
+      console.log('Usuário logado:', user);
 
       const { data, error } = await supabase
         .from('opticas')
@@ -198,3 +200,4 @@ const CreateOpticModal: React.FC<CreateOpticModalProps> = ({ onOpticCreated }) =
 };
 
 export default CreateOpticModal;
+
