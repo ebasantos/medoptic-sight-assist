@@ -14,66 +14,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { useHistoryData } from '@/hooks/useHistoryData';
 
 const HistoryPage = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMeasurement, setSelectedMeasurement] = useState<any>(null);
+  const { records, loading } = useHistoryData();
 
-  const mockMeasurements = [
-    {
-      id: 1,
-      clientName: 'Maria Silva Santos',
-      date: '2024-06-01',
-      time: '10:30',
-      dp: '62.5',
-      dnpLeft: '31.0',
-      dnpRight: '31.5',
-      heightLeft: '22.0',
-      heightRight: '22.2',
-      frameWidth: '135',
-      type: 'aferição'
-    },
-    {
-      id: 2,
-      clientName: 'João Carlos Oliveira',
-      date: '2024-06-01',
-      time: '09:45',
-      dp: '65.0',
-      dnpLeft: '32.5',
-      dnpRight: '32.5',
-      heightLeft: '24.0',
-      heightRight: '23.8',
-      frameWidth: '140',
-      type: 'aferição'
-    },
-    {
-      id: 3,
-      clientName: 'Ana Costa Lima',
-      date: '2024-06-01',
-      time: '09:15',
-      frameStyle: 'Gatinho',
-      colors: ['Preto', 'Dourado'],
-      confidence: 95,
-      type: 'sugestão'
-    },
-    {
-      id: 4,
-      clientName: 'Carlos Eduardo Santos',
-      date: '2024-05-31',
-      time: '16:20',
-      dp: '58.0',
-      dnpLeft: '29.0',
-      dnpRight: '29.0',
-      heightLeft: '20.5',
-      heightRight: '20.5',
-      frameWidth: '130',
-      type: 'aferição'
-    }
-  ];
-
-  const filteredMeasurements = mockMeasurements.filter(measurement =>
-    measurement.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMeasurements = records.filter(record =>
+    record.clientName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleViewDetails = (measurement: any) => {
@@ -84,6 +34,17 @@ const HistoryPage = () => {
     console.log('Imprimindo ficha para:', measurement.clientName);
     // Aqui implementaria a lógica de impressão
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-muted flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Carregando histórico...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted">
@@ -165,8 +126,10 @@ const HistoryPage = () => {
               </Card>
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-warning">Hoje</p>
-                  <p className="text-sm text-gray-600">Última Atualização</p>
+                  <p className="text-2xl font-bold text-warning">
+                    {records.length > 0 ? 'Atualizado' : 'Vazio'}
+                  </p>
+                  <p className="text-sm text-gray-600">Status</p>
                 </CardContent>
               </Card>
             </div>
@@ -177,57 +140,72 @@ const HistoryPage = () => {
                 <CardTitle>Registros de Atendimento</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {filteredMeasurements.map((measurement) => (
-                    <div key={measurement.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-lg">{measurement.clientName}</h3>
-                          <Badge 
-                            variant={measurement.type === 'aferição' ? 'default' : 'secondary'}
-                            className="text-xs"
-                          >
-                            {measurement.type === 'aferição' ? 'Aferição' : 'Sugestão'}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {new Date(measurement.date).toLocaleDateString('pt-BR')} às {measurement.time}
+                {filteredMeasurements.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {records.length === 0 ? 'Nenhum registro encontrado' : 'Nenhum resultado para sua busca'}
+                    </h3>
+                    <p className="text-gray-600">
+                      {records.length === 0 
+                        ? 'Ainda não há aferições ou sugestões registradas nesta ótica.'
+                        : 'Tente ajustar os termos de busca para encontrar os registros desejados.'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredMeasurements.map((measurement) => (
+                      <div key={measurement.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-semibold text-lg">{measurement.clientName}</h3>
+                            <Badge 
+                              variant={measurement.type === 'aferição' ? 'default' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {measurement.type === 'aferição' ? 'Aferição' : 'Sugestão'}
+                            </Badge>
                           </div>
-                          {measurement.type === 'aferição' && measurement.dp && (
-                            <span className="font-medium">DP: {measurement.dp}mm</span>
-                          )}
-                          {measurement.type === 'sugestão' && measurement.frameStyle && (
-                            <span className="font-medium">Estilo: {measurement.frameStyle}</span>
-                          )}
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              {new Date(measurement.date).toLocaleDateString('pt-BR')} às {measurement.time}
+                            </div>
+                            {measurement.type === 'aferição' && measurement.dp && (
+                              <span className="font-medium">DP: {measurement.dp}mm</span>
+                            )}
+                            {measurement.type === 'sugestão' && 'frameStyle' in measurement && measurement.frameStyle && (
+                              <span className="font-medium">Estilo: {measurement.frameStyle}</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleViewDetails(measurement)}
-                          className="flex items-center gap-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          Ver Detalhes
-                        </Button>
-                        {measurement.type === 'aferição' && (
+                        <div className="flex gap-2">
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => handlePrint(measurement)}
+                            onClick={() => handleViewDetails(measurement)}
                             className="flex items-center gap-2"
                           >
-                            <Printer className="h-4 w-4" />
-                            Reimprimir
+                            <Eye className="h-4 w-4" />
+                            Ver Detalhes
                           </Button>
-                        )}
+                          {measurement.type === 'aferição' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handlePrint(measurement)}
+                              className="flex items-center gap-2"
+                            >
+                              <Printer className="h-4 w-4" />
+                              Reimprimir
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -262,29 +240,39 @@ const HistoryPage = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                        <span className="font-medium">DP (Binocular):</span>
-                        <span className="text-xl font-bold text-primary">{selectedMeasurement.dp} mm</span>
+                      {selectedMeasurement.dp && (
+                        <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                          <span className="font-medium">DP (Binocular):</span>
+                          <span className="text-xl font-bold text-primary">{selectedMeasurement.dp} mm</span>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedMeasurement.dnpLeft && (
+                          <div className="text-center p-3 border rounded-lg">
+                            <p className="text-sm text-gray-600">DNP Esquerda</p>
+                            <p className="text-lg font-bold">{selectedMeasurement.dnpLeft} mm</p>
+                          </div>
+                        )}
+                        {selectedMeasurement.dnpRight && (
+                          <div className="text-center p-3 border rounded-lg">
+                            <p className="text-sm text-gray-600">DNP Direita</p>
+                            <p className="text-lg font-bold">{selectedMeasurement.dnpRight} mm</p>
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="text-center p-3 border rounded-lg">
-                          <p className="text-sm text-gray-600">DNP Esquerda</p>
-                          <p className="text-lg font-bold">{selectedMeasurement.dnpLeft} mm</p>
-                        </div>
-                        <div className="text-center p-3 border rounded-lg">
-                          <p className="text-sm text-gray-600">DNP Direita</p>
-                          <p className="text-lg font-bold">{selectedMeasurement.dnpRight} mm</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="text-center p-3 border rounded-lg">
-                          <p className="text-sm text-gray-600">Altura Esquerda</p>
-                          <p className="text-lg font-bold">{selectedMeasurement.heightLeft} mm</p>
-                        </div>
-                        <div className="text-center p-3 border rounded-lg">
-                          <p className="text-sm text-gray-600">Altura Direita</p>
-                          <p className="text-lg font-bold">{selectedMeasurement.heightRight} mm</p>
-                        </div>
+                        {selectedMeasurement.heightLeft && (
+                          <div className="text-center p-3 border rounded-lg">
+                            <p className="text-sm text-gray-600">Altura Esquerda</p>
+                            <p className="text-lg font-bold">{selectedMeasurement.heightLeft} mm</p>
+                          </div>
+                        )}
+                        {selectedMeasurement.heightRight && (
+                          <div className="text-center p-3 border rounded-lg">
+                            <p className="text-sm text-gray-600">Altura Direita</p>
+                            <p className="text-lg font-bold">{selectedMeasurement.heightRight} mm</p>
+                          </div>
+                        )}
                       </div>
                       <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
                         <span className="font-medium">Largura da Armação:</span>
@@ -322,18 +310,22 @@ const HistoryPage = () => {
                   <div className="space-y-4">
                     <div className="p-4 border rounded-lg">
                       <h3 className="text-lg font-bold mb-2">{selectedMeasurement.frameStyle}</h3>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-sm text-gray-600">Confiança:</span>
-                        <Badge variant="secondary">{selectedMeasurement.confidence}%</Badge>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-2">Cores recomendadas:</p>
-                        <div className="flex gap-2">
-                          {selectedMeasurement.colors?.map((color: string, index: number) => (
-                            <Badge key={index} variant="outline">{color}</Badge>
-                          ))}
+                      {selectedMeasurement.confidence && (
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-sm text-gray-600">Confiança:</span>
+                          <Badge variant="secondary">{selectedMeasurement.confidence}%</Badge>
                         </div>
-                      </div>
+                      )}
+                      {selectedMeasurement.colors && selectedMeasurement.colors.length > 0 && (
+                        <div>
+                          <p className="text-sm text-gray-600 mb-2">Cores recomendadas:</p>
+                          <div className="flex gap-2">
+                            {selectedMeasurement.colors.map((color: string, index: number) => (
+                              <Badge key={index} variant="outline">{color}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
