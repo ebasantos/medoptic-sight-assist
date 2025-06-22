@@ -2,7 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const deepseekApiKey = Deno.env.get('DEEPSEEK_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,23 +24,23 @@ serve(async (req) => {
       );
     }
 
-    if (!openAIApiKey) {
+    if (!deepseekApiKey) {
       return new Response(
-        JSON.stringify({ error: 'Chave da API OpenAI não configurada' }), 
+        JSON.stringify({ error: 'Chave da API DeepSeek não configurada' }), 
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Analisando imagem com OpenAI Vision...');
+    console.log('Analisando imagem com DeepSeek Vision...');
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${deepseekApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'deepseek-chat',
         messages: [
           {
             role: 'system',
@@ -90,21 +90,22 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
           }
         ],
         max_tokens: 800,
-        temperature: 0.1
+        temperature: 0.1,
+        stream: false
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro da OpenAI:', response.status, errorText);
+      console.error('Erro do DeepSeek:', response.status, errorText);
       
       let errorMessage = 'Erro na análise da imagem';
       if (response.status === 429) {
-        errorMessage = 'Limite de uso da API OpenAI excedido. Tente novamente mais tarde.';
+        errorMessage = 'Limite de uso da API DeepSeek excedido. Tente novamente mais tarde.';
       } else if (response.status === 401) {
-        errorMessage = 'Chave da API OpenAI inválida';
+        errorMessage = 'Chave da API DeepSeek inválida';
       } else if (response.status >= 500) {
-        errorMessage = 'Erro interno da OpenAI. Tente novamente.';
+        errorMessage = 'Erro interno do DeepSeek. Tente novamente.';
       }
       
       return new Response(
@@ -116,15 +117,15 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
     const data = await response.json();
     
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error('Resposta inválida da OpenAI:', data);
+      console.error('Resposta inválida do DeepSeek:', data);
       return new Response(
-        JSON.stringify({ error: 'Resposta inválida da API OpenAI' }), 
+        JSON.stringify({ error: 'Resposta inválida da API DeepSeek' }), 
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
     const content = data.choices[0].message.content;
-    console.log('Resposta da OpenAI:', content);
+    console.log('Resposta do DeepSeek:', content);
 
     // Tentar extrair JSON da resposta
     let measurements;
