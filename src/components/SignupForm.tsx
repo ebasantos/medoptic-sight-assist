@@ -46,18 +46,30 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
     try {
       console.log('=== INICIANDO CADASTRO ===');
       console.log('Email:', email);
-      console.log('É admin?', email === 'erik@admin.com');
+      const isAdmin = email === 'erik@admin.com';
+      console.log('É admin?', isAdmin);
       
-      // Fazer o signup SEM validação de email
+      // Configuração diferente para admin vs funcionário
+      const signupOptions = isAdmin ? {
+        // Para admin: sem validação de email
+        emailRedirectTo: undefined,
+        data: {
+          email_confirm: true // Marcar como confirmado automaticamente
+        }
+      } : {
+        // Para funcionário: processo normal mas sem confirmação
+        emailRedirectTo: undefined,
+        data: {
+          email_confirm: false
+        }
+      };
+
+      console.log('Opções de signup:', signupOptions);
+      
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: undefined, // Remove redirecionamento de email
-          data: {
-            email_confirm: false // Não requer confirmação de email
-          }
-        }
+        options: signupOptions
       });
 
       console.log('Resultado signup:', { authData, authError });
@@ -70,11 +82,22 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       if (authData?.user) {
         console.log('Usuário criado no auth:', authData.user.id);
         
+        // Se for admin, forçar confirmação do email via SQL
+        if (isAdmin) {
+          console.log('Confirmando email do admin automaticamente...');
+          const { error: confirmError } = await supabase.rpc('confirm_admin_email', {
+            admin_email: email
+          });
+          
+          if (confirmError) {
+            console.warn('Erro ao confirmar email (ignorado):', confirmError);
+          }
+        }
+        
         // Aguardar um pouco para garantir que o usuário foi criado no auth
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Preparar dados do usuário
-        const isAdmin = email === 'erik@admin.com';
         const userData = {
           user_id: authData.user.id,
           nome: name,
@@ -108,7 +131,9 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         
         toast({
           title: "Sucesso!",
-          description: "Conta criada com sucesso! Agora você pode fazer login.",
+          description: isAdmin 
+            ? "Conta admin criada com sucesso! Agora você pode fazer login." 
+            : "Conta criada com sucesso! Agora você pode fazer login.",
         });
         
         // Limpar formulário
@@ -131,6 +156,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         errorMessage = "Email inválido. Verifique o formato.";
       } else if (error.message?.includes('Password')) {
         errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
+      } else if (error.message?.includes('Email rate limit exceeded')) {
+        errorMessage = "Muitas tentativas. Aguarde alguns minutos.";
       } else if (error.message) {
         errorMessage = error.message;
       }
