@@ -4,33 +4,44 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Camera, Glasses } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Glasses, Brain, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import CameraCapture from '@/components/CameraCapture';
+import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
 
 const FrameSuggestionPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isAnalyzing, faceAnalysis, error, analyzeFaceCharacteristics } = useFacialMeasurements();
   
   const [step, setStep] = useState<'camera' | 'analysis'>('camera');
-  const [loading, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
-    nomeCliente: '',
-    formatoRosto: '',
-    tomPele: '',
-    distanciaOlhos: ''
+    nomeCliente: ''
   });
 
-  const handleImageCapture = (imageData: string) => {
+  const handleImageCapture = async (imageData: string) => {
     console.log('Imagem capturada na página de sugestão');
     setCapturedImage(imageData);
-    setStep('analysis');
+    
+    try {
+      // Analisar características automaticamente
+      await analyzeFaceCharacteristics(imageData);
+      setStep('analysis');
+    } catch (error) {
+      console.error('Erro na análise automática:', error);
+      toast({
+        title: "Erro na Análise",
+        description: "Erro ao analisar características faciais. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   const uploadImage = async (imageData: string): Promise<string | null> => {
@@ -73,10 +84,12 @@ const FrameSuggestionPage = () => {
   };
 
   const generateSuggestions = () => {
+    if (!faceAnalysis) return [];
+    
     const suggestions = [];
     
-    // Lógica básica de sugestões baseada no formato do rosto
-    switch (formData.formatoRosto.toLowerCase()) {
+    // Lógica de sugestões baseada no formato do rosto detectado
+    switch (faceAnalysis.formatoRosto) {
       case 'oval':
         suggestions.push({
           tipo: 'Armação Quadrada',
@@ -117,6 +130,26 @@ const FrameSuggestionPage = () => {
           motivo: 'Harmoniza com o queixo mais fino'
         });
         break;
+      case 'losango':
+        suggestions.push({
+          tipo: 'Armação Oval Larga',
+          motivo: 'Suaviza os ângulos e alarga o rosto'
+        });
+        suggestions.push({
+          tipo: 'Armação Cat-Eye',
+          motivo: 'Equilibra as proporções do rosto'
+        });
+        break;
+      case 'retangular':
+        suggestions.push({
+          tipo: 'Armação Redonda Grande',
+          motivo: 'Quebra as linhas retas e adiciona suavidade'
+        });
+        suggestions.push({
+          tipo: 'Armação Oversized',
+          motivo: 'Cria equilíbrio com o rosto alongado'
+        });
+        break;
       default:
         suggestions.push({
           tipo: 'Armação Clássica',
@@ -128,7 +161,7 @@ const FrameSuggestionPage = () => {
   };
 
   const handleSave = async () => {
-    if (!user || !capturedImage) return;
+    if (!user || !capturedImage || !faceAnalysis) return;
 
     setSaving(true);
     try {
@@ -154,9 +187,9 @@ const FrameSuggestionPage = () => {
           usuario_id: user.id,
           nome_cliente: formData.nomeCliente,
           foto_url: fotoUrl,
-          formato_rosto: formData.formatoRosto,
-          tom_pele: formData.tomPele,
-          distancia_olhos: formData.distanciaOlhos,
+          formato_rosto: faceAnalysis.formatoRosto,
+          tom_pele: faceAnalysis.tomPele,
+          distancia_olhos: faceAnalysis.distanciaOlhos,
           sugestoes
         });
 
@@ -203,7 +236,7 @@ const FrameSuggestionPage = () => {
     );
   }
 
-  const sugestoes = formData.formatoRosto ? generateSuggestions() : [];
+  const sugestoes = faceAnalysis ? generateSuggestions() : [];
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -218,7 +251,7 @@ const FrameSuggestionPage = () => {
             Voltar
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">
-            {step === 'camera' ? 'Capturar Foto do Cliente' : 'Análise Facial'}
+            {step === 'camera' ? 'Capturar Foto do Cliente' : 'Análise Facial Automática'}
           </h1>
         </div>
 
@@ -251,13 +284,67 @@ const FrameSuggestionPage = () => {
               </CardContent>
             </Card>
 
-            {/* Formulário de análise */}
+            {/* Análise automática */}
             <Card>
               <CardHeader>
-                <CardTitle>Dados da Análise</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  Análise Automática
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
+                {isAnalyzing && (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span>Analisando características faciais...</span>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
+
+                {faceAnalysis && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-green-600 mb-3">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="font-medium">Análise Concluída</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="p-3 bg-blue-50 rounded-lg">
+                        <Label className="font-semibold text-blue-900">Formato do Rosto</Label>
+                        <p className="text-blue-700 capitalize">{faceAnalysis.formatoRosto}</p>
+                      </div>
+                      
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <Label className="font-semibold text-green-900">Tom de Pele</Label>
+                        <p className="text-green-700 capitalize">{faceAnalysis.tomPele}</p>
+                      </div>
+                      
+                      <div className="p-3 bg-purple-50 rounded-lg">
+                        <Label className="font-semibold text-purple-900">Distância entre Olhos</Label>
+                        <p className="text-purple-700 capitalize">{faceAnalysis.distanciaOlhos}</p>
+                      </div>
+                      
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <Label className="font-semibold text-gray-900">Confiabilidade</Label>
+                        <p className="text-gray-700">{Math.round((faceAnalysis.confiabilidade || 0) * 100)}%</p>
+                      </div>
+                    </div>
+
+                    {faceAnalysis.observacoes && (
+                      <div className="p-3 bg-yellow-50 rounded-lg">
+                        <Label className="font-semibold text-yellow-900">Observações</Label>
+                        <p className="text-yellow-700 text-sm">{faceAnalysis.observacoes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="pt-4 border-t">
                   <Label htmlFor="nomeCliente">Nome do Cliente *</Label>
                   <Input
                     id="nomeCliente"
@@ -268,62 +355,13 @@ const FrameSuggestionPage = () => {
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="formatoRosto">Formato do Rosto</Label>
-                  <select
-                    id="formatoRosto"
-                    value={formData.formatoRosto}
-                    onChange={(e) => setFormData({ ...formData, formatoRosto: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Selecione o formato</option>
-                    <option value="oval">Oval</option>
-                    <option value="redondo">Redondo</option>
-                    <option value="quadrado">Quadrado</option>
-                    <option value="coração">Coração</option>
-                    <option value="losango">Losango</option>
-                    <option value="retangular">Retangular</option>
-                  </select>
-                </div>
-
-                <div>
-                  <Label htmlFor="tomPele">Tom de Pele</Label>
-                  <select
-                    id="tomPele"
-                    value={formData.tomPele}
-                    onChange={(e) => setFormData({ ...formData, tomPele: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Selecione o tom</option>
-                    <option value="claro">Claro</option>
-                    <option value="medio">Médio</option>
-                    <option value="escuro">Escuro</option>
-                    <option value="bronzeado">Bronzeado</option>
-                  </select>
-                </div>
-
-                <div>
-                  <Label htmlFor="distanciaOlhos">Distância entre os Olhos</Label>
-                  <select
-                    id="distanciaOlhos"
-                    value={formData.distanciaOlhos}
-                    onChange={(e) => setFormData({ ...formData, distanciaOlhos: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Selecione a distância</option>
-                    <option value="próximos">Próximos</option>
-                    <option value="normais">Normais</option>
-                    <option value="afastados">Afastados</option>
-                  </select>
-                </div>
-
                 <Button 
                   onClick={handleSave}
-                  disabled={loading || !formData.nomeCliente}
+                  disabled={saving || !formData.nomeCliente || !faceAnalysis}
                   className="w-full"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {loading ? 'Salvando...' : 'Salvar Análise'}
+                  {saving ? 'Salvando...' : 'Salvar Análise'}
                 </Button>
               </CardContent>
             </Card>
@@ -334,7 +372,7 @@ const FrameSuggestionPage = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Glasses className="h-5 w-5" />
-                    Sugestões de Armação
+                    Sugestões de Armação Baseadas na Análise
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
