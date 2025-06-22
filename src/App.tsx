@@ -4,7 +4,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useState } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -16,26 +15,36 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
+const AppRoutes = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<LoginPage />} />
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/optica" element={<OpticDashboard />} />
+      <Route path="/aferir" element={<MeasurementPage />} />
+      <Route path="/sugestao" element={<FrameSuggestionPage />} />
+      <Route path="/historico" element={<HistoryPage />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
+
+const App = () => {
+  console.log('🚀 Iniciando App...');
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LoginPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/optica" element={<OpticDashboard />} />
-            <Route path="/aferir" element={<MeasurementPage />} />
-            <Route path="/sugestao" element={<FrameSuggestionPage />} />
-            <Route path="/historico" element={<HistoryPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AuthProvider>
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </AuthProvider>
         </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
