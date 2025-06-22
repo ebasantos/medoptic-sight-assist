@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Camera, AlertCircle, CheckCircle } from 'lucide-react';
+import { Camera, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCamera } from '@/hooks/useCamera';
@@ -97,59 +97,61 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       <Card>
         <CardContent className="p-4">
           <div className="aspect-video rounded-lg overflow-hidden bg-gray-900 relative">
-            {isActive ? (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                  style={{ transform: 'scaleX(-1)' }}
-                  onLoadedMetadata={() => console.log('Video onLoadedMetadata - componente')}
-                  onCanPlay={() => console.log('Video onCanPlay - componente')}
-                  onPlay={() => console.log('Video onPlay - componente')}
-                  onError={(e) => console.error('Video onError - componente:', e)}
-                />
-                
-                {/* Guias visuais */}
-                {showGuides && (
-                  <div className="absolute inset-0 pointer-events-none">
-                    {/* Linhas centrais */}
-                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30 transform -translate-x-1/2"></div>
-                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/30 transform -translate-y-1/2"></div>
-                    
-                    {guideType === 'measurement' && (
-                      <>
-                        {/* Linhas para alinhamento dos olhos */}
-                        <div className="absolute top-1/3 left-1/4 right-1/4 h-0.5 bg-yellow-400/60"></div>
-                        <div className="absolute top-2/3 left-1/4 right-1/4 h-0.5 bg-yellow-400/60"></div>
-                      </>
-                    )}
-                    
-                    {guideType === 'face-analysis' && (
-                      <>
-                        {/* Oval para posicionamento do rosto */}
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
-                                        w-40 h-52 border-2 border-yellow-400/60 rounded-full"></div>
-                      </>
-                    )}
-                  </div>
-                )}
-                
-                {/* Indicador de status */}
-                <div className="absolute top-4 left-4">
-                  <div className="flex items-center gap-2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    Câmera Ativa
-                  </div>
-                </div>
-              </>
-            ) : (
+            {/* Elemento de vídeo sempre presente */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${isActive ? 'block' : 'hidden'}`}
+              style={{ transform: 'scaleX(-1)' }}
+              onLoadedMetadata={() => console.log('Video onLoadedMetadata - componente')}
+              onCanPlay={() => console.log('Video onCanPlay - componente')}
+              onPlay={() => console.log('Video onPlay - componente')}
+              onError={(e) => console.error('Video onError - componente:', e)}
+            />
+            
+            {/* Placeholder quando câmera não está ativa */}
+            {!isActive && (
               <div className="flex items-center justify-center h-full text-white">
                 <div className="text-center">
                   <Camera className="h-16 w-16 mx-auto mb-4" />
                   <p className="text-lg">Pressione o botão para ativar a câmera</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Guias visuais */}
+            {showGuides && isActive && (
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Linhas centrais */}
+                <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30 transform -translate-x-1/2"></div>
+                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/30 transform -translate-y-1/2"></div>
+                
+                {guideType === 'measurement' && (
+                  <>
+                    {/* Linhas para alinhamento dos olhos */}
+                    <div className="absolute top-1/3 left-1/4 right-1/4 h-0.5 bg-yellow-400/60"></div>
+                    <div className="absolute top-2/3 left-1/4 right-1/4 h-0.5 bg-yellow-400/60"></div>
+                  </>
+                )}
+                
+                {guideType === 'face-analysis' && (
+                  <>
+                    {/* Oval para posicionamento do rosto */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
+                                    w-40 h-52 border-2 border-yellow-400/60 rounded-full"></div>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {/* Indicador de status */}
+            {isActive && (
+              <div className="absolute top-4 left-4">
+                <div className="flex items-center gap-2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  Câmera Ativa
                 </div>
               </div>
             )}
