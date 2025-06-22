@@ -75,40 +75,104 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
   }
 };
 
-// Função de login usando Supabase Auth
+// Função de login simples que funciona com usuários criados diretamente na tabela
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
-    console.log('Iniciando processo de login para:', email);
+    console.log('Tentando login para:', email);
     
-    // Limpar sessão existente
-    await supabase.auth.signOut();
-    
-    // Fazer login com Supabase Auth
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    // Primeiro verificar se o usuário existe na nossa tabela
+    const { data: existingUser, error: checkError } = await supabase
+      .from('usuarios_optica')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
 
-    if (error) {
-      console.error('Erro no login do Supabase Auth:', error);
+    if (checkError) {
+      console.error('Erro ao verificar usuário:', checkError);
       return { success: false };
     }
 
-    if (data.user) {
-      console.log('Usuário autenticado no Supabase Auth:', data.user.email);
-      
-      // Buscar dados adicionais do usuário
-      const userData = await fetchUserData(data.user);
-      
-      if (userData) {
-        console.log('Login realizado com sucesso:', userData);
-        return { success: true, userData };
-      } else {
-        console.error('Usuário autenticado mas não encontrado na tabela usuarios_optica');
-        // Fazer logout se não encontrar dados do usuário
-        await supabase.auth.signOut();
+    if (!existingUser) {
+      console.log('Usuário não encontrado na tabela usuarios_optica');
+      return { success: false };
+    }
+
+    console.log('Usuário encontrado na tabela:', existingUser);
+
+    // Tentar login com Supabase Auth
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        console.error('Erro no login do Supabase Auth:', error);
+        // Se o erro for de usuário não encontrado, tentar criar no auth
+        if (error.message.includes('Invalid login credentials')) {
+          console.log('Tentando criar usuário no Auth...');
+          
+          // Tentar signup silencioso
+          const { data: signupData, error: signupError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                name: existingUser.nome
+              }
+            }
+          });
+
+          if (signupError) {
+            console.error('Erro no signup:', signupError);
+            return { success: false };
+          }
+
+          // Se conseguiu criar, tentar login novamente
+          if (signupData.user) {
+            const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+              email,
+              password
+            });
+
+            if (retryError) {
+              console.error('Erro no retry login:', retryError);
+              return { success: false };
+            }
+
+            if (retryData.user) {
+              // Atualizar user_id na tabela
+              await supabase
+                .from('usuarios_optica')
+                .update({ user_id: retryData.user.id })
+                .eq('email', email);
+
+              const userData = await fetchUserData(retryData.user);
+              return { success: true, userData };
+            }
+          }
+        }
         return { success: false };
       }
+
+      if (data.user) {
+        console.log('Login realizado com sucesso no Auth:', data.user.email);
+        
+        // Buscar dados adicionais do usuário
+        const userData = await fetchUserData(data.user);
+        
+        if (userData) {
+          console.log('Login realizado com sucesso:', userData);
+          return { success: true, userData };
+        } else {
+          console.error('Usuário autenticado mas não encontrado na tabela usuarios_optica');
+          return { success: false };
+        }
+      }
+
+    } catch (authError) {
+      console.error('Erro geral no Auth:', authError);
+      return { success: false };
     }
 
     return { success: false };
