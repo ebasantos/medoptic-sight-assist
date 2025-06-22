@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -15,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useHistoryData } from '@/hooks/useHistoryData';
+import { generateTechnicalSheet } from '@/utils/pdfGenerator';
 
 const HistoryPage = () => {
   const navigate = useNavigate();
@@ -31,8 +31,11 @@ const HistoryPage = () => {
   };
 
   const handlePrint = (measurement: any) => {
-    console.log('Imprimindo ficha para:', measurement.clientName);
-    // Aqui implementaria a lógica de impressão
+    console.log('Gerando ficha técnica para:', measurement.clientName);
+    
+    if (measurement.type === 'aferição') {
+      generateTechnicalSheet(measurement);
+    }
   };
 
   if (loading) {
