@@ -43,12 +43,12 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
   }
 };
 
-// Função de login usando Supabase Auth
+// Função de login usando Supabase Auth (aceita usuários não confirmados)
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
     console.log('Tentando login com Supabase Auth para:', email);
     
-    // Fazer login com Supabase Auth
+    // Fazer login com Supabase Auth (permite usuários não confirmados)
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -65,6 +65,7 @@ export const performLogin = async (email: string, password: string): Promise<{ s
     }
 
     console.log('Login realizado com sucesso no Auth:', authData.user.email);
+    console.log('Email confirmado?', authData.user.email_confirmed_at);
     
     // Buscar dados do usuário na tabela usuarios_optica
     const userData = await fetchUserData(authData.user.email!);

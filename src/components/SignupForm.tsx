@@ -65,14 +65,15 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         throw new Error('Este email já está cadastrado no sistema');
       }
 
-      // Primeiro criar usuário no Supabase Auth sem email de confirmação
+      // Criar usuário no Supabase Auth SEM confirmação de email
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
         password: password,
         options: {
           emailRedirectTo: undefined, // Sem redirect
           data: {
-            name: name
+            name: name,
+            email_confirm: false // Desabilitar confirmação
           }
         }
       });
@@ -117,11 +118,19 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
 
       console.log('Usuário criado com sucesso:', userData);
 
-      // Confirmar email automaticamente para evitar problemas
+      // Confirmar email automaticamente via função do banco
       if (authData.user && !authData.user.email_confirmed_at) {
         try {
-          await supabase.rpc('confirm_admin_email', { admin_email: email });
-          console.log('Email confirmado automaticamente');
+          console.log('Confirmando email automaticamente...');
+          const { error: confirmError } = await supabase.rpc('confirm_admin_email', { 
+            admin_email: email 
+          });
+          
+          if (confirmError) {
+            console.error('Erro ao confirmar email:', confirmError);
+          } else {
+            console.log('Email confirmado automaticamente');
+          }
         } catch (confirmError) {
           console.error('Erro ao confirmar email:', confirmError);
         }
@@ -261,11 +270,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         </div>
         
         <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-          <p className="font-medium mb-2">✅ Sistema atualizado:</p>
-          <p>• Cadastro com confirmação automática</p>
+          <p className="font-medium mb-2">✅ Sistema sem confirmação de email:</p>
+          <p>• Cadastro direto sem emails</p>
           <p>• Use <strong>erik@admin.com</strong> para acesso admin</p>
           <p>• Qualquer senha com 6+ caracteres</p>
-          <p>• Login direto após cadastro</p>
+          <p>• Login imediato após cadastro</p>
         </div>
       </CardContent>
     </Card>

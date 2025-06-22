@@ -16,13 +16,14 @@ export const useAuthState = () => {
     // Função para processar mudanças de autenticação
     const handleAuthChange = async (event: string, session: any) => {
       console.log('Auth state changed:', event, session?.user?.email);
+      console.log('Email confirmado?', session?.user?.email_confirmed_at);
       
       if (!mounted) return;
 
       try {
         if (session?.user) {
-          // Buscar dados do usuário
-          const userData = await fetchUserData(session.user);
+          // Buscar dados do usuário (independente de confirmação de email)
+          const userData = await fetchUserData(session.user.email);
           if (mounted) {
             setUser(userData);
             setLoading(false);
