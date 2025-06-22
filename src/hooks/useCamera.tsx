@@ -15,6 +15,31 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const waitForVideoElement = useCallback((): Promise<HTMLVideoElement> => {
+    return new Promise((resolve, reject) => {
+      const maxAttempts = 50; // 5 segundos com intervalo de 100ms
+      let attempts = 0;
+      
+      const checkElement = () => {
+        if (videoRef.current) {
+          console.log('Elemento de vídeo encontrado após', attempts, 'tentativas');
+          resolve(videoRef.current);
+          return;
+        }
+        
+        attempts++;
+        if (attempts >= maxAttempts) {
+          reject(new Error('Elemento de vídeo não encontrado após tempo limite'));
+          return;
+        }
+        
+        setTimeout(checkElement, 100);
+      };
+      
+      checkElement();
+    });
+  }, []);
+
   const startCamera = useCallback(async () => {
     try {
       setError(null);
@@ -25,6 +50,11 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('API de câmera não disponível neste navegador');
       }
+
+      // Aguardar o elemento de vídeo estar disponível
+      console.log('Aguardando elemento de vídeo...');
+      const video = await waitForVideoElement();
+      console.log('Elemento de vídeo disponível, solicitando stream...');
 
       // Solicitar permissão para usar a câmera
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -40,53 +70,48 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
       console.log('Tracks do stream:', stream.getTracks());
       streamRef.current = stream;
 
-      if (videoRef.current) {
-        console.log('Elemento de vídeo encontrado, configurando...');
-        const video = videoRef.current;
+      console.log('Configurando elemento de vídeo...');
+      
+      // Configurar eventos do vídeo antes de definir o srcObject
+      video.onloadstart = () => console.log('Video: loadstart');
+      video.onloadeddata = () => console.log('Video: loadeddata');
+      video.onloadedmetadata = () => {
+        console.log('Video: loadedmetadata - dimensões:', video.videoWidth, 'x', video.videoHeight);
         
-        // Configurar eventos do vídeo antes de definir o srcObject
-        video.onloadstart = () => console.log('Video: loadstart');
-        video.onloadeddata = () => console.log('Video: loadeddata');
-        video.onloadedmetadata = () => {
-          console.log('Video: loadedmetadata - dimensões:', video.videoWidth, 'x', video.videoHeight);
-          
-          // Tentar reproduzir o vídeo
-          const playPromise = video.play();
-          if (playPromise !== undefined) {
-            playPromise
-              .then(() => {
-                console.log('Vídeo iniciado com sucesso');
-                setIsActive(true);
-                setHasPermission(true);
-              })
-              .catch((playError) => {
-                console.error('Erro ao reproduzir vídeo:', playError);
-                setError(`Erro ao reproduzir vídeo: ${playError.message}`);
-              });
-          }
-        };
-        
-        video.oncanplay = () => console.log('Video: canplay');
-        video.oncanplaythrough = () => console.log('Video: canplaythrough');
-        video.onplaying = () => console.log('Video: playing');
-        video.onplay = () => console.log('Video: play');
-        
-        video.onerror = (err) => {
-          console.error('Erro no elemento de vídeo:', err);
-          setError('Erro ao carregar vídeo');
-        };
+        // Tentar reproduzir o vídeo
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log('Vídeo iniciado com sucesso');
+              setIsActive(true);
+              setHasPermission(true);
+            })
+            .catch((playError) => {
+              console.error('Erro ao reproduzir vídeo:', playError);
+              setError(`Erro ao reproduzir vídeo: ${playError.message}`);
+            });
+        }
+      };
+      
+      video.oncanplay = () => console.log('Video: canplay');
+      video.oncanplaythrough = () => console.log('Video: canplaythrough');
+      video.onplaying = () => console.log('Video: playing');
+      video.onplay = () => console.log('Video: play');
+      
+      video.onerror = (err) => {
+        console.error('Erro no elemento de vídeo:', err);
+        setError('Erro ao carregar vídeo');
+      };
 
-        // Definir o stream como fonte do vídeo
-        video.srcObject = stream;
-        console.log('srcObject definido no vídeo');
-        
-        // Forçar carregamento
-        video.load();
-        console.log('video.load() chamado');
-      } else {
-        console.error('Elemento de vídeo não encontrado!');
-        throw new Error('Elemento de vídeo não encontrado');
-      }
+      // Definir o stream como fonte do vídeo
+      video.srcObject = stream;
+      console.log('srcObject definido no vídeo');
+      
+      // Forçar carregamento
+      video.load();
+      console.log('video.load() chamado');
+
     } catch (err) {
       console.error('Erro ao acessar a câmera:', err);
       setHasPermission(false);
@@ -112,7 +137,7 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
         setError('Erro desconhecido ao acessar a câmera');
       }
     }
-  }, []);
+  }, [waitForVideoElement]);
 
   const stopCamera = useCallback(() => {
     console.log('Parando câmera...');
