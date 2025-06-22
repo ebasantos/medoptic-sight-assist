@@ -1,15 +1,15 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Camera } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Brain, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import CameraCapture from '@/components/CameraCapture';
+import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
 
 const MeasurementPage = () => {
   const navigate = useNavigate();
@@ -19,6 +19,8 @@ const MeasurementPage = () => {
   const [step, setStep] = useState<'camera' | 'measurements'>('camera');
   const [loading, setSaving] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  
+  const { isAnalyzing, measurements, error: analysisError, analyzeFacialMeasurements } = useFacialMeasurements();
   
   const [formData, setFormData] = useState({
     nomeCliente: '',
@@ -37,9 +39,45 @@ const MeasurementPage = () => {
     setStep('measurements');
   };
 
+  const handleAutoAnalysis = async () => {
+    if (!capturedImage || !formData.larguraArmacao) {
+      toast({
+        title: "Informações incompletas",
+        description: "É necessário informar a largura da armação antes da análise automática",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const result = await analyzeFacialMeasurements(capturedImage, parseFloat(formData.larguraArmacao));
+      
+      // Atualizar formulário com os valores calculados
+      setFormData(prev => ({
+        ...prev,
+        dpBinocular: result.dpBinocular.toFixed(1),
+        dnpEsquerda: result.dnpEsquerda.toFixed(1),
+        dnpDireita: result.dnpDireita.toFixed(1),
+        alturaEsquerda: result.alturaEsquerda.toFixed(1),
+        alturaDireita: result.alturaDireita.toFixed(1),
+        larguraLente: result.larguraLente.toFixed(1)
+      }));
+
+      toast({
+        title: "Análise concluída",
+        description: `Medições calculadas automaticamente (${Math.round(result.confiabilidade * 100)}% de confiança)`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro na análise",
+        description: "Não foi possível analisar a imagem automaticamente. Insira as medidas manualmente.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const uploadImage = async (imageData: string): Promise<string | null> => {
     try {
-      // Converter base64 para blob
       const base64Data = imageData.split(',')[1];
       const byteCharacters = atob(base64Data);
       const byteNumbers = new Array(byteCharacters.length);
@@ -51,10 +89,8 @@ const MeasurementPage = () => {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
       
-      // Gerar nome único para o arquivo
       const fileName = `afericao_${Date.now()}.jpg`;
       
-      // Upload para Supabase Storage
       const { data, error } = await supabase.storage
         .from('fotos-clientes')
         .upload(fileName, blob);
@@ -64,7 +100,6 @@ const MeasurementPage = () => {
         return null;
       }
 
-      // Obter URL pública
       const { data: publicData } = supabase.storage
         .from('fotos-clientes')
         .getPublicUrl(fileName);
@@ -81,7 +116,6 @@ const MeasurementPage = () => {
 
     setSaving(true);
     try {
-      // Upload da imagem
       const fotoUrl = await uploadImage(capturedImage);
       
       if (!fotoUrl) {
@@ -93,7 +127,6 @@ const MeasurementPage = () => {
         return;
       }
 
-      // Salvar aferição no banco
       const { error } = await supabase
         .from('afericoes')
         .insert({
@@ -180,7 +213,6 @@ const MeasurementPage = () => {
 
         {step === 'measurements' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Foto capturada */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -199,7 +231,6 @@ const MeasurementPage = () => {
               </CardContent>
             </Card>
 
-            {/* Formulário de medições */}
             <Card>
               <CardHeader>
                 <CardTitle>Dados da Aferição</CardTitle>
@@ -229,6 +260,48 @@ const MeasurementPage = () => {
                   />
                 </div>
 
+                {/* Botão de análise automática */}
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Brain className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="font-medium text-blue-900 mb-1">Análise Automática com IA</h4>
+                        <p className="text-sm text-blue-700 mb-3">
+                          Use inteligência artificial para calcular automaticamente as medidas faciais a partir da foto.
+                        </p>
+                        <Button 
+                          onClick={handleAutoAnalysis}
+                          disabled={isAnalyzing || !formData.larguraArmacao}
+                          variant="outline"
+                          size="sm"
+                          className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                        >
+                          <Brain className="h-4 w-4 mr-2" />
+                          {isAnalyzing ? 'Analisando...' : 'Calcular Medidas'}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {analysisError && (
+                      <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 mt-0.5" />
+                        <span>{analysisError}</span>
+                      </div>
+                    )}
+                    
+                    {measurements && (
+                      <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                        <strong>Análise concluída!</strong> Confiança: {Math.round(measurements.confiabilidade * 100)}%
+                        {measurements.observacoes && (
+                          <div className="mt-1 text-xs">{measurements.observacoes}</div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Campos de medidas */}
                 <div>
                   <Label htmlFor="dpBinocular">DP Binocular (mm)</Label>
                   <Input
