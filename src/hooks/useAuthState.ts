@@ -25,19 +25,18 @@ export const useAuthState = () => {
           const userData = await fetchUserData(session.user.email);
           if (mounted) {
             setUser(userData);
+            setLoading(false);
           }
         } else {
           if (mounted) {
             setUser(null);
+            setLoading(false);
           }
         }
       } catch (error) {
         console.error('Erro ao processar mudança de auth:', error);
         if (mounted) {
           setUser(null);
-        }
-      } finally {
-        if (mounted) {
           setLoading(false);
         }
       }
@@ -57,6 +56,7 @@ export const useAuthState = () => {
       } catch (error) {
         console.error('Erro ao inicializar auth:', error);
         if (mounted) {
+          setUser(null);
           setLoading(false);
         }
       }

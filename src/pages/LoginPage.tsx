@@ -19,24 +19,7 @@ const LoginPage = () => {
   
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  // Usar try-catch para capturar erros do useAuth
-  let authData;
-  try {
-    authData = useAuth();
-  } catch (error) {
-    console.error('Erro ao acessar contexto de auth:', error);
-    // Renderizar um fallback em caso de erro
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <p>Carregando sistema...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const { login, isAuthenticated, loading, user } = authData;
+  const { login, isAuthenticated, loading, user } = useAuth();
 
   // Redirecionar se já estiver autenticado
   useEffect(() => {
