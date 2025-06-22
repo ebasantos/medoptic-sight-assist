@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface UseCameraProps {
@@ -12,7 +11,7 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasCanvas>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const startCamera = useCallback(async () => {
