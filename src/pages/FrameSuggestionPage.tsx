@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Camera, Glasses, Brain, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Glasses, Brain, CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,9 +30,18 @@ const FrameSuggestionPage = () => {
     setCapturedImage(imageData);
     
     try {
+      console.log('Iniciando análise automática das características faciais...');
+      
       // Analisar características automaticamente
-      await analyzeFaceCharacteristics(imageData);
+      const result = await analyzeFaceCharacteristics(imageData);
+      console.log('Análise completada:', result);
+      
       setStep('analysis');
+      
+      toast({
+        title: "Análise Completada!",
+        description: "Características faciais detectadas automaticamente"
+      });
     } catch (error) {
       console.error('Erro na análise automática:', error);
       toast({
@@ -41,6 +49,9 @@ const FrameSuggestionPage = () => {
         description: "Erro ao analisar características faciais. Tente novamente.",
         variant: "destructive"
       });
+      
+      // Ainda permitir ir para a próxima etapa mesmo com erro
+      setStep('analysis');
     }
   };
 
@@ -84,7 +95,19 @@ const FrameSuggestionPage = () => {
   };
 
   const generateSuggestions = () => {
-    if (!faceAnalysis) return [];
+    if (!faceAnalysis) {
+      // Retornar sugestões genéricas se não houver análise
+      return [
+        {
+          tipo: 'Armação Clássica',
+          motivo: 'Versátil para diversos formatos de rosto'
+        },
+        {
+          tipo: 'Armação Moderna',
+          motivo: 'Design contemporâneo e elegante'
+        }
+      ];
+    }
     
     const suggestions = [];
     
@@ -236,7 +259,7 @@ const FrameSuggestionPage = () => {
     );
   }
 
-  const sugestoes = faceAnalysis ? generateSuggestions() : [];
+  const sugestoes = generateSuggestions();
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -301,8 +324,13 @@ const FrameSuggestionPage = () => {
                 )}
 
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-600 text-sm">{error}</p>
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <div>
+                      <p className="text-red-600 text-sm font-medium">Análise automática falhou</p>
+                      <p className="text-red-500 text-xs">{error}</p>
+                      <p className="text-gray-600 text-xs mt-1">Sugestões genéricas serão exibidas</p>
+                    </div>
                   </div>
                 )}
 
@@ -357,7 +385,7 @@ const FrameSuggestionPage = () => {
 
                 <Button 
                   onClick={handleSave}
-                  disabled={saving || !formData.nomeCliente || !faceAnalysis}
+                  disabled={saving || !formData.nomeCliente}
                   className="w-full"
                 >
                   <Save className="h-4 w-4 mr-2" />
@@ -367,26 +395,25 @@ const FrameSuggestionPage = () => {
             </Card>
 
             {/* Sugestões */}
-            {sugestoes.length > 0 && (
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Glasses className="h-5 w-5" />
-                    Sugestões de Armação Baseadas na Análise
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {sugestoes.map((sugestao, index) => (
-                      <div key={index} className="p-4 bg-blue-50 rounded-lg">
-                        <h3 className="font-semibold text-blue-900">{sugestao.tipo}</h3>
-                        <p className="text-sm text-blue-700 mt-1">{sugestao.motivo}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Glasses className="h-5 w-5" />
+                  Sugestões de Armação 
+                  {faceAnalysis ? 'Baseadas na Análise' : 'Genéricas'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sugestoes.map((sugestao, index) => (
+                    <div key={index} className="p-4 bg-blue-50 rounded-lg">
+                      <h3 className="font-semibold text-blue-900">{sugestao.tipo}</h3>
+                      <p className="text-sm text-blue-700 mt-1">{sugestao.motivo}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>

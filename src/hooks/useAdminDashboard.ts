@@ -61,22 +61,41 @@ export const useAdminDashboard = () => {
         throw usuariosError;
       }
 
-      // Buscar contadores de aferições por ótica
-      const { data: afericoesData, error: afericoesError } = await supabase
-        .from('afericoes')
-        .select('optica_id, id');
+      // Buscar TODAS as aferições (incluindo da tabela afericoes e analises_faciais)
+      console.log('Buscando aferições...');
+      const [afericoesResponse, analisesResponse] = await Promise.all([
+        supabase.from('afericoes').select('optica_id, id'),
+        supabase.from('analises_faciais').select('optica_id, id')
+      ]);
 
-      if (afericoesError) {
-        console.error('Erro ao buscar aferições:', afericoesError);
-        throw afericoesError;
+      if (afericoesResponse.error) {
+        console.error('Erro ao buscar aferições:', afericoesResponse.error);
+        throw afericoesResponse.error;
       }
 
-      console.log('Dados carregados:', { opticasData, usuariosData, afericoesData });
+      if (analisesResponse.error) {
+        console.error('Erro ao buscar análises faciais:', analisesResponse.error);
+        throw analisesResponse.error;
+      }
+
+      const afericoesData = afericoesResponse.data || [];
+      const analisesData = analisesResponse.data || [];
+      
+      // Combinar ambos os tipos de aferições
+      const todasAfericoes = [...afericoesData, ...analisesData];
+
+      console.log('Dados carregados:', { 
+        opticasData: opticasData?.length, 
+        usuariosData: usuariosData?.length, 
+        afericoesData: afericoesData.length,
+        analisesData: analisesData.length,
+        totalAfericoes: todasAfericoes.length
+      });
 
       // Processar dados das óticas com contadores
       const opticasProcessed = opticasData?.map(optica => {
         const users = usuariosData?.filter(u => u.optica_id === optica.id).length || 0;
-        const measurements = afericoesData?.filter(a => a.optica_id === optica.id).length || 0;
+        const measurements = todasAfericoes.filter(a => a.optica_id === optica.id).length || 0;
         
         return {
           ...optica,
@@ -90,7 +109,15 @@ export const useAdminDashboard = () => {
       const opticasAtivas = opticasProcessed.filter(o => o.ativo).length;
       const opticasBloqueadas = totalOpticas - opticasAtivas;
       const totalUsuarios = usuariosData?.length || 0;
-      const totalAfericoes = afericoesData?.length || 0;
+      const totalAfericoes = todasAfericoes.length; // Soma de todas as aferições
+
+      console.log('Estatísticas calculadas:', {
+        totalOpticas,
+        opticasAtivas,
+        opticasBloqueadas,
+        totalUsuarios,
+        totalAfericoes
+      });
 
       setOpticas(opticasProcessed);
       setStats({
