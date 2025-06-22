@@ -117,7 +117,6 @@ const MeasurementPage = () => {
 
       if (error) {
         console.error('Erro detalhado no upload:', error);
-        console.error('Código do erro:', error.statusCode);
         console.error('Mensagem do erro:', error.message);
         
         if (error.message?.includes('row-level security')) {
