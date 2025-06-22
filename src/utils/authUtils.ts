@@ -9,7 +9,7 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
     console.log('Buscando dados do usuário:', supabaseUser.id, supabaseUser.email);
     
     // Buscar dados do usuário na tabela usuarios_optica
-    const { data: userData, error: userError } = await supabase
+    let { data: userData, error: userError } = await supabase
       .from('usuarios_optica')
       .select(`
         *,
