@@ -11,7 +11,7 @@ export const useAuthState = () => {
   useEffect(() => {
     console.log('Configurando listeners de autenticação...');
     
-    // Escutar mudanças de autenticação primeiro
+    // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);

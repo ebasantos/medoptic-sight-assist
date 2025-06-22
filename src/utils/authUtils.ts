@@ -49,45 +49,33 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
   }
 };
 
-// Função de login simplificada - agora funciona diretamente pela tabela usuarios_optica
+// Função de login usando Supabase Auth
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
-    console.log('Tentando fazer login direto pela tabela...', email);
+    console.log('Tentando fazer login com Supabase Auth...', email);
     
-    // Buscar usuário diretamente na tabela usuarios_optica
-    const { data: userData, error: dbError } = await supabase
-      .from('usuarios_optica')
-      .select(`
-        *,
-        opticas (
-          id,
-          nome
-        )
-      `)
-      .eq('email', email)
-      .eq('ativo', true)
-      .single();
+    // Fazer login com Supabase Auth
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    if (dbError || !userData) {
-      console.error('Usuário não encontrado na base:', dbError);
+    if (error) {
+      console.error('Erro no login do Supabase:', error);
       return { success: false };
     }
 
-    // Por enquanto, vamos aceitar qualquer senha para facilitar o teste
-    // Em produção, você deveria implementar hash de senha
-    console.log('Usuário encontrado:', userData);
+    if (data.user) {
+      // Buscar dados adicionais do usuário
+      const userData = await fetchUserData(data.user);
+      
+      if (userData) {
+        console.log('Login realizado com sucesso:', userData.role);
+        return { success: true, userData };
+      }
+    }
 
-    const userObj = {
-      id: userData.user_id,
-      name: userData.nome,
-      email: userData.email,
-      role: userData.role as 'admin' | 'funcionario',
-      opticId: userData.optica_id,
-      opticName: userData.opticas?.nome || null
-    };
-
-    console.log('Login realizado com sucesso para:', userObj.role);
-    return { success: true, userData: userObj };
+    return { success: false };
 
   } catch (error) {
     console.error('Erro durante login:', error);
@@ -99,9 +87,8 @@ export const performLogin = async (email: string, password: string): Promise<{ s
 export const performLogout = async (): Promise<void> => {
   try {
     console.log('Fazendo logout...');
-    // Como não estamos usando o Auth do Supabase, apenas limpamos o estado local
+    await supabase.auth.signOut();
   } catch (error) {
     console.error('Erro durante logout:', error);
   }
 };
-

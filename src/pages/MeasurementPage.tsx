@@ -74,12 +74,21 @@ const MeasurementPage = () => {
   const uploadImage = async (imageData: string): Promise<string | null> => {
     try {
       console.log('Iniciando upload da imagem...');
-      console.log('Usuário atual:', user);
       
-      if (!user?.id) {
-        console.error('Usuário não autenticado');
-        throw new Error('Usuário não autenticado');
+      // Verificar se o usuário está autenticado
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Erro ao verificar sessão:', sessionError);
+        throw new Error('Erro ao verificar autenticação');
       }
+      
+      if (!session?.user) {
+        console.error('Usuário não autenticado');
+        throw new Error('Usuário não autenticado. Faça login novamente.');
+      }
+      
+      console.log('Usuário autenticado:', session.user.id);
       
       // Converter base64 para blob
       const base64Data = imageData.split(',')[1];
@@ -93,17 +102,9 @@ const MeasurementPage = () => {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
       
-      const fileName = `afericao_${user.id}_${Date.now()}.jpg`;
+      const fileName = `afericao_${session.user.id}_${Date.now()}.jpg`;
       console.log('Nome do arquivo:', fileName);
       console.log('Tamanho do arquivo:', blob.size, 'bytes');
-      
-      // Verificar se o usuário está autenticado
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Sessão atual:', session ? 'Ativa' : 'Não encontrada');
-      
-      if (!session) {
-        throw new Error('Sessão não encontrada. Faça login novamente.');
-      }
       
       // Fazer upload para o storage
       console.log('Fazendo upload para o bucket fotos-clientes...');
@@ -162,6 +163,18 @@ const MeasurementPage = () => {
 
     setSaving(true);
     try {
+      // Verificar autenticação antes de prosseguir
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast({
+          title: "Sessão expirada",
+          description: "Sua sessão expirou. Faça login novamente.",
+          variant: "destructive"
+        });
+        navigate('/');
+        return;
+      }
+
       console.log('Fazendo upload da imagem...');
       const fotoUrl = await uploadImage(capturedImage);
       
@@ -177,7 +190,7 @@ const MeasurementPage = () => {
       console.log('Salvando aferição no banco de dados...');
       console.log('Dados para inserir:', {
         optica_id: user.opticId,
-        usuario_id: user.id,
+        usuario_id: session.user.id,
         nome_cliente: formData.nomeCliente.trim(),
         foto_url: fotoUrl,
         largura_armacao: parseFloat(formData.larguraArmacao),
@@ -193,7 +206,7 @@ const MeasurementPage = () => {
         .from('afericoes')
         .insert({
           optica_id: user.opticId!,
-          usuario_id: user.id,
+          usuario_id: session.user.id,
           nome_cliente: formData.nomeCliente.trim(),
           foto_url: fotoUrl,
           largura_armacao: parseFloat(formData.larguraArmacao),
@@ -224,6 +237,11 @@ const MeasurementPage = () => {
     } catch (error) {
       console.error('Erro:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro inesperado ao salvar aferição';
+      
+      if (errorMessage.includes('não autenticado')) {
+        navigate('/');
+      }
+      
       toast({
         title: "Erro",
         description: errorMessage,
