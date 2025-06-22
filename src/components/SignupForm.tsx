@@ -50,56 +50,50 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       const isAdmin = email === 'erik@admin.com';
       console.log('É admin?', isAdmin);
       
-      // Criar usuário no Supabase Auth sem confirmação de email
-      const { data, error } = await supabase.auth.signUp({
+      // Criar usuário no Supabase Auth SEM confirmação de email
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
           data: {
             name: name
           }
         }
       });
 
-      console.log('Resultado do signup:', { data, error });
+      console.log('Resultado do signup:', { signUpData, signUpError });
 
-      if (error) {
-        // Se o erro for de rate limit ou email, tentar uma abordagem diferente
-        if (error.message.includes('rate limit') || error.message.includes('email')) {
-          console.log('Erro de rate limit detectado, verificando se usuário já existe...');
-          
-          // Tentar fazer login para ver se o usuário já existe
-          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          });
-
-          if (loginData.user && !loginError) {
-            toast({
-              title: "Usuário já existe",
-              description: "Este email já está cadastrado. Redirecionando para login...",
-            });
-            onBackToLogin();
-            return;
-          }
-          
-          // Se não conseguiu fazer login, mostrar erro mais específico
-          throw new Error('Sistema temporariamente indisponível para novos cadastros devido a limitações de email. Tente novamente em alguns minutos.');
-        } else {
-          throw error;
-        }
+      if (signUpError) {
+        console.error('Erro no signup:', signUpError);
+        throw signUpError;
       }
 
-      // Se conseguiu criar o usuário
-      if (data.user) {
-        console.log('Usuário criado com sucesso:', data.user.id);
+      if (signUpData.user) {
+        console.log('Usuário criado com sucesso:', signUpData.user.id);
+        
+        // Confirmar o email automaticamente se for erik@admin.com
+        if (isAdmin) {
+          console.log('Confirmando email do admin automaticamente...');
+          try {
+            const { error: confirmError } = await supabase.rpc('confirm_admin_email', {
+              admin_email: email
+            });
+            
+            if (confirmError) {
+              console.error('Erro ao confirmar email do admin:', confirmError);
+            } else {
+              console.log('Email do admin confirmado com sucesso');
+            }
+          } catch (confirmErr) {
+            console.error('Erro na função de confirmação:', confirmErr);
+          }
+        }
         
         // Inserir dados na tabela usuarios_optica
         const { error: insertError } = await supabase
           .from('usuarios_optica')
           .insert({
-            user_id: data.user.id,
+            user_id: signUpData.user.id,
             nome: name,
             email: email,
             role: isAdmin ? 'admin' : 'funcionario',
@@ -142,7 +136,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       } else if (error.message?.includes('Password')) {
         errorMessage = "Senha muito fraca. Use pelo menos 6 caracteres.";
       } else if (error.message?.includes('rate limit') || error.message?.includes('email')) {
-        errorMessage = "Sistema temporariamente indisponível para novos cadastros. Tente novamente em alguns minutos.";
+        errorMessage = "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -252,11 +246,12 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           </Button>
         </div>
         
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-          <p className="font-medium mb-2">ℹ️ Como testar:</p>
-          <p>1. Use <strong>erik@admin.com</strong> para criar conta admin</p>
-          <p>2. Use qualquer senha com 6+ caracteres</p>
-          <p>3. O sistema não requer confirmação de email</p>
+        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+          <p className="font-medium mb-2">✅ Sistema simplificado:</p>
+          <p>• Não requer confirmação de email</p>
+          <p>• Use <strong>erik@admin.com</strong> para acesso admin</p>
+          <p>• Qualquer senha com 6+ caracteres</p>
+          <p>• Login imediato após cadastro</p>
         </div>
       </CardContent>
     </Card>

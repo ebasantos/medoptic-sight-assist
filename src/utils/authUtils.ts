@@ -49,7 +49,7 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
   }
 };
 
-// Função de login simplificada
+// Função de login simplificada - sem verificação de confirmação de email
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
     console.log('Tentando fazer login:', email);
@@ -66,10 +66,13 @@ export const performLogin = async (email: string, password: string): Promise<{ s
 
     if (data.user) {
       console.log('Login do Supabase realizado, buscando dados do usuário...');
+      
+      // Aguardar um pouco para garantir que os dados foram inseridos
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const userData = await fetchUserData(data.user);
       if (!userData) {
         console.error('Usuário não encontrado no sistema');
-        await supabase.auth.signOut();
         return { success: false };
       }
       
