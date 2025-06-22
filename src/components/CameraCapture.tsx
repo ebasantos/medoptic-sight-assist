@@ -31,8 +31,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   } = useCamera({ onCapture });
 
   const handleCapture = () => {
-    capturePhoto();
-    stopCamera();
+    const result = capturePhoto();
+    if (result) {
+      stopCamera();
+    }
   };
 
   if (capturedImage) {
@@ -103,6 +105,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
                   playsInline
                   muted
                   className="w-full h-full object-cover"
+                  style={{ transform: 'scaleX(-1)' }}
                 />
                 
                 {/* Guias visuais */}
@@ -142,7 +145,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               <div className="flex items-center justify-center h-full text-white">
                 <div className="text-center">
                   <Camera className="h-16 w-16 mx-auto mb-4" />
-                  <p className="text-lg">Câmera será ativada</p>
+                  <p className="text-lg">Pressione o botão para ativar a câmera</p>
                 </div>
               </div>
             )}

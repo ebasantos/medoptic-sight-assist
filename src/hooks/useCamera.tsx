@@ -18,6 +18,7 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
   const startCamera = useCallback(async () => {
     try {
       setError(null);
+      setHasPermission(null);
       console.log('Tentando iniciar câmera...');
       
       // Verificar se getUserMedia está disponível
@@ -36,22 +37,55 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
       });
 
       console.log('Stream obtido:', stream);
+      streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        streamRef.current = stream;
         
-        // Aguardar o vídeo carregar
-        videoRef.current.onloadedmetadata = () => {
-          console.log('Vídeo carregado, iniciando reprodução');
-          videoRef.current?.play();
-          setIsActive(true);
-          setHasPermission(true);
+        // Aguardar o vídeo estar pronto para reproduzir
+        const playVideo = () => {
+          return new Promise<void>((resolve, reject) => {
+            if (!videoRef.current) {
+              reject(new Error('Elemento de vídeo não encontrado'));
+              return;
+            }
+
+            const video = videoRef.current;
+            
+            video.onloadedmetadata = () => {
+              console.log('Vídeo carregado, tentando reproduzir');
+              video.play()
+                .then(() => {
+                  console.log('Vídeo iniciado com sucesso');
+                  setIsActive(true);
+                  setHasPermission(true);
+                  resolve();
+                })
+                .catch((playError) => {
+                  console.error('Erro ao reproduzir vídeo:', playError);
+                  reject(playError);
+                });
+            };
+
+            video.onerror = (err) => {
+              console.error('Erro no elemento de vídeo:', err);
+              reject(new Error('Erro ao carregar vídeo'));
+            };
+          });
         };
+
+        await playVideo();
       }
     } catch (err) {
       console.error('Erro ao acessar a câmera:', err);
       setHasPermission(false);
+      setIsActive(false);
+      
+      // Limpar stream em caso de erro
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
       
       if (err instanceof Error) {
         if (err.name === 'NotAllowedError') {
@@ -82,6 +116,7 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
     
     if (videoRef.current) {
       videoRef.current.srcObject = null;
+      videoRef.current.pause();
     }
     
     setIsActive(false);
@@ -99,6 +134,12 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
 
     if (!context) {
       console.error('Contexto do canvas não disponível');
+      return null;
+    }
+
+    // Verificar se o vídeo tem dimensões válidas
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.error('Vídeo não possui dimensões válidas');
       return null;
     }
 
