@@ -11,30 +11,35 @@ export const useAuthState = () => {
   useEffect(() => {
     let mounted = true;
 
-    console.log('Configurando listeners de autenticação...');
+    console.log('🔧 Iniciando useAuthState...');
     
     // Função para processar mudanças de autenticação
     const handleAuthChange = async (event: string, session: any) => {
-      console.log('Auth state changed:', event, session?.user?.email);
+      console.log('🔄 Auth state changed:', event, session?.user?.email || 'sem sessão');
       
-      if (!mounted) return;
+      if (!mounted) {
+        console.log('⚠️ Componente desmontado, ignorando mudança');
+        return;
+      }
 
       try {
         if (session?.user) {
-          // Buscar dados do usuário
+          console.log('👤 Processando usuário logado...');
           const userData = await fetchUserData(session.user.email);
           if (mounted) {
+            console.log('✅ Dados do usuário carregados:', userData);
             setUser(userData);
             setLoading(false);
           }
         } else {
+          console.log('🚪 Usuário não logado');
           if (mounted) {
             setUser(null);
             setLoading(false);
           }
         }
       } catch (error) {
-        console.error('Erro ao processar mudança de auth:', error);
+        console.error('❌ Erro ao processar mudança de auth:', error);
         if (mounted) {
           setUser(null);
           setLoading(false);
@@ -45,16 +50,18 @@ export const useAuthState = () => {
     // Verificar sessão atual primeiro
     const initializeAuth = async () => {
       try {
-        console.log('Verificando sessão inicial...');
+        console.log('🔍 Verificando sessão inicial...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Erro ao verificar sessão:', error);
+          console.error('❌ Erro ao verificar sessão:', error);
+          throw error;
         }
 
+        console.log('📋 Sessão encontrada:', session ? 'SIM' : 'NÃO');
         await handleAuthChange('INITIAL_SESSION', session);
       } catch (error) {
-        console.error('Erro ao inicializar auth:', error);
+        console.error('❌ Erro ao inicializar auth:', error);
         if (mounted) {
           setUser(null);
           setLoading(false);
@@ -63,17 +70,20 @@ export const useAuthState = () => {
     };
 
     // Escutar mudanças de autenticação
+    console.log('👂 Configurando listener de auth...');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
     // Inicializar
     initializeAuth();
 
     return () => {
-      console.log('Limpando listeners de auth...');
+      console.log('🧹 Limpando listeners de auth...');
       mounted = false;
       subscription.unsubscribe();
     };
   }, []);
+
+  console.log('📊 Estado atual - Loading:', loading, 'User:', user?.email || 'nenhum');
 
   return { user, setUser, loading, setLoading };
 };
