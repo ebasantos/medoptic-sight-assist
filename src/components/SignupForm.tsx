@@ -44,12 +44,12 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
     setIsLoading(true);
     
     try {
-      console.log('Iniciando cadastro direto na tabela usuarios_optica para:', email);
+      console.log('Iniciando cadastro para:', email);
       
       const isAdmin = email === 'erik@admin.com';
       console.log('É admin?', isAdmin);
       
-      // Verificar se já existe na tabela usuarios_optica
+      // Verificar se já existe
       const { data: existingUser, error: checkError } = await supabase
         .from('usuarios_optica')
         .select('email')
@@ -65,26 +65,67 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         throw new Error('Este email já está cadastrado no sistema');
       }
 
-      // Criar usuário diretamente na tabela usuarios_optica (sem Supabase Auth para evitar emails)
+      // Primeiro criar usuário no Supabase Auth sem email de confirmação
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          emailRedirectTo: undefined, // Sem redirect
+          data: {
+            name: name
+          }
+        }
+      });
+
+      if (authError) {
+        console.error('Erro ao criar usuário no Auth:', authError);
+        throw new Error(`Erro na autenticação: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error('Usuário não foi criado no sistema de autenticação');
+      }
+
+      console.log('Usuário criado no Auth:', authData.user.id);
+      
+      // Inserir na tabela usuarios_optica
       const { data: userData, error: insertError } = await supabase
         .from('usuarios_optica')
         .insert({
+          user_id: authData.user.id,
           nome: name,
           email: email,
           role: isAdmin ? 'admin' : 'funcionario',
           optica_id: isAdmin ? null : undefined,
-          ativo: true,
-          password_hash: password // Armazenar temporariamente para o login funcionar
+          ativo: true
         })
         .select()
         .single();
 
       if (insertError) {
         console.error('Erro ao inserir usuário na tabela:', insertError);
-        throw new Error('Erro ao criar usuário: ' + insertError.message);
+        
+        // Limpar usuário do Auth se falhou na tabela
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('Erro ao limpar usuário do Auth:', cleanupError);
+        }
+        
+        throw new Error(`Erro ao salvar dados do usuário: ${insertError.message}`);
       }
 
-      console.log('Usuário criado com sucesso na tabela usuarios_optica:', userData);
+      console.log('Usuário criado com sucesso:', userData);
+
+      // Confirmar email automaticamente para evitar problemas
+      if (authData.user && !authData.user.email_confirmed_at) {
+        try {
+          await supabase.rpc('confirm_admin_email', { admin_email: email });
+          console.log('Email confirmado automaticamente');
+        } catch (confirmError) {
+          console.error('Erro ao confirmar email:', confirmError);
+        }
+      }
 
       toast({
         title: "Sucesso!",
@@ -108,6 +149,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         errorMessage = "Este email já está cadastrado. Tente fazer login.";
       } else if (error.message?.includes('Invalid email')) {
         errorMessage = "Email inválido. Verifique o formato.";
+      } else if (error.message?.includes('rate limit')) {
+        errorMessage = "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -219,7 +262,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         
         <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
           <p className="font-medium mb-2">✅ Sistema atualizado:</p>
-          <p>• Cadastro sem confirmação de email</p>
+          <p>• Cadastro com confirmação automática</p>
           <p>• Use <strong>erik@admin.com</strong> para acesso admin</p>
           <p>• Qualquer senha com 6+ caracteres</p>
           <p>• Login direto após cadastro</p>

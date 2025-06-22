@@ -1,12 +1,11 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 import { User } from '@/types/auth';
 
 // Função para buscar dados do usuário no banco
-export const fetchUserData = async (email: string): Promise<User | null> => {
+export const fetchUserData = async (userEmail: string): Promise<User | null> => {
   try {
-    console.log('Buscando dados do usuário por email:', email);
+    console.log('Buscando dados do usuário por email:', userEmail);
     
     // Buscar usuário na tabela usuarios_optica
     const { data: userData, error: userError } = await supabase
@@ -18,13 +17,13 @@ export const fetchUserData = async (email: string): Promise<User | null> => {
           nome
         )
       `)
-      .eq('email', email)
+      .eq('email', userEmail)
       .maybeSingle();
 
     console.log('Resultado da busca por email:', { userData, userError });
 
     if (userData) {
-      const userObj = {
+      const userObj: User = {
         id: userData.id,
         name: userData.nome,
         email: userData.email,
@@ -44,48 +43,40 @@ export const fetchUserData = async (email: string): Promise<User | null> => {
   }
 };
 
-// Função de login que funciona com usuários criados diretamente na tabela
+// Função de login usando Supabase Auth
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
-    console.log('Tentando login direto na tabela para:', email);
+    console.log('Tentando login com Supabase Auth para:', email);
     
-    // Buscar usuário na tabela usuarios_optica com senha
-    const { data: userData, error: userError } = await supabase
-      .from('usuarios_optica')
-      .select(`
-        *,
-        opticas (
-          id,
-          nome
-        )
-      `)
-      .eq('email', email)
-      .eq('password_hash', password) // Verificar senha diretamente
-      .eq('ativo', true)
-      .maybeSingle();
+    // Fazer login com Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    if (userError) {
-      console.error('Erro ao buscar usuário:', userError);
+    if (authError) {
+      console.error('Erro no login:', authError);
       return { success: false };
     }
 
+    if (!authData.user) {
+      console.log('Usuário não encontrado');
+      return { success: false };
+    }
+
+    console.log('Login realizado com sucesso no Auth:', authData.user.email);
+    
+    // Buscar dados do usuário na tabela usuarios_optica
+    const userData = await fetchUserData(authData.user.email!);
+    
     if (!userData) {
-      console.log('Usuário não encontrado ou senha incorreta');
+      console.log('Dados do usuário não encontrados na tabela usuarios_optica');
+      // Fazer logout se não encontrar dados
+      await supabase.auth.signOut();
       return { success: false };
     }
 
-    console.log('Login realizado com sucesso:', userData.email);
-    
-    const userObj = {
-      id: userData.id,
-      name: userData.nome,
-      email: userData.email,
-      role: userData.role as 'admin' | 'funcionario',
-      opticId: userData.optica_id,
-      opticName: userData.opticas?.nome || null
-    };
-
-    return { success: true, userData: userObj };
+    return { success: true, userData };
 
   } catch (error) {
     console.error('Erro durante login:', error);
@@ -93,11 +84,11 @@ export const performLogin = async (email: string, password: string): Promise<{ s
   }
 };
 
-// Função de logout (simples limpeza de estado)
+// Função de logout
 export const performLogout = async (): Promise<void> => {
   try {
     console.log('Fazendo logout...');
-    // Apenas limpeza local, sem Supabase Auth
+    await supabase.auth.signOut();
   } catch (error) {
     console.error('Erro durante logout:', error);
   }
