@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Camera, Glasses, Brain, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Glasses, Brain, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import CameraCapture from '@/components/CameraCapture';
+import FaceAnalysisLoader from '@/components/FaceAnalysisLoader';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
 
 const FrameSuggestionPage = () => {
@@ -20,6 +21,8 @@ const FrameSuggestionPage = () => {
   const [step, setStep] = useState<'camera' | 'analysis'>('camera');
   const [saving, setSaving] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStage, setAnalysisStage] = useState<'capturing' | 'compressing' | 'analyzing' | 'processing'>('capturing');
   
   const [formData, setFormData] = useState({
     nomeCliente: ''
@@ -32,26 +35,85 @@ const FrameSuggestionPage = () => {
     try {
       console.log('Iniciando análise automática das características faciais...');
       
+      // Simular progresso da análise
+      setAnalysisStage('compressing');
+      setAnalysisProgress(10);
+      
+      // Pequeno delay para mostrar o loader
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setAnalysisProgress(25);
+      
+      setAnalysisStage('analyzing');
+      setAnalysisProgress(40);
+      
       // Analisar características automaticamente
       const result = await analyzeFaceCharacteristics(imageData);
+      
+      setAnalysisStage('processing');
+      setAnalysisProgress(90);
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
+      setAnalysisProgress(100);
+      
       console.log('Análise completada:', result);
       
       setStep('analysis');
       
       toast({
         title: "Análise Completada!",
-        description: "Características faciais detectadas automaticamente"
+        description: "Características faciais detectadas com sucesso"
       });
     } catch (error) {
       console.error('Erro na análise automática:', error);
+      
+      // Mensagem de erro mais específica
+      let errorMessage = "Erro ao analisar características faciais.";
+      if (error instanceof Error) {
+        if (error.message.includes('TIMEOUT') || error.message.includes('timeout')) {
+          errorMessage = "A análise demorou muito para responder. Tente novamente com uma foto mais clara.";
+        } else if (error.message.includes('limite') || error.message.includes('excedido')) {
+          errorMessage = "Limite de análises excedido. Tente novamente em alguns minutos.";
+        } else if (error.message.includes('imagem')) {
+          errorMessage = "Problema com a qualidade da imagem. Tente capturar novamente com melhor iluminação.";
+        }
+      }
+      
       toast({
         title: "Erro na Análise",
-        description: "Erro ao analisar características faciais. Tente novamente.",
+        description: errorMessage,
         variant: "destructive"
       });
       
-      // Ainda permitir ir para a próxima etapa mesmo com erro
+      // Permitir ir para a próxima etapa mesmo com erro
       setStep('analysis');
+    } finally {
+      setAnalysisProgress(0);
+    }
+  };
+
+  const retryAnalysis = async () => {
+    if (!capturedImage) return;
+    
+    try {
+      setAnalysisStage('analyzing');
+      setAnalysisProgress(30);
+      
+      const result = await analyzeFaceCharacteristics(capturedImage);
+      setAnalysisProgress(100);
+      
+      toast({
+        title: "Análise Completada!",
+        description: "Características faciais detectadas com sucesso"
+      });
+    } catch (error) {
+      console.error('Erro na nova tentativa:', error);
+      toast({
+        title: "Erro Persistente",
+        description: "Não foi possível analisar a imagem. Sugestões genéricas serão usadas.",
+        variant: "destructive"
+      });
+    } finally {
+      setAnalysisProgress(0);
     }
   };
 
@@ -105,6 +167,10 @@ const FrameSuggestionPage = () => {
         {
           tipo: 'Armação Moderna',
           motivo: 'Design contemporâneo e elegante'
+        },
+        {
+          tipo: 'Armação Neutra',
+          motivo: 'Cores que combinam com qualquer tom de pele'
         }
       ];
     }
@@ -112,7 +178,7 @@ const FrameSuggestionPage = () => {
     const suggestions = [];
     
     // Lógica de sugestões baseada no formato do rosto detectado
-    switch (faceAnalysis.formatoRosto) {
+    switch (faceAnalysis.formatoRosto.toLowerCase()) {
       case 'oval':
         suggestions.push({
           tipo: 'Armação Quadrada',
@@ -144,6 +210,7 @@ const FrameSuggestionPage = () => {
         });
         break;
       case 'coração':
+      case 'triangular':
         suggestions.push({
           tipo: 'Armação com Base Larga',
           motivo: 'Equilibra a testa mais larga'
@@ -164,6 +231,7 @@ const FrameSuggestionPage = () => {
         });
         break;
       case 'retangular':
+      case 'alongado':
         suggestions.push({
           tipo: 'Armação Redonda Grande',
           motivo: 'Quebra as linhas retas e adiciona suavidade'
@@ -178,6 +246,25 @@ const FrameSuggestionPage = () => {
           tipo: 'Armação Clássica',
           motivo: 'Versátil para diversos formatos'
         });
+    }
+
+    // Adicionar sugestões baseadas no tom de pele
+    const tomPele = faceAnalysis.tomPele.toLowerCase();
+    if (tomPele.includes('claro')) {
+      suggestions.push({
+        tipo: 'Cores Suaves',
+        motivo: 'Tons pastéis e neutros harmonizam com pele clara'
+      });
+    } else if (tomPele.includes('escuro') || tomPele.includes('bronzeado')) {
+      suggestions.push({
+        tipo: 'Cores Vibrantes',
+        motivo: 'Tons mais intensos realçam a beleza natural da pele'
+      });
+    } else if (tomPele.includes('médio')) {
+      suggestions.push({
+        tipo: 'Cores Versáteis',
+        motivo: 'Tom de pele médio permite grande variedade de cores'
+      });
     }
 
     return suggestions;
@@ -278,6 +365,13 @@ const FrameSuggestionPage = () => {
           </h1>
         </div>
 
+        {/* Loader durante análise */}
+        {isAnalyzing && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <FaceAnalysisLoader progress={analysisProgress} stage={analysisStage} />
+          </div>
+        )}
+
         {step === 'camera' && (
           <CameraCapture
             onCapture={handleImageCapture}
@@ -313,23 +407,32 @@ const FrameSuggestionPage = () => {
                 <CardTitle className="flex items-center gap-2">
                   <Brain className="h-5 w-5" />
                   Análise Automática
+                  {error && (
+                    <Button
+                      onClick={retryAnalysis}
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                      disabled={isAnalyzing}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Tentar Novamente
+                    </Button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {isAnalyzing && (
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    <span>Analisando características faciais...</span>
-                  </div>
-                )}
-
                 {error && (
-                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <div>
+                  <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
                       <p className="text-red-600 text-sm font-medium">Análise automática falhou</p>
-                      <p className="text-red-500 text-xs">{error}</p>
-                      <p className="text-gray-600 text-xs mt-1">Sugestões genéricas serão exibidas</p>
+                      <p className="text-red-500 text-xs mt-1">{error}</p>
+                      <p className="text-gray-600 text-xs mt-2">
+                        ✓ Sugestões genéricas serão exibidas<br/>
+                        ✓ Você pode tentar analisar novamente<br/>
+                        ✓ Ou continuar com as sugestões básicas
+                      </p>
                     </div>
                   </div>
                 )}
@@ -338,7 +441,7 @@ const FrameSuggestionPage = () => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-green-600 mb-3">
                       <CheckCircle className="h-4 w-4" />
-                      <span className="font-medium">Análise Concluída</span>
+                      <span className="font-medium">Análise Concluída com Sucesso</span>
                     </div>
                     
                     <div className="grid grid-cols-1 gap-3">
@@ -365,7 +468,7 @@ const FrameSuggestionPage = () => {
 
                     {faceAnalysis.observacoes && (
                       <div className="p-3 bg-yellow-50 rounded-lg">
-                        <Label className="font-semibold text-yellow-900">Observações</Label>
+                        <Label className="font-semibold text-yellow-900">Observações da IA</Label>
                         <p className="text-yellow-700 text-sm">{faceAnalysis.observacoes}</p>
                       </div>
                     )}
@@ -400,18 +503,26 @@ const FrameSuggestionPage = () => {
                 <CardTitle className="flex items-center gap-2">
                   <Glasses className="h-5 w-5" />
                   Sugestões de Armação 
-                  {faceAnalysis ? 'Baseadas na Análise' : 'Genéricas'}
+                  {faceAnalysis ? '(Baseadas na Análise IA)' : '(Sugestões Genéricas)'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {sugestoes.map((sugestao, index) => (
-                    <div key={index} className="p-4 bg-blue-50 rounded-lg">
+                    <div key={index} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                       <h3 className="font-semibold text-blue-900">{sugestao.tipo}</h3>
                       <p className="text-sm text-blue-700 mt-1">{sugestao.motivo}</p>
                     </div>
                   ))}
                 </div>
+                
+                {!faceAnalysis && (
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-amber-800 text-sm">
+                      💡 <strong>Dica:</strong> Para sugestões mais precisas, tente capturar novamente uma foto com boa iluminação e o rosto bem centralizado.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
