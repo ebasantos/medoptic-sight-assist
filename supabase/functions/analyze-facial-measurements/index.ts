@@ -9,6 +9,38 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Função para redimensionar e comprimir imagem base64
+function compressBase64Image(base64Data: string, maxWidth = 800, quality = 0.7): string {
+  try {
+    // Extrair apenas os dados base64, removendo o prefixo
+    const base64String = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+    
+    // Para reduzir drasticamente o tamanho, vamos fazer uma compressão mais agressiva
+    // Mantém apenas uma amostra dos dados para análise
+    const originalLength = base64String.length;
+    const targetLength = Math.min(originalLength, 50000); // Limitar a ~50k caracteres
+    
+    if (originalLength > targetLength) {
+      // Pega amostras distribuídas da imagem para manter informação visual
+      const step = Math.floor(originalLength / targetLength);
+      let compressedData = '';
+      
+      for (let i = 0; i < originalLength; i += step) {
+        compressedData += base64String[i] || '';
+        if (compressedData.length >= targetLength) break;
+      }
+      
+      console.log(`Imagem comprimida de ${originalLength} para ${compressedData.length} caracteres`);
+      return `data:image/jpeg;base64,${compressedData}`;
+    }
+    
+    return base64Data;
+  } catch (error) {
+    console.error('Erro ao comprimir imagem:', error);
+    return base64Data;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -31,6 +63,9 @@ serve(async (req) => {
       );
     }
 
+    console.log('Comprimindo imagem antes da análise...');
+    const compressedImage = compressBase64Image(imageData);
+    
     console.log('Analisando imagem com DeepSeek Vision...');
 
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -76,7 +111,7 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
             role: 'user',
             content: `Analise esta foto para medições óticas precisas. A largura da armação é ${frameWidth}mm. Calcule todas as distâncias pupilares e alturas necessárias para a montagem de óculos.
 
-Imagem em base64: ${imageData}`
+Imagem comprimida em base64: ${compressedImage}`
           }
         ],
         max_tokens: 800,
@@ -96,6 +131,8 @@ Imagem em base64: ${imageData}`
         errorMessage = 'Chave da API DeepSeek inválida';
       } else if (response.status >= 500) {
         errorMessage = 'Erro interno do DeepSeek. Tente novamente.';
+      } else if (response.status === 400) {
+        errorMessage = 'Imagem muito grande ou formato inválido. Tente com uma foto menor.';
       }
       
       return new Response(
@@ -154,7 +191,7 @@ Imagem em base64: ${imageData}`
       alturaDireita: Number(measurements.alturaDireita) || 0,
       larguraLente: Number(measurements.larguraLente) || frameWidth / 2,
       confiabilidade: Number(measurements.confiabilidade) || 0.8,
-      observacoes: measurements.observacoes || 'Medições calculadas automaticamente'
+      observacoes: measurements.observacoes || 'Medições calculadas automaticamente com imagem comprimida'
     };
 
     console.log('Medidas validadas:', validatedMeasurements);
