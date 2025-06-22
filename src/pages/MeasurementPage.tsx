@@ -74,6 +74,9 @@ const MeasurementPage = () => {
 
   const uploadImage = async (imageData: string): Promise<string | null> => {
     try {
+      console.log('Iniciando upload da imagem...');
+      
+      // Converter base64 para blob
       const base64Data = imageData.split(',')[1];
       const byteCharacters = atob(base64Data);
       const byteNumbers = new Array(byteCharacters.length);
@@ -85,21 +88,30 @@ const MeasurementPage = () => {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
       
-      const fileName = `afericao_${Date.now()}.jpg`;
+      const fileName = `afericao_${user?.id}_${Date.now()}.jpg`;
+      console.log('Nome do arquivo:', fileName);
       
+      // Fazer upload para o storage
       const { data, error } = await supabase.storage
         .from('fotos-clientes')
-        .upload(fileName, blob);
+        .upload(fileName, blob, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (error) {
         console.error('Erro no upload:', error);
         return null;
       }
 
+      console.log('Upload realizado com sucesso:', data);
+
+      // Obter URL pública
       const { data: publicData } = supabase.storage
         .from('fotos-clientes')
         .getPublicUrl(fileName);
 
+      console.log('URL pública gerada:', publicData.publicUrl);
       return publicData.publicUrl;
     } catch (error) {
       console.error('Erro ao processar upload:', error);
@@ -117,25 +129,36 @@ const MeasurementPage = () => {
       return;
     }
 
+    if (!formData.nomeCliente.trim()) {
+      toast({
+        title: "Nome obrigatório",
+        description: "É necessário informar o nome do cliente",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setSaving(true);
     try {
+      console.log('Fazendo upload da imagem...');
       const fotoUrl = await uploadImage(capturedImage);
       
       if (!fotoUrl) {
         toast({
-          title: "Erro",
-          description: "Erro ao fazer upload da imagem",
+          title: "Erro no upload",
+          description: "Erro ao fazer upload da imagem. Tente novamente.",
           variant: "destructive"
         });
         return;
       }
 
+      console.log('Salvando aferição no banco de dados...');
       const { error } = await supabase
         .from('afericoes')
         .insert({
           optica_id: user.opticId!,
           usuario_id: user.id,
-          nome_cliente: formData.nomeCliente,
+          nome_cliente: formData.nomeCliente.trim(),
           foto_url: fotoUrl,
           largura_armacao: parseFloat(formData.larguraArmacao),
           dp_binocular: measurements.dpBinocular,
@@ -149,8 +172,8 @@ const MeasurementPage = () => {
       if (error) {
         console.error('Erro ao salvar aferição:', error);
         toast({
-          title: "Erro",
-          description: "Erro ao salvar aferição",
+          title: "Erro ao salvar",
+          description: `Erro ao salvar aferição: ${error.message}`,
           variant: "destructive"
         });
         return;
@@ -166,7 +189,7 @@ const MeasurementPage = () => {
       console.error('Erro:', error);
       toast({
         title: "Erro",
-        description: "Erro inesperado",
+        description: "Erro inesperado ao salvar aferição",
         variant: "destructive"
       });
     } finally {
@@ -378,7 +401,7 @@ const MeasurementPage = () => {
 
                 <Button 
                   onClick={handleSave}
-                  disabled={loading || !formData.nomeCliente || !formData.larguraArmacao || !measurementCalculated}
+                  disabled={loading || !formData.nomeCliente.trim() || !formData.larguraArmacao || !measurementCalculated}
                   className="w-full"
                 >
                   <Save className="h-4 w-4 mr-2" />
