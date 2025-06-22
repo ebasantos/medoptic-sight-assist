@@ -40,6 +40,25 @@ const CreateOpticModal: React.FC<CreateOpticModalProps> = ({ onOpticCreated }) =
     try {
       console.log('Criando nova ótica:', formData);
       
+      // Verificar se o usuário está autenticado
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('Usuário atual:', user);
+      console.log('Erro de auth:', authError);
+      
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Verificar role do usuário
+      const { data: userRole, error: roleError } = await supabase
+        .from('usuarios_optica')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      
+      console.log('Role do usuário:', userRole);
+      console.log('Erro ao buscar role:', roleError);
+
       const { data, error } = await supabase
         .from('opticas')
         .insert({
@@ -53,7 +72,7 @@ const CreateOpticModal: React.FC<CreateOpticModalProps> = ({ onOpticCreated }) =
         .single();
 
       if (error) {
-        console.error('Erro ao criar ótica:', error);
+        console.error('Erro detalhado ao criar ótica:', error);
         throw new Error(error.message);
       }
 
