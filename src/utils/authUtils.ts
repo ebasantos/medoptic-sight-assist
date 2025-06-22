@@ -27,20 +27,21 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
       return cached.user;
     }
     
-    // Criar a query e executá-la com timeout de 5 segundos
-    const queryPromise = supabase
-      .from('usuarios_optica')
-      .select(`
-        *,
-        opticas (
-          id,
-          nome
-        )
-      `)
-      .eq('email', userEmail)
-      .maybeSingle();
-
-    const { data: userData, error: userError } = await withTimeout(queryPromise, 5000);
+    // Executar a query com timeout de 5 segundos
+    const { data: userData, error: userError } = await withTimeout(
+      supabase
+        .from('usuarios_optica')
+        .select(`
+          *,
+          opticas (
+            id,
+            nome
+          )
+        `)
+        .eq('email', userEmail)
+        .maybeSingle(),
+      5000
+    );
 
     console.log('📊 Resultado da busca por email:', { userData, userError });
 
