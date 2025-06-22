@@ -37,44 +37,55 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
       });
 
       console.log('Stream obtido:', stream);
+      console.log('Tracks do stream:', stream.getTracks());
       streamRef.current = stream;
 
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        console.log('Elemento de vídeo encontrado, configurando...');
+        const video = videoRef.current;
         
-        // Aguardar o vídeo estar pronto para reproduzir
-        const playVideo = () => {
-          return new Promise<void>((resolve, reject) => {
-            if (!videoRef.current) {
-              reject(new Error('Elemento de vídeo não encontrado'));
-              return;
-            }
-
-            const video = videoRef.current;
-            
-            video.onloadedmetadata = () => {
-              console.log('Vídeo carregado, tentando reproduzir');
-              video.play()
-                .then(() => {
-                  console.log('Vídeo iniciado com sucesso');
-                  setIsActive(true);
-                  setHasPermission(true);
-                  resolve();
-                })
-                .catch((playError) => {
-                  console.error('Erro ao reproduzir vídeo:', playError);
-                  reject(playError);
-                });
-            };
-
-            video.onerror = (err) => {
-              console.error('Erro no elemento de vídeo:', err);
-              reject(new Error('Erro ao carregar vídeo'));
-            };
-          });
+        // Configurar eventos do vídeo antes de definir o srcObject
+        video.onloadstart = () => console.log('Video: loadstart');
+        video.onloadeddata = () => console.log('Video: loadeddata');
+        video.onloadedmetadata = () => {
+          console.log('Video: loadedmetadata - dimensões:', video.videoWidth, 'x', video.videoHeight);
+          
+          // Tentar reproduzir o vídeo
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log('Vídeo iniciado com sucesso');
+                setIsActive(true);
+                setHasPermission(true);
+              })
+              .catch((playError) => {
+                console.error('Erro ao reproduzir vídeo:', playError);
+                setError(`Erro ao reproduzir vídeo: ${playError.message}`);
+              });
+          }
+        };
+        
+        video.oncanplay = () => console.log('Video: canplay');
+        video.oncanplaythrough = () => console.log('Video: canplaythrough');
+        video.onplaying = () => console.log('Video: playing');
+        video.onplay = () => console.log('Video: play');
+        
+        video.onerror = (err) => {
+          console.error('Erro no elemento de vídeo:', err);
+          setError('Erro ao carregar vídeo');
         };
 
-        await playVideo();
+        // Definir o stream como fonte do vídeo
+        video.srcObject = stream;
+        console.log('srcObject definido no vídeo');
+        
+        // Forçar carregamento
+        video.load();
+        console.log('video.load() chamado');
+      } else {
+        console.error('Elemento de vídeo não encontrado!');
+        throw new Error('Elemento de vídeo não encontrado');
       }
     } catch (err) {
       console.error('Erro ao acessar a câmera:', err);

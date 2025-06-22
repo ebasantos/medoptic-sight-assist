@@ -106,6 +106,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
                   muted
                   className="w-full h-full object-cover"
                   style={{ transform: 'scaleX(-1)' }}
+                  onLoadedMetadata={() => console.log('Video onLoadedMetadata - componente')}
+                  onCanPlay={() => console.log('Video onCanPlay - componente')}
+                  onPlay={() => console.log('Video onPlay - componente')}
+                  onError={(e) => console.error('Video onError - componente:', e)}
                 />
                 
                 {/* Guias visuais */}
