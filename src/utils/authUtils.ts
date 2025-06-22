@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/auth';
 
@@ -37,7 +38,8 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
         )
       `)
       .eq('email', userEmail)
-      .maybeSingle();
+      .maybeSingle()
+      .then(result => result); // Garantir que retorna uma Promise
 
     const { data: userData, error: userError } = await withTimeout(queryPromise, 5000);
 
