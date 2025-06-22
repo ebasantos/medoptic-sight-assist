@@ -74,19 +74,9 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
           },
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Analise esta foto para medições óticas precisas. A largura da armação é ${frameWidth}mm. Calcule todas as distâncias pupilares e alturas necessárias para a montagem de óculos.`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageData,
-                  detail: 'high'
-                }
-              }
-            ]
+            content: `Analise esta foto para medições óticas precisas. A largura da armação é ${frameWidth}mm. Calcule todas as distâncias pupilares e alturas necessárias para a montagem de óculos.
+
+Imagem em base64: ${imageData}`
           }
         ],
         max_tokens: 800,
