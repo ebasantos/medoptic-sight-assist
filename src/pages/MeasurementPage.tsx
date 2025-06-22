@@ -37,10 +37,19 @@ const MeasurementPage = () => {
   };
 
   const handleAutoAnalysis = async () => {
-    if (!capturedImage || !formData.larguraArmacao) {
+    if (!capturedImage) {
+      toast({
+        title: "Foto necessária",
+        description: "É necessário capturar uma foto antes da análise automática",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.larguraArmacao || parseFloat(formData.larguraArmacao) <= 0) {
       toast({
         title: "Informações incompletas",
-        description: "É necessário informar a largura da armação antes da análise automática",
+        description: "É necessário informar a largura da armação (valor maior que 0) antes da análise automática",
         variant: "destructive"
       });
       return;
@@ -247,6 +256,7 @@ const MeasurementPage = () => {
                     id="larguraArmacao"
                     type="number"
                     step="0.1"
+                    min="0.1"
                     value={formData.larguraArmacao}
                     onChange={(e) => setFormData({ ...formData, larguraArmacao: e.target.value })}
                     placeholder="Ex: 52.5"
@@ -267,7 +277,7 @@ const MeasurementPage = () => {
                           </p>
                           <Button 
                             onClick={handleAutoAnalysis}
-                            disabled={isAnalyzing || !formData.larguraArmacao}
+                            disabled={isAnalyzing || !capturedImage || !formData.larguraArmacao || parseFloat(formData.larguraArmacao) <= 0}
                             variant="outline"
                             size="sm"
                             className="border-blue-300 text-blue-700 hover:bg-blue-100"
