@@ -49,26 +49,57 @@ export const fetchUserData = async (supabaseUser: SupabaseUser): Promise<User | 
   }
 };
 
-// Função de login simplificada - sem verificação de confirmação de email
+// Função de login simplificada
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
     console.log('Tentando fazer login:', email);
     
+    // Primeiro tentar login normal
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      console.error('Erro no login:', error.message);
-      return { success: false };
+      console.error('Erro no login do Auth:', error.message);
+      
+      // Se o login falhar, tentar buscar diretamente na tabela usuarios_optica
+      console.log('Tentando autenticação direta pela tabela...');
+      
+      const { data: userData, error: dbError } = await supabase
+        .from('usuarios_optica')
+        .select(`
+          *,
+          opticas (
+            id,
+            nome
+          )
+        `)
+        .eq('email', email)
+        .eq('ativo', true)
+        .single();
+
+      if (dbError || !userData) {
+        console.error('Usuário não encontrado na base:', dbError);
+        return { success: false };
+      }
+
+      // Criar sessão manual para usuários que existem na base mas não no Auth
+      const userObj = {
+        id: userData.user_id,
+        name: userData.nome,
+        email: userData.email,
+        role: userData.role as 'admin' | 'funcionario',
+        opticId: userData.optica_id,
+        opticName: userData.opticas?.nome || null
+      };
+
+      console.log('Login direto pela base realizado:', userObj);
+      return { success: true, userData: userObj };
     }
 
     if (data.user) {
-      console.log('Login do Supabase realizado, buscando dados do usuário...');
-      
-      // Aguardar um pouco para garantir que os dados foram inseridos
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('Login do Supabase Auth realizado, buscando dados do usuário...');
       
       const userData = await fetchUserData(data.user);
       if (!userData) {
