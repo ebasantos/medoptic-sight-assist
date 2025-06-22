@@ -10,33 +10,69 @@ import {
   Eye,
   Ruler,
   Users,
-  Calendar
+  Calendar,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOpticDashboard } from '@/hooks/useOpticDashboard';
 
 const OpticDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { stats, recentMeasurements, loading } = useOpticDashboard();
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
   const quickStats = [
-    { label: 'Aferições Hoje', value: '8', icon: Ruler, color: 'text-primary' },
-    { label: 'Esta Semana', value: '34', icon: Calendar, color: 'text-success' },
-    { label: 'Total Clientes', value: '156', icon: Users, color: 'text-warning' },
-    { label: 'Sugestões Geradas', value: '42', icon: Eye, color: 'text-purple-600' }
+    { 
+      label: 'Aferições Hoje', 
+      value: stats.afericoesHoje.toString(), 
+      icon: Ruler, 
+      color: 'text-primary' 
+    },
+    { 
+      label: 'Esta Semana', 
+      value: stats.afericoesSemana.toString(), 
+      icon: Calendar, 
+      color: 'text-success' 
+    },
+    { 
+      label: 'Total Clientes', 
+      value: stats.totalClientes.toString(), 
+      icon: Users, 
+      color: 'text-warning' 
+    },
+    { 
+      label: 'Sugestões Geradas', 
+      value: stats.sugestoesGeradas.toString(), 
+      icon: Eye, 
+      color: 'text-purple-600' 
+    }
   ];
 
-  const recentMeasurements = [
-    { id: 1, client: 'Maria Silva', date: '10:30', dp: '62mm' },
-    { id: 2, client: 'João Santos', date: '09:45', dp: '65mm' },
-    { id: 3, client: 'Ana Costa', date: '09:15', dp: '58mm' }
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-muted flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Carregando dashboard...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted">
@@ -156,24 +192,34 @@ const OpticDashboard = () => {
           <Card className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
             <CardHeader>
               <CardTitle>Aferições Recentes</CardTitle>
-              <CardDescription>Últimos clientes atendidos hoje</CardDescription>
+              <CardDescription>Últimos clientes atendidos</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {recentMeasurements.map((measurement) => (
-                  <div key={measurement.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div>
-                      <p className="font-medium">{measurement.client}</p>
-                      <p className="text-sm text-gray-500">{measurement.date}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">DP: {measurement.dp}</p>
-                      <Button size="sm" variant="outline" className="text-xs">
-                        Ver Detalhes
-                      </Button>
-                    </div>
+                {recentMeasurements.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500">
+                    <Ruler className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>Nenhuma aferição realizada ainda</p>
+                    <p className="text-sm">Comece fazendo sua primeira aferição</p>
                   </div>
-                ))}
+                ) : (
+                  recentMeasurements.map((measurement) => (
+                    <div key={measurement.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div>
+                        <p className="font-medium">{measurement.nome_cliente}</p>
+                        <p className="text-sm text-gray-500">{formatTime(measurement.created_at)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">
+                          DP: {measurement.dp_binocular ? `${measurement.dp_binocular}mm` : 'N/A'}
+                        </p>
+                        <Button size="sm" variant="outline" className="text-xs">
+                          Ver Detalhes
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
