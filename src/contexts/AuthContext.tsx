@@ -18,22 +18,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { user, setUser, loading, setLoading } = useAuthState();
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    setLoading(true);
-    const result = await performLogin(email, password);
-    
-    if (result.success && result.userData) {
-      setUser(result.userData);
+    try {
+      setLoading(true);
+      console.log('Iniciando processo de login...');
+      
+      const result = await performLogin(email, password);
+      
+      if (result.success && result.userData) {
+        setUser(result.userData);
+        console.log('Login bem-sucedido:', result.userData.email);
+        return true;
+      }
+      
+      console.log('Falha no login');
+      return false;
+    } catch (error) {
+      console.error('Erro durante login:', error);
+      return false;
+    } finally {
       setLoading(false);
-      return true;
     }
-    
-    setLoading(false);
-    return false;
   };
 
   const logout = async () => {
-    await performLogout();
-    setUser(null);
+    try {
+      console.log('Iniciando logout...');
+      await performLogout();
+      setUser(null);
+      console.log('Logout concluído');
+    } catch (error) {
+      console.error('Erro durante logout:', error);
+    }
   };
 
   const isAuthenticated = !!user && !loading;

@@ -46,14 +46,11 @@ export const useAuthState = () => {
     // Verificar sessão atual primeiro
     const initializeAuth = async () => {
       try {
+        console.log('Verificando sessão inicial...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Erro ao verificar sessão:', error);
-          if (mounted) {
-            setLoading(false);
-          }
-          return;
         }
 
         await handleAuthChange('INITIAL_SESSION', session);
@@ -72,6 +69,7 @@ export const useAuthState = () => {
     initializeAuth();
 
     return () => {
+      console.log('Limpando listeners de auth...');
       mounted = false;
       subscription.unsubscribe();
     };
