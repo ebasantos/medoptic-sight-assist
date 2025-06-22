@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,27 +48,16 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       const isAdmin = email === 'erik@admin.com';
       console.log('É admin?', isAdmin);
       
-      // Configuração diferente para admin vs funcionário
-      const signupOptions = isAdmin ? {
-        // Para admin: sem validação de email
-        emailRedirectTo: undefined,
-        data: {
-          email_confirm: true // Marcar como confirmado automaticamente
-        }
-      } : {
-        // Para funcionário: processo normal mas sem confirmação
-        emailRedirectTo: undefined,
-        data: {
-          email_confirm: false
-        }
-      };
-
-      console.log('Opções de signup:', signupOptions);
-      
+      // Fazer o signup SEM validação de email
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        options: signupOptions
+        options: {
+          emailRedirectTo: undefined, // Remove redirecionamento de email
+          data: {
+            email_confirm: false // Não requer confirmação de email
+          }
+        }
       });
 
       console.log('Resultado signup:', { authData, authError });
@@ -82,7 +70,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       if (authData?.user) {
         console.log('Usuário criado no auth:', authData.user.id);
         
-        // Se for admin, forçar confirmação do email via SQL
+        // Se for admin, confirmar email automaticamente
         if (isAdmin) {
           console.log('Confirmando email do admin automaticamente...');
           const { error: confirmError } = await supabase.rpc('confirm_admin_email', {
@@ -91,6 +79,8 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
           
           if (confirmError) {
             console.warn('Erro ao confirmar email (ignorado):', confirmError);
+          } else {
+            console.log('Email do admin confirmado com sucesso!');
           }
         }
         
@@ -132,7 +122,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         toast({
           title: "Sucesso!",
           description: isAdmin 
-            ? "Conta admin criada com sucesso! Agora você pode fazer login." 
+            ? "Conta admin criada com sucesso! Email confirmado automaticamente. Agora você pode fazer login." 
             : "Conta criada com sucesso! Agora você pode fazer login.",
         });
         
