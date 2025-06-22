@@ -2,12 +2,21 @@
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/auth';
 
-// Função para buscar dados do usuário no banco
+// Cache para evitar requisições desnecessárias
+const userCache = new Map<string, { user: User | null; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
 export const fetchUserData = async (userEmail: string): Promise<User | null> => {
   try {
     console.log('🔍 Buscando dados do usuário por email:', userEmail);
     
-    // Buscar usuário na tabela usuarios_optica
+    // Verificar cache primeiro
+    const cached = userCache.get(userEmail);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+      console.log('💾 Dados encontrados no cache');
+      return cached.user;
+    }
+    
     const { data: userData, error: userError } = await supabase
       .from('usuarios_optica')
       .select(`
@@ -24,6 +33,7 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
 
     if (userError) {
       console.error('❌ Erro ao buscar usuário:', userError);
+      userCache.set(userEmail, { user: null, timestamp: Date.now() });
       return null;
     }
 
@@ -37,23 +47,26 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
         opticName: userData.opticas?.nome || null
       };
       console.log('✅ Dados do usuário processados:', userObj);
+      
+      // Salvar no cache
+      userCache.set(userEmail, { user: userObj, timestamp: Date.now() });
       return userObj;
     }
 
     console.log('⚠️ Usuário não encontrado na tabela usuarios_optica');
+    userCache.set(userEmail, { user: null, timestamp: Date.now() });
     return null;
   } catch (error) {
     console.error('❌ Erro ao processar dados do usuário:', error);
+    userCache.set(userEmail, { user: null, timestamp: Date.now() });
     return null;
   }
 };
 
-// Função de login usando Supabase Auth
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
     console.log('🔐 Tentando login com Supabase Auth para:', email);
     
-    // Fazer login com Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -71,12 +84,10 @@ export const performLogin = async (email: string, password: string): Promise<{ s
 
     console.log('✅ Login realizado com sucesso no Auth:', authData.user.email);
     
-    // Buscar dados do usuário na tabela usuarios_optica
     const userData = await fetchUserData(authData.user.email!);
     
     if (!userData) {
       console.log('⚠️ Dados do usuário não encontrados na tabela usuarios_optica');
-      // Fazer logout se não encontrar dados
       await supabase.auth.signOut();
       return { success: false };
     }
@@ -89,10 +100,11 @@ export const performLogin = async (email: string, password: string): Promise<{ s
   }
 };
 
-// Função de logout
 export const performLogout = async (): Promise<void> => {
   try {
     console.log('🚪 Fazendo logout...');
+    // Limpar cache ao fazer logout
+    userCache.clear();
     await supabase.auth.signOut();
   } catch (error) {
     console.error('❌ Erro durante logout:', error);

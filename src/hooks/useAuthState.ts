@@ -10,17 +10,19 @@ export const useAuthState = () => {
 
   useEffect(() => {
     let mounted = true;
+    let isProcessing = false; // Flag para evitar processamento simultâneo
 
     console.log('🔧 Iniciando useAuthState...');
     
-    // Função para processar mudanças de autenticação
     const handleAuthChange = async (event: string, session: any) => {
       console.log('🔄 Auth state changed:', event, session?.user?.email || 'sem sessão');
       
-      if (!mounted) {
-        console.log('⚠️ Componente desmontado, ignorando mudança');
+      if (!mounted || isProcessing) {
+        console.log('⚠️ Componente desmontado ou já processando, ignorando mudança');
         return;
       }
+
+      isProcessing = true;
 
       try {
         if (session?.user) {
@@ -29,25 +31,26 @@ export const useAuthState = () => {
           if (mounted) {
             console.log('✅ Dados do usuário carregados:', userData);
             setUser(userData);
-            setLoading(false);
           }
         } else {
           console.log('🚪 Usuário não logado');
           if (mounted) {
             setUser(null);
-            setLoading(false);
           }
         }
       } catch (error) {
         console.error('❌ Erro ao processar mudança de auth:', error);
         if (mounted) {
           setUser(null);
+        }
+      } finally {
+        if (mounted) {
           setLoading(false);
+          isProcessing = false;
         }
       }
     };
 
-    // Verificar sessão atual primeiro
     const initializeAuth = async () => {
       try {
         console.log('🔍 Verificando sessão inicial...');
@@ -69,16 +72,17 @@ export const useAuthState = () => {
       }
     };
 
-    // Escutar mudanças de autenticação
+    // Configurar listener primeiro
     console.log('👂 Configurando listener de auth...');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    // Inicializar
+    // Inicializar depois
     initializeAuth();
 
     return () => {
       console.log('🧹 Limpando listeners de auth...');
       mounted = false;
+      isProcessing = false;
       subscription.unsubscribe();
     };
   }, []);
