@@ -6,6 +6,16 @@ import { User } from '@/types/auth';
 const userCache = new Map<string, { user: User | null; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
+// Função para criar timeout em promises
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
+    )
+  ]);
+};
+
 export const fetchUserData = async (userEmail: string): Promise<User | null> => {
   try {
     console.log('🔍 Buscando dados do usuário por email:', userEmail);
@@ -17,7 +27,8 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
       return cached.user;
     }
     
-    const { data: userData, error: userError } = await supabase
+    // Adicionar timeout de 1 segundo na consulta
+    const queryPromise = supabase
       .from('usuarios_optica')
       .select(`
         *,
@@ -28,6 +39,8 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
       `)
       .eq('email', userEmail)
       .maybeSingle();
+
+    const { data: userData, error: userError } = await withTimeout(queryPromise, 1000);
 
     console.log('📊 Resultado da busca por email:', { userData, userError });
 
@@ -57,6 +70,23 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
     userCache.set(userEmail, { user: null, timestamp: Date.now() });
     return null;
   } catch (error) {
+    if (error instanceof Error && error.message === 'TIMEOUT') {
+      console.error('⏰ Timeout na busca de dados do usuário - fazendo logout automático');
+      
+      // Fazer logout automático em caso de timeout
+      try {
+        await supabase.auth.signOut();
+        // Limpar cache
+        userCache.clear();
+        // Recarregar a página para ir para login
+        window.location.href = '/';
+      } catch (logoutError) {
+        console.error('❌ Erro ao fazer logout automático:', logoutError);
+      }
+      
+      return null;
+    }
+    
     console.error('❌ Erro ao processar dados do usuário:', error);
     userCache.set(userEmail, { user: null, timestamp: Date.now() });
     return null;
