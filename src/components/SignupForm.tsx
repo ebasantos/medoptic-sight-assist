@@ -44,23 +44,39 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
     setIsLoading(true);
     
     try {
-      console.log('Iniciando cadastro direto sem confirmação de email:', email);
+      console.log('Iniciando cadastro para:', email);
       
       const isAdmin = email === 'erik@admin.com';
       console.log('É admin?', isAdmin);
       
-      // Primeiro vamos tentar criar diretamente na tabela usuarios_optica
-      // sem usar o sistema auth do Supabase que está com problemas de email
+      // Criar usuário no Supabase Auth primeiro
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            name: name
+          },
+          emailRedirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (authError) {
+        console.error('Erro no Auth:', authError);
+        throw new Error(`Erro na autenticação: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error('Usuário não foi criado no sistema de autenticação');
+      }
+
+      console.log('Usuário criado no Auth:', authData.user.id);
       
-      // Gerar um user_id único
-      const userId = crypto.randomUUID();
-      console.log('ID de usuário gerado:', userId);
-      
-      // Inserir diretamente na tabela usuarios_optica
-      const { data: insertData, error: insertError } = await supabase
-        .from('usuarios_optica')
+      // Inserir na tabela usuarios_optica
+      const { data: userData, error: userError } = await supabase
+        .from('usuarios_optica')  
         .insert({
-          user_id: userId,
+          user_id: authData.user.id,
           nome: name,
           email: email,
           role: isAdmin ? 'admin' : 'funcionario',
@@ -70,39 +86,12 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         .select()
         .single();
 
-      if (insertError) {
-        console.error('Erro ao inserir usuário:', insertError);
-        
-        if (insertError.code === '23505') { // duplicate key error
-          throw new Error('Este email já está cadastrado no sistema');
-        }
-        
-        throw new Error(`Erro no banco de dados: ${insertError.message}`);
+      if (userError) {
+        console.error('Erro ao criar usuário na tabela:', userError);
+        throw new Error(`Erro ao salvar dados do usuário: ${userError.message}`);
       }
 
-      console.log('Usuário criado com sucesso na base:', insertData);
-
-      // Agora criar no Auth do Supabase sem confirmação de email
-      try {
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email: email,
-          password: password,
-          user_metadata: {
-            name: name
-          },
-          email_confirm: true // Confirmar email automaticamente
-        });
-
-        if (authError) {
-          console.log('Erro no Auth (mas usuário já criado na base):', authError);
-          // Não vamos falhar por causa do Auth, o usuário já está na base
-        } else {
-          console.log('Usuário criado no Auth também:', authData);
-        }
-      } catch (authErr) {
-        console.log('Falha no Auth, mas usuário já está na base:', authErr);
-        // Continuar mesmo se o Auth falhar
-      }
+      console.log('Usuário criado com sucesso:', userData);
 
       toast({
         title: "Sucesso!",
@@ -122,7 +111,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
       
       let errorMessage = "Erro inesperado. Tente novamente.";
       
-      if (error.message?.includes('já está cadastrado')) {
+      if (error.message?.includes('User already registered')) {
         errorMessage = "Este email já está cadastrado. Tente fazer login.";
       } else if (error.message?.includes('Invalid email')) {
         errorMessage = "Email inválido. Verifique o formato.";
@@ -236,11 +225,11 @@ const SignupForm: React.FC<SignupFormProps> = ({ onBackToLogin }) => {
         </div>
         
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-          <p className="font-medium mb-2">✅ Sistema otimizado:</p>
-          <p>• Cadastro instantâneo sem email</p>
+          <p className="font-medium mb-2">✅ Sistema corrigido:</p>
+          <p>• Crie uma conta com seu email</p>
           <p>• Use <strong>erik@admin.com</strong> para acesso admin</p>
           <p>• Qualquer senha com 6+ caracteres</p>
-          <p>• Login imediato após cadastro</p>
+          <p>• Login após o cadastro</p>
         </div>
       </CardContent>
     </Card>
