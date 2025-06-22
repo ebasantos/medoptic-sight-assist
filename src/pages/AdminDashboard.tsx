@@ -6,32 +6,40 @@ import {
   Users, 
   BarChart3, 
   Settings, 
-  Plus,
   Shield,
   LogOut,
   Eye,
   Lock,
-  Unlock
+  Unlock,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdminDashboard } from '@/hooks/useAdminDashboard';
+import CreateOpticModal from '@/components/CreateOpticModal';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { opticas, stats, loading, fetchDashboardData, toggleOpticStatus } = useAdminDashboard();
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
-  const mockOptics = [
-    { id: 1, name: 'Ótica Visual+', users: 3, status: 'ativa', measurements: 156 },
-    { id: 2, name: 'Ótica Elite', users: 2, status: 'ativa', measurements: 89 },
-    { id: 3, name: 'Ótica Centro', users: 1, status: 'bloqueada', measurements: 45 },
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-muted flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Carregando dashboard...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted">
@@ -68,8 +76,10 @@ const AdminDashboard = () => {
               <Building2 className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
-              <p className="text-xs text-gray-500">2 ativas, 1 bloqueada</p>
+              <div className="text-2xl font-bold">{stats.totalOpticas}</div>
+              <p className="text-xs text-gray-500">
+                {stats.opticasAtivas} ativas, {stats.opticasBloqueadas} bloqueadas
+              </p>
             </CardContent>
           </Card>
 
@@ -79,7 +89,7 @@ const AdminDashboard = () => {
               <Users className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">6</div>
+              <div className="text-2xl font-bold">{stats.totalUsuarios}</div>
               <p className="text-xs text-gray-500">Distribuídos nas óticas</p>
             </CardContent>
           </Card>
@@ -90,8 +100,8 @@ const AdminDashboard = () => {
               <BarChart3 className="h-4 w-4 text-warning" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">290</div>
-              <p className="text-xs text-gray-500">Este mês: +47</p>
+              <div className="text-2xl font-bold">{stats.totalAfericoes}</div>
+              <p className="text-xs text-gray-500">Todas as óticas</p>
             </CardContent>
           </Card>
 
@@ -102,26 +112,23 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-success">Online</div>
-              <p className="text-xs text-gray-500">Uptime: 99.9%</p>
+              <p className="text-xs text-gray-500">Funcionando</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Actions */}
+        {/* Actions and Optics List */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
+                <Building2 className="h-5 w-5" />
                 Ações Rápidas
               </CardTitle>
               <CardDescription>Gerenciar óticas e usuários</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full justify-start h-12" variant="outline">
-                <Building2 className="h-4 w-4 mr-2" />
-                Criar Nova Ótica
-              </Button>
+              <CreateOpticModal onOpticCreated={fetchDashboardData} />
               <Button className="w-full justify-start h-12" variant="outline">
                 <Users className="h-4 w-4 mr-2" />
                 Adicionar Usuário
@@ -140,39 +147,49 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockOptics.map((optic) => (
-                  <div key={optic.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium">{optic.name}</h3>
-                        <Badge 
-                          variant={optic.status === 'ativa' ? 'default' : 'destructive'}
-                          className="text-xs"
-                        >
-                          {optic.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        {optic.users} usuários • {optic.measurements} aferições
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="text-warning hover:text-warning"
-                      >
-                        {optic.status === 'ativa' ? 
-                          <Lock className="h-4 w-4" /> : 
-                          <Unlock className="h-4 w-4" />
-                        }
-                      </Button>
-                    </div>
+                {opticas.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500">
+                    <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>Nenhuma ótica cadastrada ainda</p>
+                    <p className="text-sm">Use o botão "Criar Nova Ótica" para começar</p>
                   </div>
-                ))}
+                ) : (
+                  opticas.map((optica) => (
+                    <div key={optica.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium">{optica.nome}</h3>
+                          <Badge 
+                            variant={optica.ativo ? 'default' : 'destructive'}
+                            className="text-xs"
+                          >
+                            {optica.ativo ? 'ativa' : 'bloqueada'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {optica.users} usuários • {optica.measurements} aferições
+                        </p>
+                        <p className="text-xs text-gray-400">{optica.email}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="text-warning hover:text-warning"
+                          onClick={() => toggleOpticStatus(optica.id, optica.ativo)}
+                        >
+                          {optica.ativo ? 
+                            <Lock className="h-4 w-4" /> : 
+                            <Unlock className="h-4 w-4" />
+                          }
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
