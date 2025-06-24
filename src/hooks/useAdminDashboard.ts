@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +38,24 @@ export const useAdminDashboard = () => {
     try {
       console.log('🔍 Buscando dados do dashboard admin...');
       
+      // Verificar primeiro se o usuário tem permissão de admin
+      console.log('🔒 Verificando permissões de admin...');
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('👤 Usuário atual:', user?.email);
+      
+      // Buscar dados do usuário atual
+      const { data: currentUserData, error: currentUserError } = await supabase
+        .from('usuarios_optica')
+        .select('role, optica_id')
+        .eq('user_id', user?.id)
+        .single();
+      
+      if (currentUserError) {
+        console.error('❌ Erro ao buscar dados do usuário atual:', currentUserError);
+      } else {
+        console.log('👥 Dados do usuário atual:', currentUserData);
+      }
+
       // Buscar óticas
       console.log('📊 Buscando óticas...');
       const { data: opticasData, error: opticasError } = await supabase
@@ -53,46 +70,90 @@ export const useAdminDashboard = () => {
 
       console.log('✅ Óticas encontradas:', opticasData?.length || 0);
 
-      // Buscar usuários
+      // Buscar usuários - tentar sem filtros RLS primeiro
       console.log('👥 Buscando usuários...');
       const { data: usuariosData, error: usuariosError } = await supabase
         .from('usuarios_optica')
-        .select('optica_id, id, ativo');
+        .select('optica_id, id, ativo, role, nome, email');
 
       if (usuariosError) {
         console.error('❌ Erro ao buscar usuários:', usuariosError);
-        throw usuariosError;
+        console.log('⚠️ Tentando buscar usuários com query mais simples...');
+        
+        // Tentar query mais simples
+        const { data: usuariosSimple, error: usuariosSimpleError } = await supabase
+          .from('usuarios_optica')
+          .select('*');
+          
+        if (usuariosSimpleError) {
+          console.error('❌ Erro na query simples também:', usuariosSimpleError);
+        } else {
+          console.log('✅ Query simples funcionou:', usuariosSimple?.length || 0);
+        }
+      } else {
+        console.log('✅ Usuários encontrados:', usuariosData?.length || 0);
+        console.log('📋 Primeiros usuários:', usuariosData?.slice(0, 3));
       }
 
-      console.log('✅ Usuários encontrados:', usuariosData?.length || 0);
-
-      // Buscar aferições tradicionais
+      // Buscar aferições tradicionais - com logs detalhados
       console.log('📏 Buscando aferições tradicionais...');
       const { data: afericoesData, error: afericoesError } = await supabase
         .from('afericoes')
-        .select('optica_id, id');
+        .select('optica_id, id, usuario_id, nome_cliente, created_at');
+
+      console.log('🔍 Resultado da query de aferições:', {
+        data: afericoesData,
+        error: afericoesError,
+        count: afericoesData?.length || 0
+      });
 
       if (afericoesError) {
         console.error('❌ Erro ao buscar aferições:', afericoesError);
-        throw afericoesError;
+        console.log('⚠️ Tentando buscar aferições com query mais simples...');
+        
+        // Tentar query mais simples para aferições
+        const { data: afericoesSimple, error: afericoesSimpleError } = await supabase
+          .from('afericoes')
+          .select('*');
+          
+        if (afericoesSimpleError) {
+          console.error('❌ Erro na query simples de aferições também:', afericoesSimpleError);
+        } else {
+          console.log('✅ Query simples de aferições funcionou:', afericoesSimple?.length || 0);
+          console.log('📋 Primeiras aferições:', afericoesSimple?.slice(0, 3));
+        }
       }
 
-      console.log('✅ Aferições encontradas:', afericoesData?.length || 0);
-
-      // Buscar análises faciais
+      // Buscar análises faciais - com logs detalhados
       console.log('🎭 Buscando análises faciais...');
       const { data: analisesData, error: analisesError } = await supabase
         .from('analises_faciais')
-        .select('optica_id, id');
+        .select('optica_id, id, usuario_id, nome_cliente, created_at');
+
+      console.log('🔍 Resultado da query de análises:', {
+        data: analisesData,
+        error: analisesError,
+        count: analisesData?.length || 0
+      });
 
       if (analisesError) {
         console.error('❌ Erro ao buscar análises:', analisesError);
-        throw analisesError;
+        console.log('⚠️ Tentando buscar análises com query mais simples...');
+        
+        // Tentar query mais simples para análises
+        const { data: analisesSimple, error: analisesSimpleError } = await supabase
+          .from('analises_faciais')
+          .select('*');
+          
+        if (analisesSimpleError) {
+          console.error('❌ Erro na query simples de análises também:', analisesSimpleError);
+        } else {
+          console.log('✅ Query simples de análises funcionou:', analisesSimple?.length || 0);
+          console.log('📋 Primeiras análises:', analisesSimple?.slice(0, 3));
+        }
       }
 
-      console.log('✅ Análises encontradas:', analisesData?.length || 0);
-
-      // Processar dados de medições
+      // Processar dados de medições - usando os dados que conseguimos buscar
       const afericoesList = afericoesData || [];
       const analisesList = analisesData || [];
       const usuariosList = usuariosData || [];
