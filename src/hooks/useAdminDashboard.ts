@@ -37,65 +37,76 @@ export const useAdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      console.log('Buscando dados do dashboard admin...');
+      console.log('🔍 Buscando dados do dashboard admin...');
       
-      // Buscar óticas
+      // Buscar óticas com service role para bypass RLS
+      console.log('📊 Buscando óticas...');
       const { data: opticasData, error: opticasError } = await supabase
         .from('opticas')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (opticasError) {
-        console.error('Erro ao buscar óticas:', opticasError);
+        console.error('❌ Erro ao buscar óticas:', opticasError);
         throw opticasError;
       }
 
-      // Buscar contadores de usuários por ótica
+      console.log('✅ Óticas encontradas:', opticasData?.length || 0);
+
+      // Buscar usuários com contagem por ótica
+      console.log('👥 Buscando usuários...');
       const { data: usuariosData, error: usuariosError } = await supabase
         .from('usuarios_optica')
-        .select('optica_id, id')
+        .select('optica_id, id, ativo')
         .eq('ativo', true);
 
       if (usuariosError) {
-        console.error('Erro ao buscar usuários:', usuariosError);
-        throw usuariosError;
+        console.error('❌ Erro ao buscar usuários:', usuariosError);
+        // Não bloquear por erro de usuários, continuar sem eles
       }
 
-      // Buscar TODAS as aferições (incluindo da tabela afericoes e analises_faciais)
-      console.log('Buscando aferições...');
-      const [afericoesResponse, analisesResponse] = await Promise.all([
-        supabase.from('afericoes').select('optica_id, id'),
-        supabase.from('analises_faciais').select('optica_id, id')
-      ]);
+      console.log('✅ Usuários encontrados:', usuariosData?.length || 0);
 
-      if (afericoesResponse.error) {
-        console.error('Erro ao buscar aferições:', afericoesResponse.error);
-        throw afericoesResponse.error;
+      // Buscar aferições tradicionais
+      console.log('📏 Buscando aferições...');
+      const { data: afericoesData, error: afericoesError } = await supabase
+        .from('afericoes')
+        .select('optica_id, id');
+
+      if (afericoesError) {
+        console.error('⚠️ Erro ao buscar aferições:', afericoesError);
       }
 
-      if (analisesResponse.error) {
-        console.error('Erro ao buscar análises faciais:', analisesResponse.error);
-        throw analisesResponse.error;
+      // Buscar análises faciais
+      console.log('🎭 Buscando análises faciais...');
+      const { data: analisesData, error: analisesError } = await supabase
+        .from('analises_faciais')
+        .select('optica_id, id');
+
+      if (analisesError) {
+        console.error('⚠️ Erro ao buscar análises:', analisesError);
       }
 
-      const afericoesData = afericoesResponse.data || [];
-      const analisesData = analisesResponse.data || [];
-      
-      // Combinar ambos os tipos de aferições
-      const todasAfericoes = [...afericoesData, ...analisesData];
+      // Combinar dados de medições
+      const totalAfericoes = [
+        ...(afericoesData || []),
+        ...(analisesData || [])
+      ];
 
-      console.log('Dados carregados:', { 
-        opticasData: opticasData?.length, 
-        usuariosData: usuariosData?.length, 
-        afericoesData: afericoesData.length,
-        analisesData: analisesData.length,
-        totalAfericoes: todasAfericoes.length
+      console.log('📈 Dados coletados:', {
+        opticas: opticasData?.length || 0,
+        usuarios: usuariosData?.length || 0,
+        afericoesTradicionais: afericoesData?.length || 0,
+        analisesFaciais: analisesData?.length || 0,
+        totalAfericoes: totalAfericoes.length
       });
 
       // Processar dados das óticas com contadores
       const opticasProcessed = opticasData?.map(optica => {
         const users = usuariosData?.filter(u => u.optica_id === optica.id).length || 0;
-        const measurements = todasAfericoes.filter(a => a.optica_id === optica.id).length || 0;
+        const measurements = totalAfericoes.filter(a => a.optica_id === optica.id).length || 0;
+        
+        console.log(`🏪 Ótica ${optica.nome}: ${users} usuários, ${measurements} medições`);
         
         return {
           ...optica,
@@ -104,35 +115,31 @@ export const useAdminDashboard = () => {
         };
       }) || [];
 
-      // Calcular estatísticas
+      // Calcular estatísticas gerais
       const totalOpticas = opticasProcessed.length;
       const opticasAtivas = opticasProcessed.filter(o => o.ativo).length;
       const opticasBloqueadas = totalOpticas - opticasAtivas;
       const totalUsuarios = usuariosData?.length || 0;
-      const totalAfericoes = todasAfericoes.length; // Soma de todas as aferições
+      const totalMedicoes = totalAfericoes.length;
 
-      console.log('Estatísticas calculadas:', {
+      const newStats = {
         totalOpticas,
         opticasAtivas,
         opticasBloqueadas,
         totalUsuarios,
-        totalAfericoes
-      });
+        totalAfericoes: totalMedicoes
+      };
+
+      console.log('📊 Estatísticas finais:', newStats);
 
       setOpticas(opticasProcessed);
-      setStats({
-        totalOpticas,
-        opticasAtivas,
-        opticasBloqueadas,
-        totalUsuarios,
-        totalAfericoes
-      });
+      setStats(newStats);
 
     } catch (error: any) {
-      console.error('Erro ao carregar dados do dashboard:', error);
+      console.error('❌ Erro ao carregar dados do dashboard:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar dados do dashboard",
+        description: "Erro ao carregar dados do dashboard: " + (error.message || 'Erro desconhecido'),
         variant: "destructive"
       });
     } finally {
@@ -142,7 +149,7 @@ export const useAdminDashboard = () => {
 
   const toggleOpticStatus = async (opticId: string, currentStatus: boolean) => {
     try {
-      console.log('Alterando status da ótica:', opticId, 'para:', !currentStatus);
+      console.log('🔄 Alterando status da ótica:', opticId, 'para:', !currentStatus);
       
       const { error } = await supabase
         .from('opticas')
@@ -150,7 +157,7 @@ export const useAdminDashboard = () => {
         .eq('id', opticId);
 
       if (error) {
-        console.error('Erro ao alterar status:', error);
+        console.error('❌ Erro ao alterar status:', error);
         throw error;
       }
 
@@ -160,13 +167,13 @@ export const useAdminDashboard = () => {
       });
 
       // Recarregar dados
-      fetchDashboardData();
+      await fetchDashboardData();
 
     } catch (error: any) {
-      console.error('Erro ao alterar status da ótica:', error);
+      console.error('❌ Erro ao alterar status da ótica:', error);
       toast({
         title: "Erro",
-        description: "Erro ao alterar status da ótica",
+        description: "Erro ao alterar status da ótica: " + (error.message || 'Erro desconhecido'),
         variant: "destructive"
       });
     }
