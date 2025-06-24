@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -52,66 +53,49 @@ export const useAdminDashboard = () => {
 
       console.log('✅ Óticas encontradas:', opticasData?.length || 0);
 
-      // Buscar usuários com contagem por ótica - usando RPC ou query mais simples
+      // Buscar usuários
       console.log('👥 Buscando usuários...');
       const { data: usuariosData, error: usuariosError } = await supabase
-        .rpc('get_admin_users_count')
-        .then(response => {
-          if (response.error) {
-            console.log('⚠️ RPC não disponível, usando query direta...');
-            return supabase
-              .from('usuarios_optica')
-              .select('optica_id, id, ativo');
-          }
-          return response;
-        });
+        .from('usuarios_optica')
+        .select('optica_id, id, ativo');
 
       if (usuariosError) {
         console.error('❌ Erro ao buscar usuários:', usuariosError);
+        throw usuariosError;
       }
 
       console.log('✅ Usuários encontrados:', usuariosData?.length || 0);
 
-      // Buscar aferições tradicionais - usando query mais robusta
+      // Buscar aferições tradicionais
       console.log('📏 Buscando aferições tradicionais...');
       const { data: afericoesData, error: afericoesError } = await supabase
-        .rpc('get_admin_afericoes_count')
-        .then(response => {
-          if (response.error) {
-            console.log('⚠️ RPC não disponível, usando query direta para aferições...');
-            return supabase
-              .from('afericoes')
-              .select('optica_id, id');
-          }
-          return response;
-        });
+        .from('afericoes')
+        .select('optica_id, id');
 
       if (afericoesError) {
-        console.error('⚠️ Erro ao buscar aferições:', afericoesError);
+        console.error('❌ Erro ao buscar aferições:', afericoesError);
+        throw afericoesError;
       }
+
+      console.log('✅ Aferições encontradas:', afericoesData?.length || 0);
 
       // Buscar análises faciais
       console.log('🎭 Buscando análises faciais...');
       const { data: analisesData, error: analisesError } = await supabase
-        .rpc('get_admin_analises_count')
-        .then(response => {
-          if (response.error) {
-            console.log('⚠️ RPC não disponível, usando query direta para análises...');
-            return supabase
-              .from('analises_faciais')
-              .select('optica_id, id');
-          }
-          return response;
-        });
+        .from('analises_faciais')
+        .select('optica_id, id');
 
       if (analisesError) {
-        console.error('⚠️ Erro ao buscar análises:', analisesError);
+        console.error('❌ Erro ao buscar análises:', analisesError);
+        throw analisesError;
       }
 
-      // Processar dados de medições de forma mais robusta
-      const afericoesList = Array.isArray(afericoesData) ? afericoesData : [];
-      const analisesList = Array.isArray(analisesData) ? analisesData : [];
-      const usuariosList = Array.isArray(usuariosData) ? usuariosData : [];
+      console.log('✅ Análises encontradas:', analisesData?.length || 0);
+
+      // Processar dados de medições
+      const afericoesList = afericoesData || [];
+      const analisesList = analisesData || [];
+      const usuariosList = usuariosData || [];
 
       console.log('📈 Dados coletados:', {
         opticas: opticasData?.length || 0,
