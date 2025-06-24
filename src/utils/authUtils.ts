@@ -6,6 +6,32 @@ import { User } from '@/types/auth';
 const userCache = new Map<string, { user: User | null; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
+// Função para limpar completamente o estado de autenticação
+export const cleanupAuthState = () => {
+  console.log('🧹 Limpando estado de autenticação...');
+  
+  // Limpar todas as chaves relacionadas ao Supabase do localStorage
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // Limpar do sessionStorage se estiver sendo usado
+  if (typeof sessionStorage !== 'undefined') {
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  }
+  
+  // Limpar cache de usuários
+  userCache.clear();
+  
+  console.log('✅ Estado de autenticação limpo');
+};
+
 // Função para criar timeout em promises
 const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   return Promise.race([
@@ -87,8 +113,25 @@ export const fetchUserData = async (userEmail: string): Promise<User | null> => 
 
 export const performLogin = async (email: string, password: string): Promise<{ success: boolean; userData?: User | null }> => {
   try {
-    console.log('🔐 Tentando login com Supabase Auth para:', email);
+    console.log('🔐 Iniciando processo de login para:', email);
     
+    // ETAPA 1: Limpar estado de autenticação antes de tentar login
+    cleanupAuthState();
+    
+    // ETAPA 2: Tentar logout global para garantir estado limpo
+    try {
+      console.log('🚪 Fazendo logout global preventivo...');
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch (logoutError) {
+      console.log('⚠️ Erro no logout preventivo (continuando):', logoutError);
+      // Continuar mesmo se o logout falhar
+    }
+    
+    // ETAPA 3: Aguardar um pouco para garantir que o estado foi limpo
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // ETAPA 4: Tentar login
+    console.log('🔑 Tentando login com Supabase Auth...');
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -106,6 +149,7 @@ export const performLogin = async (email: string, password: string): Promise<{ s
 
     console.log('✅ Login realizado com sucesso no Auth:', authData.user.email);
     
+    // ETAPA 5: Buscar dados complementares do usuário
     const userData = await fetchUserData(authData.user.email!);
     
     if (!userData) {
@@ -114,21 +158,43 @@ export const performLogin = async (email: string, password: string): Promise<{ s
       return { success: false };
     }
 
+    console.log('🎉 Login completo com sucesso!');
     return { success: true, userData };
 
   } catch (error) {
     console.error('❌ Erro durante login:', error);
+    // Limpar estado em caso de erro
+    cleanupAuthState();
     return { success: false };
   }
 };
 
 export const performLogout = async (): Promise<void> => {
   try {
-    console.log('🚪 Fazendo logout...');
-    // Limpar cache ao fazer logout
-    userCache.clear();
-    await supabase.auth.signOut();
+    console.log('🚪 Iniciando processo de logout...');
+    
+    // ETAPA 1: Limpar estado primeiro
+    cleanupAuthState();
+    
+    // ETAPA 2: Tentar logout global
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+      console.log('✅ Logout global realizado');
+    } catch (error) {
+      console.log('⚠️ Erro no logout global (continuando):', error);
+      // Continuar mesmo se falhar
+    }
+    
+    // ETAPA 3: Forçar refresh da página para garantir estado limpo
+    console.log('🔄 Forçando refresh da página...');
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 100);
+    
   } catch (error) {
     console.error('❌ Erro durante logout:', error);
+    // Mesmo com erro, limpar estado e forçar refresh
+    cleanupAuthState();
+    window.location.href = '/';
   }
 };

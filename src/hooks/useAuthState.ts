@@ -26,26 +26,43 @@ export const useAuthState = () => {
 
       try {
         if (session?.user) {
-          console.log('👤 Processando usuário logado...');
-          const userData = await fetchUserData(session.user.email);
-          if (mounted) {
-            console.log('✅ Dados do usuário carregados:', userData);
-            setUser(userData);
-          }
+          console.log('👤 Processando usuário logado...', event);
+          
+          // Defer data fetching to prevent deadlocks
+          setTimeout(async () => {
+            if (!mounted) return;
+            
+            try {
+              const userData = await fetchUserData(session.user.email);
+              if (mounted) {
+                console.log('✅ Dados do usuário carregados:', userData);
+                setUser(userData);
+                setLoading(false);
+              }
+            } catch (error) {
+              console.error('❌ Erro ao carregar dados do usuário:', error);
+              if (mounted) {
+                setUser(null);
+                setLoading(false);
+              }
+            }
+          }, 0);
+          
         } else {
-          console.log('🚪 Usuário não logado');
+          console.log('🚪 Usuário não logado ou sessão finalizada');
           if (mounted) {
             setUser(null);
+            setLoading(false);
           }
         }
       } catch (error) {
         console.error('❌ Erro ao processar mudança de auth:', error);
         if (mounted) {
           setUser(null);
+          setLoading(false);
         }
       } finally {
         if (mounted) {
-          setLoading(false);
           isProcessing = false;
         }
       }
