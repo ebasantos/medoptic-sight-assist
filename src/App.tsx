@@ -15,20 +15,6 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const AppRoutes = () => {
-  return (
-    <Routes>
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/optica" element={<OpticDashboard />} />
-      <Route path="/aferir" element={<MeasurementPage />} />
-      <Route path="/sugestao" element={<FrameSuggestionPage />} />
-      <Route path="/historico" element={<HistoryPage />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
-
 const App = () => {
   console.log('🚀 Iniciando App...');
   
@@ -37,9 +23,17 @@ const App = () => {
       <TooltipProvider>
         <BrowserRouter>
           <AuthProvider>
+            <Routes>
+              <Route path="/" element={<LoginPage />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/optica" element={<OpticDashboard />} />
+              <Route path="/aferir" element={<MeasurementPage />} />
+              <Route path="/sugestao" element={<FrameSuggestionPage />} />
+              <Route path="/historico" element={<HistoryPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
             <Toaster />
             <Sonner />
-            <AppRoutes />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
