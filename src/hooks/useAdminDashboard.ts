@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -39,7 +38,7 @@ export const useAdminDashboard = () => {
     try {
       console.log('🔍 Buscando dados do dashboard admin...');
       
-      // Buscar óticas com service role para bypass RLS
+      // Buscar óticas
       console.log('📊 Buscando óticas...');
       const { data: opticasData, error: opticasError } = await supabase
         .from('opticas')
@@ -53,25 +52,39 @@ export const useAdminDashboard = () => {
 
       console.log('✅ Óticas encontradas:', opticasData?.length || 0);
 
-      // Buscar usuários com contagem por ótica
+      // Buscar usuários com contagem por ótica - usando RPC ou query mais simples
       console.log('👥 Buscando usuários...');
       const { data: usuariosData, error: usuariosError } = await supabase
-        .from('usuarios_optica')
-        .select('optica_id, id, ativo')
-        .eq('ativo', true);
+        .rpc('get_admin_users_count')
+        .then(response => {
+          if (response.error) {
+            console.log('⚠️ RPC não disponível, usando query direta...');
+            return supabase
+              .from('usuarios_optica')
+              .select('optica_id, id, ativo');
+          }
+          return response;
+        });
 
       if (usuariosError) {
         console.error('❌ Erro ao buscar usuários:', usuariosError);
-        // Não bloquear por erro de usuários, continuar sem eles
       }
 
       console.log('✅ Usuários encontrados:', usuariosData?.length || 0);
 
-      // Buscar aferições tradicionais
-      console.log('📏 Buscando aferições...');
+      // Buscar aferições tradicionais - usando query mais robusta
+      console.log('📏 Buscando aferições tradicionais...');
       const { data: afericoesData, error: afericoesError } = await supabase
-        .from('afericoes')
-        .select('optica_id, id');
+        .rpc('get_admin_afericoes_count')
+        .then(response => {
+          if (response.error) {
+            console.log('⚠️ RPC não disponível, usando query direta para aferições...');
+            return supabase
+              .from('afericoes')
+              .select('optica_id, id');
+          }
+          return response;
+        });
 
       if (afericoesError) {
         console.error('⚠️ Erro ao buscar aferições:', afericoesError);
@@ -80,33 +93,45 @@ export const useAdminDashboard = () => {
       // Buscar análises faciais
       console.log('🎭 Buscando análises faciais...');
       const { data: analisesData, error: analisesError } = await supabase
-        .from('analises_faciais')
-        .select('optica_id, id');
+        .rpc('get_admin_analises_count')
+        .then(response => {
+          if (response.error) {
+            console.log('⚠️ RPC não disponível, usando query direta para análises...');
+            return supabase
+              .from('analises_faciais')
+              .select('optica_id, id');
+          }
+          return response;
+        });
 
       if (analisesError) {
         console.error('⚠️ Erro ao buscar análises:', analisesError);
       }
 
-      // Combinar dados de medições
-      const totalAfericoes = [
-        ...(afericoesData || []),
-        ...(analisesData || [])
-      ];
+      // Processar dados de medições de forma mais robusta
+      const afericoesList = Array.isArray(afericoesData) ? afericoesData : [];
+      const analisesList = Array.isArray(analisesData) ? analisesData : [];
+      const usuariosList = Array.isArray(usuariosData) ? usuariosData : [];
 
       console.log('📈 Dados coletados:', {
         opticas: opticasData?.length || 0,
-        usuarios: usuariosData?.length || 0,
-        afericoesTradicionais: afericoesData?.length || 0,
-        analisesFaciais: analisesData?.length || 0,
-        totalAfericoes: totalAfericoes.length
+        usuarios: usuariosList.length,
+        afericoesTradicionais: afericoesList.length,
+        analisesFaciais: analisesList.length,
+        totalMedicoes: afericoesList.length + analisesList.length
       });
 
       // Processar dados das óticas com contadores
       const opticasProcessed = opticasData?.map(optica => {
-        const users = usuariosData?.filter(u => u.optica_id === optica.id).length || 0;
-        const measurements = totalAfericoes.filter(a => a.optica_id === optica.id).length || 0;
+        // Contar usuários por ótica
+        const users = usuariosList.filter(u => u.optica_id === optica.id).length;
         
-        console.log(`🏪 Ótica ${optica.nome}: ${users} usuários, ${measurements} medições`);
+        // Contar medições por ótica (aferições + análises)
+        const afericoesCount = afericoesList.filter(a => a.optica_id === optica.id).length;
+        const analisesCount = analisesList.filter(a => a.optica_id === optica.id).length;
+        const measurements = afericoesCount + analisesCount;
+        
+        console.log(`🏪 Ótica ${optica.nome}: ${users} usuários, ${measurements} medições (${afericoesCount} aferições + ${analisesCount} análises)`);
         
         return {
           ...optica,
@@ -119,8 +144,8 @@ export const useAdminDashboard = () => {
       const totalOpticas = opticasProcessed.length;
       const opticasAtivas = opticasProcessed.filter(o => o.ativo).length;
       const opticasBloqueadas = totalOpticas - opticasAtivas;
-      const totalUsuarios = usuariosData?.length || 0;
-      const totalMedicoes = totalAfericoes.length;
+      const totalUsuarios = usuariosList.length;
+      const totalMedicoes = afericoesList.length + analisesList.length;
 
       const newStats = {
         totalOpticas,
