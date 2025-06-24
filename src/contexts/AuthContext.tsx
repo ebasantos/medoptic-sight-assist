@@ -53,8 +53,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const isAuthenticated = !!user && !loading;
 
+  // Ensure we always provide a valid context value, even during initialization
+  const contextValue: AuthContextType = {
+    user,
+    loading,
+    login,
+    logout,
+    isAuthenticated
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

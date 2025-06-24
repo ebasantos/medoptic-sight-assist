@@ -93,18 +93,32 @@ export const useAuthState = () => {
       }
     };
 
-    // Configurar listener primeiro
+    // Set up auth state listener first
     console.log('👂 Configurando listener de auth...');
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+    let subscription;
+    
+    try {
+      const { data } = supabase.auth.onAuthStateChange(handleAuthChange);
+      subscription = data.subscription;
+    } catch (error) {
+      console.error('❌ Erro ao configurar listener:', error);
+      if (mounted) {
+        setUser(null);
+        setLoading(false);
+      }
+      return;
+    }
 
-    // Inicializar depois
+    // Initialize auth after setting up listener
     initializeAuth();
 
     return () => {
       console.log('🧹 Limpando listeners de auth...');
       mounted = false;
       isProcessing = false;
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
