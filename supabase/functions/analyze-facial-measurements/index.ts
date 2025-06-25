@@ -61,13 +61,25 @@ serve(async (req) => {
       messages: [
         {
           role: 'user',
-          content: `Analise esta imagem para medições de óculos. Largura da armação: ${adjustedFrameWidth}mm.
+          content: `ANALISE CUIDADOSAMENTE esta imagem para detectar se a pessoa ESTÁ ou NÃO ESTÁ usando óculos.
 
-IMPORTANTE: Se a pessoa NÃO estiver usando óculos, defina "temOculos": false e NÃO inclua alturaEsquerda e alturaDireita no JSON.
+CRITÉRIOS RIGOROSOS PARA DETECÇÃO DE ÓCULOS:
+- Procure por ARMAÇÕES visíveis ao redor dos olhos
+- Observe REFLEXOS nas lentes
+- Identifique HASTES dos óculos nas laterais
+- Verifique se há PONTE nasal entre os olhos
+- Se NÃO conseguir identificar CLARAMENTE essas características, considere SEM ÓCULOS
 
-Retorne apenas JSON válido com esta estrutura:
+IMPORTANTE SOBRE ÓCULOS:
+- Se a pessoa NÃO estiver usando óculos OU se você não tiver CERTEZA ABSOLUTA, defina "temOculos": false
+- APENAS defina "temOculos": true se conseguir ver CLARAMENTE a armação dos óculos
+- Se definir "temOculos": false, NÃO inclua "alturaEsquerda" e "alturaDireita" no JSON
 
-Se COM óculos:
+Largura da armação de referência: ${adjustedFrameWidth}mm.
+
+Retorne APENAS JSON válido:
+
+Se COM óculos (certeza absoluta):
 {
   "dpBinocular": 62,
   "dnpEsquerda": 31, 
@@ -77,10 +89,10 @@ Se COM óculos:
   "larguraLente": 25,
   "confiabilidade": 0.8,
   "temOculos": true,
-  "observacoes": "Análise com óculos"
+  "observacoes": "Óculos claramente visíveis na imagem"
 }
 
-Se SEM óculos:
+Se SEM óculos (padrão quando há dúvida):
 {
   "dpBinocular": 62,
   "dnpEsquerda": 31, 
@@ -88,7 +100,7 @@ Se SEM óculos:
   "larguraLente": 25,
   "confiabilidade": 0.8,
   "temOculos": false,
-  "observacoes": "Análise sem óculos"
+  "observacoes": "Sem óculos detectados na imagem"
 }
 
 Imagem: ${processedImage}`
