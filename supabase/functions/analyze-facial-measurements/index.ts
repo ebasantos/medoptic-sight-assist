@@ -63,7 +63,11 @@ serve(async (req) => {
           role: 'user',
           content: `Analise esta imagem para medições de óculos. Largura da armação: ${adjustedFrameWidth}mm.
 
-Retorne apenas JSON válido:
+IMPORTANTE: Se a pessoa NÃO estiver usando óculos, defina "temOculos": false e NÃO inclua alturaEsquerda e alturaDireita no JSON.
+
+Retorne apenas JSON válido com esta estrutura:
+
+Se COM óculos:
 {
   "dpBinocular": 62,
   "dnpEsquerda": 31, 
@@ -73,7 +77,18 @@ Retorne apenas JSON válido:
   "larguraLente": 25,
   "confiabilidade": 0.8,
   "temOculos": true,
-  "observacoes": "Análise automática"
+  "observacoes": "Análise com óculos"
+}
+
+Se SEM óculos:
+{
+  "dpBinocular": 62,
+  "dnpEsquerda": 31, 
+  "dnpDireita": 31,
+  "larguraLente": 25,
+  "confiabilidade": 0.8,
+  "temOculos": false,
+  "observacoes": "Análise sem óculos"
 }
 
 Imagem: ${processedImage}`
@@ -95,16 +110,14 @@ Imagem: ${processedImage}`
     if (!response.ok) {
       console.error('❌ Erro do DeepSeek:', response.status);
       
-      // Retornar medidas padrão em caso de erro
+      // Retornar medidas padrão SEM óculos em caso de erro
       const defaultMeasurements = {
         dpBinocular: 62,
         dnpEsquerda: 31,
         dnpDireita: 31,
-        alturaEsquerda: 20,
-        alturaDireita: 20,
         larguraLente: adjustedFrameWidth / 2,
         confiabilidade: 0.5,
-        temOculos: true,
+        temOculos: false,
         observacoes: 'Medidas padrão - erro na análise automática'
       };
 
@@ -120,16 +133,14 @@ Imagem: ${processedImage}`
     if (!data.choices?.[0]?.message?.content) {
       console.error('❌ Resposta inválida do DeepSeek');
       
-      // Retornar medidas padrão
+      // Retornar medidas padrão SEM óculos
       const defaultMeasurements = {
         dpBinocular: 62,
         dnpEsquerda: 31,
         dnpDireita: 31,
-        alturaEsquerda: 20,
-        alturaDireita: 20,
         larguraLente: adjustedFrameWidth / 2,
         confiabilidade: 0.5,
-        temOculos: true,
+        temOculos: false,
         observacoes: 'Medidas padrão - resposta inválida da IA'
       };
 
@@ -157,27 +168,31 @@ Imagem: ${processedImage}`
         dpBinocular: 62,
         dnpEsquerda: 31,
         dnpDireita: 31,
-        alturaEsquerda: 20,
-        alturaDireita: 20,
         larguraLente: adjustedFrameWidth / 2,
         confiabilidade: 0.5,
-        temOculos: true,
+        temOculos: false,
         observacoes: 'Medidas padrão - erro no processamento da resposta'
       };
     }
 
-    // Validar e garantir valores seguros
-    const validatedMeasurements = {
+    // Validar e garantir valores seguros baseado se tem óculos ou não
+    const temOculos = Boolean(measurements.temOculos);
+    
+    let validatedMeasurements = {
       dpBinocular: Number(measurements.dpBinocular) || 62,
       dnpEsquerda: Number(measurements.dnpEsquerda) || 31,
       dnpDireita: Number(measurements.dnpDireita) || 31,
-      alturaEsquerda: Number(measurements.alturaEsquerda) || 20,
-      alturaDireita: Number(measurements.alturaDireita) || 20,
       larguraLente: Number(measurements.larguraLente) || adjustedFrameWidth / 2,
       confiabilidade: Number(measurements.confiabilidade) || 0.8,
-      temOculos: Boolean(measurements.temOculos),
+      temOculos: temOculos,
       observacoes: measurements.observacoes || 'Medições calculadas automaticamente'
     };
+
+    // Adicionar alturas apenas se a pessoa estiver usando óculos
+    if (temOculos) {
+      validatedMeasurements.alturaEsquerda = Number(measurements.alturaEsquerda) || 20;
+      validatedMeasurements.alturaDireita = Number(measurements.alturaDireita) || 20;
+    }
 
     console.log('🎯 Retornando medidas:', validatedMeasurements);
 
@@ -189,16 +204,14 @@ Imagem: ${processedImage}`
   } catch (error) {
     console.error('💥 Erro geral na função:', error);
     
-    // Sempre retornar medidas padrão em caso de erro crítico
+    // Sempre retornar medidas padrão SEM óculos em caso de erro crítico
     const emergencyMeasurements = {
       dpBinocular: 62,
       dnpEsquerda: 31,
       dnpDireita: 31,
-      alturaEsquerda: 20,
-      alturaDireita: 20,
       larguraLente: 25,
       confiabilidade: 0.5,
-      temOculos: true,
+      temOculos: false,
       observacoes: 'Medidas padrão - erro crítico na análise'
     };
 
