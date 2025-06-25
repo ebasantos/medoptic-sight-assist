@@ -49,12 +49,15 @@ serve(async (req) => {
   try {
     const { imageData, frameWidth } = await req.json();
 
-    if (!imageData || !frameWidth) {
+    if (!imageData) {
       return new Response(
-        JSON.stringify({ error: 'imageData e frameWidth são obrigatórios' }), 
+        JSON.stringify({ error: 'imageData é obrigatório' }), 
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Usar largura padrão de 50mm se não fornecida
+    const adjustedFrameWidth = frameWidth || 50;
 
     if (!deepseekApiKey) {
       return new Response(
@@ -94,7 +97,7 @@ Medidas a calcular:
 - Largura da lente: largura horizontal de cada lente da armação
 
 IMPORTANTE: 
-- A largura da armação informada é ${frameWidth}mm
+- A largura da armação de referência é ${adjustedFrameWidth}mm
 - Use esta medida como referência de escala para converter pixels em milímetros
 - Seja preciso na identificação das pupilas e pontos de referência
 - Considere a perspectiva e possível distorção da câmera
@@ -114,7 +117,7 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
           },
           {
             role: 'user',
-            content: `Analise esta foto para medições óticas precisas. A largura da armação é ${frameWidth}mm. 
+            content: `Analise esta foto para medições óticas precisas. A largura da armação de referência é ${adjustedFrameWidth}mm. 
 
 IMPORTANTE: Detecte primeiro se a pessoa está usando óculos. Se estiver, calcule todas as medidas. Se não estiver, calcule apenas DP e DNP (defina alturas como 0).
 
@@ -196,7 +199,7 @@ Imagem comprimida em base64: ${compressedImage}`
       dnpDireita: Number(measurements.dnpDireita) || 0,
       alturaEsquerda: Number(measurements.alturaEsquerda) || 0,
       alturaDireita: Number(measurements.alturaDireita) || 0,
-      larguraLente: Number(measurements.larguraLente) || frameWidth / 2,
+      larguraLente: Number(measurements.larguraLente) || adjustedFrameWidth / 2,
       confiabilidade: Number(measurements.confiabilidade) || 0.8,
       temOculos: Boolean(measurements.temOculos),
       observacoes: measurements.observacoes || 'Medições calculadas automaticamente'

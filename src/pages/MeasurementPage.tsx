@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,17 +45,11 @@ const MeasurementPage = () => {
       return;
     }
 
-    if (!formData.larguraArmacao || parseFloat(formData.larguraArmacao) <= 0) {
-      toast({
-        title: "Informações incompletas",
-        description: "É necessário informar a largura da armação (valor maior que 0) antes da análise automática",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
-      await analyzeFacialMeasurements(capturedImage, parseFloat(formData.larguraArmacao));
+      // Usar largura padrão de 50mm se não for informada
+      const frameWidth = formData.larguraArmacao ? parseFloat(formData.larguraArmacao) : 50;
+      
+      await analyzeFacialMeasurements(capturedImage, frameWidth);
       setMeasurementCalculated(true);
       
       toast({
@@ -189,20 +182,10 @@ const MeasurementPage = () => {
       }
 
       console.log('Salvando aferição no banco de dados...');
-      console.log('Dados para inserir:', {
-        optica_id: user.opticId,
-        usuario_id: session.user.id,
-        nome_cliente: formData.nomeCliente.trim(),
-        foto_url: fotoUrl,
-        largura_armacao: parseFloat(formData.larguraArmacao),
-        dp_binocular: measurements.dpBinocular,
-        dnp_esquerda: measurements.dnpEsquerda,
-        dnp_direita: measurements.dnpDireita,
-        altura_esquerda: measurements.alturaEsquerda,
-        altura_direita: measurements.alturaDireita,
-        largura_lente: measurements.larguraLente
-      });
-
+      
+      // Usar largura padrão se não foi informada
+      const larguraArmacao = formData.larguraArmacao ? parseFloat(formData.larguraArmacao) : 50;
+      
       const { error } = await supabase
         .from('afericoes')
         .insert({
@@ -210,7 +193,7 @@ const MeasurementPage = () => {
           usuario_id: session.user.id,
           nome_cliente: formData.nomeCliente.trim(),
           foto_url: fotoUrl,
-          largura_armacao: parseFloat(formData.larguraArmacao),
+          largura_armacao: larguraArmacao,
           dp_binocular: measurements.dpBinocular,
           dnp_esquerda: measurements.dnpEsquerda,
           dnp_direita: measurements.dnpDireita,
@@ -330,7 +313,7 @@ const MeasurementPage = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="larguraArmacao">Largura da Armação (mm) *</Label>
+                  <Label htmlFor="larguraArmacao">Largura da Armação (mm) - Opcional</Label>
                   <Input
                     id="larguraArmacao"
                     type="number"
@@ -338,9 +321,11 @@ const MeasurementPage = () => {
                     min="0.1"
                     value={formData.larguraArmacao}
                     onChange={(e) => setFormData({ ...formData, larguraArmacao: e.target.value })}
-                    placeholder="Ex: 52.5"
-                    required
+                    placeholder="Ex: 52.5 (padrão: 50mm se não informado)"
                   />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Se não informada, será usado o valor padrão de 50mm
+                  </p>
                 </div>
 
                 {!measurementCalculated && (
@@ -355,7 +340,7 @@ const MeasurementPage = () => {
                           </p>
                           <Button 
                             onClick={handleAutoAnalysis}
-                            disabled={isAnalyzing || !capturedImage || !formData.larguraArmacao || parseFloat(formData.larguraArmacao) <= 0}
+                            disabled={isAnalyzing || !capturedImage}
                             variant="outline"
                             size="sm"
                             className="border-blue-300 text-blue-700 hover:bg-blue-100"
@@ -481,7 +466,7 @@ const MeasurementPage = () => {
 
                 <Button 
                   onClick={handleSave}
-                  disabled={loading || !formData.nomeCliente.trim() || !formData.larguraArmacao || !measurementCalculated}
+                  disabled={loading || !formData.nomeCliente.trim() || !measurementCalculated}
                   className="w-full"
                 >
                   <Save className="h-4 w-4 mr-2" />
