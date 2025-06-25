@@ -47,13 +47,16 @@ serve(async (req) => {
       );
     }
 
-    // Validar e comprimir imagem
+    // Validar e comprimir imagem se necessário
     let processedImage = imageData;
     try {
-      if (imageData.length > 200000) { // Se maior que ~200KB
+      if (imageData.length > 150000) { // Se maior que ~150KB
         console.log('🔄 Comprimindo imagem...');
         const base64String = imageData.includes(',') ? imageData.split(',')[1] : imageData;
-        const compressedData = base64String.substring(0, 100000); // Reduzir para ~100KB
+        // Reduzir para aproximadamente 100KB
+        const compressionRatio = Math.min(1, 100000 / base64String.length);
+        const compressedLength = Math.floor(base64String.length * compressionRatio);
+        const compressedData = base64String.substring(0, compressedLength);
         processedImage = `data:image/jpeg;base64,${compressedData}`;
         console.log('✅ Imagem comprimida de', imageData.length, 'para', processedImage.length, 'caracteres');
       }
@@ -64,6 +67,7 @@ serve(async (req) => {
     
     console.log('🤖 Preparando chamada para DeepSeek Vision...');
 
+    // Formato correto para DeepSeek Vision API
     const requestBody = {
       model: 'deepseek-chat',
       messages: [
@@ -104,20 +108,11 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
         },
         {
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analise esta foto para medições óticas precisas. A largura da armação de referência é ${adjustedFrameWidth}mm. 
+          content: `Analise esta foto para medições óticas precisas. A largura da armação de referência é ${adjustedFrameWidth}mm. 
 
-IMPORTANTE: Detecte primeiro se a pessoa está usando óculos. Se estiver, calcule todas as medidas. Se não estiver, calcule apenas DP e DNP (defina alturas como 0).`
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: processedImage
-              }
-            }
-          ]
+IMPORTANTE: Detecte primeiro se a pessoa está usando óculos. Se estiver, calcule todas as medidas. Se não estiver, calcule apenas DP e DNP (defina alturas como 0).
+
+Imagem base64: ${processedImage}`
         }
       ],
       max_tokens: 800,
@@ -155,6 +150,8 @@ IMPORTANTE: Detecte primeiro se a pessoa está usando óculos. Se estiver, calcu
         errorMessage = 'Erro interno do DeepSeek. Tente novamente.';
       } else if (response.status === 400) {
         errorMessage = 'Erro na requisição. Verifique se a imagem está em formato válido.';
+      } else if (response.status === 422) {
+        errorMessage = 'Formato de dados inválido. A imagem pode estar corrompida.';
       }
       
       return new Response(
