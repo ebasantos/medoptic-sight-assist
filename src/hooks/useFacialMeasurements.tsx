@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -34,6 +33,8 @@ export const useFacialMeasurements = () => {
     
     try {
       console.log('Iniciando análise facial...');
+      console.log('Tamanho da imagem:', imageData.length);
+      console.log('Largura da armação:', frameWidth);
       
       const { data, error: supabaseError } = await supabase.functions.invoke('analyze-facial-measurements', {
         body: {
@@ -42,12 +43,17 @@ export const useFacialMeasurements = () => {
         }
       });
 
+      console.log('Resposta da edge function:', data);
+      console.log('Erro da edge function:', supabaseError);
+
       if (supabaseError) {
-        console.error('Erro do Supabase:', supabaseError);
+        console.error('Erro detalhado do Supabase:', supabaseError);
         let errorMessage = 'Erro ao processar a análise';
         
         if (supabaseError.message?.includes('non-2xx status code')) {
           errorMessage = 'Erro na comunicação com o serviço de análise. Tente novamente.';
+        } else if (supabaseError.message?.includes('timeout')) {
+          errorMessage = 'Timeout na análise. A imagem pode estar muito grande. Tente novamente.';
         }
         
         throw new Error(errorMessage);
@@ -55,14 +61,16 @@ export const useFacialMeasurements = () => {
 
       if (data?.error) {
         console.error('Erro da função:', data.error);
+        console.error('Detalhes do erro:', data.details);
         throw new Error(data.error);
       }
 
       if (!data?.measurements) {
+        console.error('Resposta inesperada:', data);
         throw new Error('Nenhuma medição foi retornada');
       }
 
-      console.log('Análise concluída:', data.measurements);
+      console.log('Análise concluída com sucesso:', data.measurements);
       setMeasurements(data.measurements);
       return data.measurements;
 

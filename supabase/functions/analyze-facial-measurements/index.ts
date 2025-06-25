@@ -47,9 +47,19 @@ serve(async (req) => {
   }
 
   try {
-    const { imageData, frameWidth } = await req.json();
+    console.log('Iniciando função de análise facial...');
+    
+    const requestData = await req.json();
+    console.log('Dados recebidos:', {
+      hasImageData: !!requestData.imageData,
+      imageDataLength: requestData.imageData?.length || 0,
+      frameWidth: requestData.frameWidth
+    });
+
+    const { imageData, frameWidth } = requestData;
 
     if (!imageData) {
+      console.error('ImageData não fornecido');
       return new Response(
         JSON.stringify({ error: 'imageData é obrigatório' }), 
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -58,8 +68,10 @@ serve(async (req) => {
 
     // Usar largura padrão de 50mm se não fornecida
     const adjustedFrameWidth = frameWidth || 50;
+    console.log('Largura da armação ajustada:', adjustedFrameWidth);
 
     if (!deepseekApiKey) {
+      console.error('Chave da API DeepSeek não configurada');
       return new Response(
         JSON.stringify({ error: 'Chave da API DeepSeek não configurada' }), 
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -68,21 +80,16 @@ serve(async (req) => {
 
     console.log('Comprimindo imagem antes da análise...');
     const compressedImage = compressBase64Image(imageData);
+    console.log('Imagem comprimida com sucesso');
     
-    console.log('Analisando imagem com DeepSeek Vision...');
+    console.log('Preparando chamada para DeepSeek Vision...');
 
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${deepseekApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [
-          {
-            role: 'system',
-            content: `Você é um especialista em medições óticas faciais para óculos. Analise a imagem fornecida e siga estas instruções específicas:
+    const requestBody = {
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content: `Você é um especialista em medições óticas faciais para óculos. Analise a imagem fornecida e siga estas instruções específicas:
 
 1. PRIMEIRO: Detecte se a pessoa está usando óculos/armação no rosto
 2. Se estiver usando óculos: calcule TODAS as medidas (DP, DNP e alturas)
@@ -114,25 +121,52 @@ Retorne APENAS um JSON válido com as medidas em milímetros:
   "temOculos": true_ou_false,
   "observacoes": "string_com_observacoes_sobre_a_qualidade_da_medicao_e_se_tem_oculos"
 }`
-          },
-          {
-            role: 'user',
-            content: `Analise esta foto para medições óticas precisas. A largura da armação de referência é ${adjustedFrameWidth}mm. 
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Analise esta foto para medições óticas precisas. A largura da armação de referência é ${adjustedFrameWidth}mm. 
 
-IMPORTANTE: Detecte primeiro se a pessoa está usando óculos. Se estiver, calcule todas as medidas. Se não estiver, calcule apenas DP e DNP (defina alturas como 0).
+IMPORTANTE: Detecte primeiro se a pessoa está usando óculos. Se estiver, calcule todas as medidas. Se não estiver, calcule apenas DP e DNP (defina alturas como 0).`
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: compressedImage
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 800,
+      temperature: 0.1,
+      stream: false
+    };
 
-Imagem comprimida em base64: ${compressedImage}`
-          }
-        ],
-        max_tokens: 800,
-        temperature: 0.1,
-        stream: false
-      }),
+    console.log('Enviando requisição para DeepSeek...');
+    console.log('Tamanho do corpo da requisição:', JSON.stringify(requestBody).length);
+
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${deepseekApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
     });
+
+    console.log('Resposta recebida do DeepSeek, status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro do DeepSeek:', response.status, errorText);
+      console.error('Erro detalhado do DeepSeek:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorText
+      });
       
       let errorMessage = 'Erro na análise da imagem';
       if (response.status === 429) {
@@ -142,27 +176,28 @@ Imagem comprimida em base64: ${compressedImage}`
       } else if (response.status >= 500) {
         errorMessage = 'Erro interno do DeepSeek. Tente novamente.';
       } else if (response.status === 400) {
-        errorMessage = 'Imagem muito grande ou formato inválido. Tente com uma foto menor.';
+        errorMessage = 'Erro na requisição. Verifique se a imagem está em formato válido.';
       }
       
       return new Response(
-        JSON.stringify({ error: errorMessage }), 
+        JSON.stringify({ error: errorMessage, details: errorText }), 
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const data = await response.json();
+    console.log('Dados recebidos do DeepSeek:', JSON.stringify(data, null, 2));
     
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error('Resposta inválida do DeepSeek:', data);
+      console.error('Resposta inválida do DeepSeek - estrutura inesperada:', data);
       return new Response(
-        JSON.stringify({ error: 'Resposta inválida da API DeepSeek' }), 
+        JSON.stringify({ error: 'Resposta inválida da API DeepSeek', details: data }), 
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
     const content = data.choices[0].message.content;
-    console.log('Resposta do DeepSeek:', content);
+    console.log('Conteúdo da resposta do DeepSeek:', content);
 
     // Tentar extrair JSON da resposta
     let measurements;
@@ -170,15 +205,23 @@ Imagem comprimida em base64: ${compressedImage}`
       // Procurar por JSON na resposta
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
+        console.log('JSON encontrado na resposta:', jsonMatch[0]);
         measurements = JSON.parse(jsonMatch[0]);
+        console.log('JSON parseado com sucesso:', measurements);
       } else {
+        console.error('JSON não encontrado na resposta do DeepSeek');
+        console.error('Conteúdo completo:', content);
         throw new Error('JSON não encontrado na resposta');
       }
     } catch (parseError) {
       console.error('Erro ao parsear JSON:', parseError);
-      console.error('Conteúdo recebido:', content);
+      console.error('Conteúdo que falhou no parse:', content);
       return new Response(
-        JSON.stringify({ error: 'Erro ao interpretar resposta da IA' }), 
+        JSON.stringify({ 
+          error: 'Erro ao interpretar resposta da IA', 
+          details: parseError.message,
+          rawContent: content 
+        }), 
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -187,7 +230,10 @@ Imagem comprimida em base64: ${compressedImage}`
     if (!measurements.dpBinocular || !measurements.dnpEsquerda || !measurements.dnpDireita) {
       console.error('Medidas principais não calculadas:', measurements);
       return new Response(
-        JSON.stringify({ error: 'IA não conseguiu calcular as medidas principais' }), 
+        JSON.stringify({ 
+          error: 'IA não conseguiu calcular as medidas principais',
+          details: measurements 
+        }), 
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -205,7 +251,7 @@ Imagem comprimida em base64: ${compressedImage}`
       observacoes: measurements.observacoes || 'Medições calculadas automaticamente'
     };
 
-    console.log('Medidas validadas:', validatedMeasurements);
+    console.log('Medidas validadas e finais:', validatedMeasurements);
 
     return new Response(
       JSON.stringify({ measurements: validatedMeasurements }), 
@@ -213,11 +259,13 @@ Imagem comprimida em base64: ${compressedImage}`
     );
 
   } catch (error) {
-    console.error('Erro na análise:', error);
+    console.error('Erro geral na análise:', error);
+    console.error('Stack trace:', error.stack);
     return new Response(
       JSON.stringify({ 
         error: 'Erro interno do servidor', 
-        details: error.message 
+        details: error.message,
+        stack: error.stack
       }), 
       { 
         status: 500, 
