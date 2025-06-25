@@ -79,37 +79,44 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `Você é um especialista em medições óticas faciais para óculos. Analise a imagem fornecida e calcule as seguintes medidas com precisão:
+            content: `Você é um especialista em medições óticas faciais para óculos. Analise a imagem fornecida e siga estas instruções específicas:
 
-1. Distância pupilar binocular (DP): distância entre as pupilas dos dois olhos
-2. DNP esquerda: distância do centro do nariz (ponte nasal) à pupila esquerda
-3. DNP direita: distância do centro do nariz (ponte nasal) à pupila direita
-4. Altura esquerda: altura da pupila esquerda até a parte inferior da armação/lente
-5. Altura direita: altura da pupila direita até a parte inferior da armação/lente
-6. Largura da lente: largura horizontal de cada lente da armação
+1. PRIMEIRO: Detecte se a pessoa está usando óculos/armação no rosto
+2. Se estiver usando óculos: calcule TODAS as medidas (DP, DNP e alturas)
+3. Se NÃO estiver usando óculos: calcule APENAS as medidas DP e DNP (defina alturas como 0)
+
+Medidas a calcular:
+- Distância pupilar binocular (DP): distância entre as pupilas dos dois olhos
+- DNP esquerda: distância do centro do nariz (ponte nasal) à pupila esquerda  
+- DNP direita: distância do centro do nariz (ponte nasal) à pupila direita
+- Altura esquerda: altura da pupila esquerda até a parte inferior da armação/lente (APENAS se usando óculos)
+- Altura direita: altura da pupila direita até a parte inferior da armação/lente (APENAS se usando óculos)
+- Largura da lente: largura horizontal de cada lente da armação
 
 IMPORTANTE: 
 - A largura da armação informada é ${frameWidth}mm
 - Use esta medida como referência de escala para converter pixels em milímetros
 - Seja preciso na identificação das pupilas e pontos de referência
 - Considere a perspectiva e possível distorção da câmera
-- Se a pessoa não estiver usando óculos, estime onde seria a posição da armação
 
 Retorne APENAS um JSON válido com as medidas em milímetros:
 {
   "dpBinocular": número,
   "dnpEsquerda": número,
   "dnpDireita": número,
-  "alturaEsquerda": número,
-  "alturaDireita": número,
+  "alturaEsquerda": número_ou_0_se_sem_oculos,
+  "alturaDireita": número_ou_0_se_sem_oculos,
   "larguraLente": número,
   "confiabilidade": número_entre_0_e_1,
-  "observacoes": "string_com_observacoes_sobre_a_qualidade_da_medicao"
+  "temOculos": true_ou_false,
+  "observacoes": "string_com_observacoes_sobre_a_qualidade_da_medicao_e_se_tem_oculos"
 }`
           },
           {
             role: 'user',
-            content: `Analise esta foto para medições óticas precisas. A largura da armação é ${frameWidth}mm. Calcule todas as distâncias pupilares e alturas necessárias para a montagem de óculos.
+            content: `Analise esta foto para medições óticas precisas. A largura da armação é ${frameWidth}mm. 
+
+IMPORTANTE: Detecte primeiro se a pessoa está usando óculos. Se estiver, calcule todas as medidas. Se não estiver, calcule apenas DP e DNP (defina alturas como 0).
 
 Imagem comprimida em base64: ${compressedImage}`
           }
@@ -191,7 +198,8 @@ Imagem comprimida em base64: ${compressedImage}`
       alturaDireita: Number(measurements.alturaDireita) || 0,
       larguraLente: Number(measurements.larguraLente) || frameWidth / 2,
       confiabilidade: Number(measurements.confiabilidade) || 0.8,
-      observacoes: measurements.observacoes || 'Medições calculadas automaticamente com imagem comprimida'
+      temOculos: Boolean(measurements.temOculos),
+      observacoes: measurements.observacoes || 'Medições calculadas automaticamente'
     };
 
     console.log('Medidas validadas:', validatedMeasurements);

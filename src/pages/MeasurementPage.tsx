@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Camera, Brain, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Brain, AlertTriangle, CheckCircle, Glasses, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -350,7 +351,7 @@ const MeasurementPage = () => {
                         <div className="flex-1">
                           <h4 className="font-medium text-blue-900 mb-1">Análise Automática com IA</h4>
                           <p className="text-sm text-blue-700 mb-3">
-                            Clique para calcular automaticamente todas as medidas faciais a partir da foto.
+                            Clique para calcular automaticamente as medidas faciais a partir da foto.
                           </p>
                           <Button 
                             onClick={handleAutoAnalysis}
@@ -381,6 +382,19 @@ const MeasurementPage = () => {
                       <div className="flex items-center gap-2 mb-4">
                         <CheckCircle className="h-5 w-5 text-green-600" />
                         <h4 className="font-medium text-green-900">Medidas Calculadas Automaticamente</h4>
+                        <div className="ml-auto flex items-center gap-1 text-sm">
+                          {measurements.temOculos ? (
+                            <>
+                              <Glasses className="h-4 w-4 text-green-600" />
+                              <span className="text-green-700">Com óculos</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-4 w-4 text-blue-600" />
+                              <span className="text-blue-700">Sem óculos</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -412,19 +426,32 @@ const MeasurementPage = () => {
                           </div>
                         </div>
                         
-                        <div>
-                          <Label className="text-gray-600">Altura Esquerda</Label>
-                          <div className="font-mono font-semibold text-green-800">
-                            {measurements.alturaEsquerda.toFixed(1)} mm
-                          </div>
-                        </div>
+                        {measurements.temOculos && (
+                          <>
+                            <div>
+                              <Label className="text-gray-600">Altura Esquerda</Label>
+                              <div className="font-mono font-semibold text-green-800">
+                                {measurements.alturaEsquerda.toFixed(1)} mm
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <Label className="text-gray-600">Altura Direita</Label>
+                              <div className="font-mono font-semibold text-green-800">
+                                {measurements.alturaDireita.toFixed(1)} mm
+                              </div>
+                            </div>
+                          </>
+                        )}
                         
-                        <div>
-                          <Label className="text-gray-600">Altura Direita</Label>
-                          <div className="font-mono font-semibold text-green-800">
-                            {measurements.alturaDireita.toFixed(1)} mm
+                        {!measurements.temOculos && (
+                          <div className="col-span-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+                            <div className="flex items-center gap-2">
+                              <Eye className="h-4 w-4" />
+                              <span>Medidas de altura não disponíveis - pessoa sem óculos</span>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                       
                       <div className="mt-4 p-2 bg-white rounded border">

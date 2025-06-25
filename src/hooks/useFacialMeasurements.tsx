@@ -18,6 +18,7 @@ interface MeasurementResult {
   alturaDireita: number;
   larguraLente: number;
   confiabilidade: number;
+  temOculos: boolean;
   observacoes: string;
 }
 
