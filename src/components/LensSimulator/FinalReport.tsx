@@ -1,25 +1,18 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { 
-  FileText, 
   Download, 
-  Share, 
-  Mail, 
-  MessageCircle, 
-  Eye, 
   Star, 
+  Eye, 
+  Shield, 
+  Sparkles,
   Check,
   ArrowLeft,
-  RotateCcw,
-  Sparkles,
-  Calculator,
-  ShieldCheck
+  RefreshCw
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface FinalReportProps {
   configuration: any;
@@ -32,60 +25,15 @@ export const FinalReport: React.FC<FinalReportProps> = ({
   onRestart,
   onBack
 }) => {
-  const [isExporting, setIsExporting] = useState(false);
+  const isMobile = useIsMobile();
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  console.log('Configuração recebida no relatório:', configuration);
-
-  const reportData = {
-    client: {
-      name: configuration.clientName || configuration.lifestyleData?.nomeCompleto || 'Cliente',
-      date: new Date().toLocaleDateString('pt-BR'),
-      age: configuration.lifestyleData?.idade || 'Não informado',
-      occupation: configuration.lifestyleData?.profissao || 'Não informado'
-    },
-    configuration: {
-      lens: configuration.selectedLens || 'progressiva',
-      treatments: configuration.selectedTreatments || ['antirreflexo'],
-      totalPrice: 850,
-      installments: '12x R$ 70,83'
-    },
-    benefits: [
-      'Visão nítida em todas as distâncias',
-      'Redução de 90% nos reflexos',
-      'Proteção total contra raios UV',
-      'Diminuição da fadiga visual em 80%',
-      'Melhora na qualidade do sono',
-      'Adaptação natural e confortável'
-    ],
-    technicalSpecs: {
-      'Tipo de Lente': configuration.selectedLens || 'Progressiva Premium',
-      'Material': 'Policarbonato CR-39',
-      'Índice de Refração': '1.59',
-      'Tratamentos': Array.isArray(configuration.selectedTreatments) 
-        ? configuration.selectedTreatments.join(', ') 
-        : 'Antirreflexo',
-      'Garantia': '2 anos contra defeitos de fabricação'
-    },
-    aiScore: configuration.aiRecommendations?.score || 94,
-    lifestyle: configuration.lifestyleData?.profissao || 'Não informado'
-  };
-
-  const handleExportPDF = async () => {
-    setIsExporting(true);
-    
+  const generatePDF = async () => {
     try {
-      console.log('Iniciando geração de PDF...');
+      setIsGeneratingPDF(true);
       
-      // Verificar se temos os dados necessários
-      if (!reportData.client.name || reportData.client.name === 'Cliente') {
-        toast.error('Nome do cliente não encontrado. Refaça a simulação.');
-        setIsExporting(false);
-        return;
-      }
-      
-      // Importar jsPDF dinamicamente
-      const jsPDFModule = await import('jspdf');
-      const { jsPDF } = jsPDFModule.default || jsPDFModule;
+      // Importação dinâmica do jsPDF
+      const { default: jsPDF } = await import('jspdf');
       
       const doc = new jsPDF();
       
@@ -93,16 +41,16 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       const pageWidth = doc.internal.pageSize.width;
       const margin = 20;
       let yPosition = 20;
-      
+
       // Cabeçalho
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       doc.text('RELATÓRIO DE SIMULAÇÃO DE LENTES', pageWidth / 2, yPosition, { align: 'center' });
       
-      yPosition += 15;
+      yPosition += 10;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
-      doc.text('Simulador com Inteligência Artificial', pageWidth / 2, yPosition, { align: 'center' });
+      doc.text('Análise Personalizada com IA', pageWidth / 2, yPosition, { align: 'center' });
       
       // Linha separadora
       yPosition += 15;
@@ -116,16 +64,22 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       doc.text('DADOS DO CLIENTE', margin, yPosition);
       
       yPosition += 10;
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Nome: ${reportData.client.name}`, margin, yPosition);
+      doc.text(`Nome: ${configuration.clientName || 'Não informado'}`, margin, yPosition);
       
       yPosition += 8;
-      doc.text(`Data: ${reportData.client.date}`, margin, yPosition);
-      doc.text(`Idade: ${reportData.client.age}`, margin + 80, yPosition);
+      if (configuration.lifestyleData?.idade) {
+        doc.text(`Idade: ${configuration.lifestyleData.idade}`, margin, yPosition);
+        yPosition += 8;
+      }
       
-      yPosition += 8;
-      doc.text(`Profissão: ${reportData.client.occupation}`, margin, yPosition);
+      if (configuration.lifestyleData?.profissao) {
+        doc.text(`Profissão: ${configuration.lifestyleData.profissao}`, margin, yPosition);
+        yPosition += 8;
+      }
+      
+      doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, margin, yPosition);
       
       // Configuração recomendada
       yPosition += 20;
@@ -134,387 +88,363 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       doc.text('CONFIGURAÇÃO RECOMENDADA', margin, yPosition);
       
       yPosition += 10;
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Tipo de Lente: ${reportData.configuration.lens}`, margin, yPosition);
+      doc.text(`Tipo de Lente: ${configuration.selectedLens || 'Não selecionado'}`, margin, yPosition);
       
       yPosition += 8;
-      doc.text(`Tratamentos: ${reportData.technicalSpecs.Tratamentos}`, margin, yPosition);
-      
-      yPosition += 8;
-      doc.text(`Score IA: ${reportData.aiScore}/100`, margin, yPosition);
-      
-      // Investimento
-      yPosition += 20;
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('INVESTIMENTO', margin, yPosition);
-      
-      yPosition += 10;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Valor: R$ ${reportData.configuration.totalPrice}`, margin, yPosition);
-      
-      yPosition += 8;
-      doc.text(`Parcelamento: ${reportData.configuration.installments}`, margin, yPosition);
-      
-      // Benefícios
-      yPosition += 20;
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PRINCIPAIS BENEFÍCIOS', margin, yPosition);
-      
-      yPosition += 10;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      
-      reportData.benefits.forEach((benefit) => {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = 20;
-        }
-        doc.text(`• ${benefit}`, margin, yPosition);
+      if (configuration.selectedTreatments?.length > 0) {
+        doc.text('Tratamentos:', margin, yPosition);
         yPosition += 6;
-      });
-      
-      // Especificações técnicas
-      yPosition += 15;
-      if (yPosition > 200) {
-        doc.addPage();
-        yPosition = 20;
+        configuration.selectedTreatments.forEach((treatment: string) => {
+          doc.text(`• ${treatment}`, margin + 10, yPosition);
+          yPosition += 6;
+        });
       }
       
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('ESPECIFICAÇÕES TÉCNICAS', margin, yPosition);
-      
-      yPosition += 10;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      
-      Object.entries(reportData.technicalSpecs).forEach(([key, value]) => {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = 20;
-        }
-        doc.text(`${key}: ${value}`, margin, yPosition);
-        yPosition += 6;
-      });
+      // Recomendações da IA
+      if (configuration.aiRecommendations?.motivos?.length > 0) {
+        yPosition += 10;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('JUSTIFICATIVAS DA IA', margin, yPosition);
+        
+        yPosition += 10;
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        configuration.aiRecommendations.motivos.forEach((motivo: string) => {
+          doc.text(`• ${motivo}`, margin, yPosition);
+          yPosition += 8;
+        });
+      }
       
       // Rodapé
-      const totalPages = doc.getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-        const pageHeight = doc.internal.pageSize.height;
-        
-        doc.setLineWidth(0.3);
-        doc.line(margin, pageHeight - 30, pageWidth - margin, pageHeight - 30);
-        
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'italic');
-        doc.text('Relatório gerado automaticamente pelo Simulador de Lentes IA', pageWidth / 2, pageHeight - 20, { align: 'center' });
-        doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, pageHeight - 14, { align: 'center' });
-        doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+      const footerY = doc.internal.pageSize.height - 30;
+      doc.setLineWidth(0.3);
+      doc.line(margin, footerY, pageWidth - margin, footerY);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'italic');
+      doc.text('Relatório gerado automaticamente pelo Simulador de Lentes IA', pageWidth / 2, footerY + 10, { align: 'center' });
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, footerY + 18, { align: 'center' });
+      
+      // Abrir em nova aba
+      const pdfBlob = doc.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const newWindow = window.open(pdfUrl, '_blank');
+      
+      if (newWindow) {
+        newWindow.onload = () => {
+          newWindow.print();
+        };
       }
       
-      // Baixar o PDF
-      const fileName = `relatorio-simulacao-${reportData.client.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
-      doc.save(fileName);
-      
-      console.log('PDF gerado com sucesso');
-      toast.success('PDF gerado e baixado com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast.error(`Erro ao gerar PDF: ${error.message || 'Erro desconhecido'}`);
+      alert('Erro ao gerar PDF. Tente novamente.');
     } finally {
-      setIsExporting(false);
+      setIsGeneratingPDF(false);
     }
   };
 
-  const handleShareWhatsApp = () => {
-    const message = encodeURIComponent(
-      `🔍 *Relatório de Simulação de Lentes*\n\n` +
-      `👤 Cliente: ${reportData.client.name}\n` +
-      `✨ Configuração Recomendada:\n` +
-      `📱 Lente: ${reportData.configuration.lens}\n` +
-      `🛡️ Tratamentos: ${reportData.technicalSpecs.Tratamentos}\n` +
-      `⭐ Score IA: ${reportData.aiScore}/100\n\n` +
-      `💰 Investimento: R$ ${reportData.configuration.totalPrice}\n` +
-      `💳 Ou ${reportData.configuration.installments}\n\n` +
-      `Simule você também! 👓✨`
-    );
-    
-    window.open(`https://wa.me/?text=${message}`, '_blank');
+  // Dados para exibição
+  const clientData = {
+    nome: configuration.clientName || 'Cliente',
+    idade: configuration.lifestyleData?.idade || 'Não informado',
+    profissao: configuration.lifestyleData?.profissao || 'Não informado',
+    tempoTela: configuration.lifestyleData?.tempoTela || 'Não informado'
   };
 
-  const handleShareEmail = () => {
-    const subject = encodeURIComponent(`Relatório de Simulação de Lentes - ${reportData.client.name}`);
-    const body = encodeURIComponent(
-      `Olá!\n\nSegue o relatório da simulação de lentes com IA para ${reportData.client.name}:\n\n` +
-      `CONFIGURAÇÃO RECOMENDADA:\n` +
-      `- Lente: ${reportData.configuration.lens}\n` +
-      `- Tratamentos: ${reportData.technicalSpecs.Tratamentos}\n` +
-      `- Score de Compatibilidade: ${reportData.aiScore}/100\n\n` +
-      `INVESTIMENTO:\n` +
-      `- Valor: R$ ${reportData.configuration.totalPrice}\n` +
-      `- Parcelamento: ${reportData.configuration.installments}\n\n` +
-      `DADOS DO CLIENTE:\n` +
-      `- Nome: ${reportData.client.name}\n` +
-      `- Idade: ${reportData.client.age}\n` +
-      `- Profissão: ${reportData.client.occupation}\n\n` +
-      `Entre em contato para finalizar o pedido!\n\n` +
-      `Atenciosamente,\nEquipe Ótica Digital`
-    );
-    
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+  const recommendations = {
+    lente: configuration.selectedLens || 'Não selecionado',
+    tratamentos: configuration.selectedTreatments || [],
+    score: configuration.aiRecommendations?.score || 85,
+    motivos: configuration.aiRecommendations?.motivos || []
   };
 
-  return (
-    <div className="max-w-5xl mx-auto">
-      {/* Header do Relatório */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-          <FileText className="w-8 h-8 text-green-600" />
+  if (isMobile) {
+    return (
+      <div className="flex flex-col min-h-screen bg-white">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b px-4 py-6">
+          <div className="text-center">
+            <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Star className="w-8 h-8 text-green-600" />
+            </div>
+            <h1 className="text-xl font-bold text-green-900 mb-2">
+              Simulação Concluída!
+            </h1>
+            <p className="text-sm text-green-700">
+              Sua configuração personalizada está pronta
+            </p>
+          </div>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Relatório de Simulação Completo
-        </h1>
-        <p className="text-lg text-gray-600">
-          Configuração personalizada para {reportData.client.name}
-        </p>
-        <Badge className="bg-green-600 text-white text-lg px-4 py-2 mt-4">
-          <Star className="w-4 h-4 mr-2" />
-          Score IA: {reportData.aiScore}/100
-        </Badge>
-      </div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Coluna Principal - Relatório */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-3 text-green-900">
-                <Sparkles className="w-6 h-6" />
-                <span>Resumo da Recomendação IA</span>
+        {/* Content */}
+        <div className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
+          {/* Resumo do Cliente */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center">
+                <Eye className="w-5 h-5 text-blue-600 mr-2" />
+                Resumo do Cliente
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-6">
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <h3 className="font-semibold text-green-900 mb-3">Sua Configuração Ideal:</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-green-700">Tipo de Lente:</span>
-                      <Badge className="bg-green-600 text-white">{reportData.configuration.lens}</Badge>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-green-700">Tratamentos:</span>
-                      <div className="flex flex-wrap gap-1">
-                        {Array.isArray(reportData.configuration.treatments) ? 
-                          reportData.configuration.treatments.map((treatment, index) => (
-                            <Badge key={index} variant="outline" className="border-green-300 text-green-700 text-xs">
-                              {treatment}
-                            </Badge>
-                          )) :
-                          <Badge variant="outline" className="border-green-300 text-green-700 text-xs">
-                            {reportData.technicalSpecs.Tratamentos}
-                          </Badge>
-                        }
-                      </div>
-                    </div>
-                  </div>
+                  <span className="font-medium text-gray-600">Nome:</span>
+                  <p className="text-gray-900">{clientData.nome}</p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-green-900 mb-3">Principais Benefícios:</h3>
+                  <span className="font-medium text-gray-600">Idade:</span>
+                  <p className="text-gray-900">{clientData.idade}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Profissão:</span>
+                  <p className="text-gray-900">{clientData.profissao}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Tempo Tela:</span>
+                  <p className="text-gray-900">{clientData.tempoTela}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Configuração Recomendada */}
+          <Card className="border-2 border-green-200 bg-green-50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center">
+                  <Shield className="w-5 h-5 text-green-600 mr-2" />
+                  Configuração Final
+                </div>
+                <Badge className="bg-green-600 text-white">
+                  Score: {recommendations.score}/100
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <span className="font-medium text-gray-700">Tipo de Lente:</span>
+                <p className="text-lg font-semibold text-green-800 capitalize">
+                  {recommendations.lente}
+                </p>
+              </div>
+              
+              {recommendations.tratamentos.length > 0 && (
+                <div>
+                  <span className="font-medium text-gray-700 block mb-2">Tratamentos:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {recommendations.tratamentos.map((treatment: string, index: number) => (
+                      <Badge key={index} variant="outline" className="border-green-300 text-green-700">
+                        {treatment}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {recommendations.motivos.length > 0 && (
+                <div>
+                  <span className="font-medium text-gray-700 block mb-2">Justificativas da IA:</span>
                   <ul className="space-y-1">
-                    {reportData.benefits.slice(0, 4).map((benefit, index) => (
-                      <li key={index} className="flex items-start text-sm text-green-700">
-                        <Check className="w-3 h-3 text-green-500 mr-2 mt-0.5" />
-                        {benefit}
+                    {recommendations.motivos.map((motivo: string, index: number) => (
+                      <li key={index} className="flex items-start text-sm text-gray-700">
+                        <Check className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                        {motivo}
                       </li>
                     ))}
                   </ul>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Especificações Técnicas */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-3">
-                <Eye className="w-6 h-6 text-blue-600" />
-                <span>Especificações Técnicas</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-4">
-                {Object.entries(reportData.technicalSpecs).map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                    <span className="font-medium text-gray-700">{key}:</span>
-                    <span className="text-gray-900">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-3">
-                <ShieldCheck className="w-6 h-6 text-blue-600" />
-                <span>Todos os Benefícios</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-3">
-                {reportData.benefits.map((benefit, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
-                    <Check className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <span className="text-blue-900 font-medium">{benefit}</span>
-                  </div>
-                ))}
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Coluna Lateral - Informações e Ações */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Informações da Simulação</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Cliente:</span>
-                <span className="font-medium">{reportData.client.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Data:</span>
-                <span className="font-medium">{reportData.client.date}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Idade:</span>
-                <span className="font-medium">{reportData.client.age}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Profissão:</span>
-                <span className="font-medium">{reportData.client.occupation}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span className="text-gray-600">Score IA:</span>
-                <Badge className="bg-green-600 text-white">{reportData.aiScore}/100</Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Investimento */}
-          <Card className="border-2 border-blue-200 bg-blue-50">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-blue-900">
-                <Calculator className="w-5 h-5" />
-                <span>Investimento</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center space-y-3">
-                <div>
-                  <div className="text-3xl font-bold text-blue-900">
-                    R$ {reportData.configuration.totalPrice}
-                  </div>
-                  <div className="text-blue-700">à vista</div>
-                </div>
-                <Separator />
-                <div>
-                  <div className="text-xl font-medium text-blue-800">
-                    {reportData.configuration.installments}
-                  </div>
-                  <div className="text-sm text-blue-600">sem juros</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Share className="w-5 h-5" />
-                <span>Compartilhar Relatório</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                onClick={handleExportPDF}
-                disabled={isExporting}
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-              >
-                <Download className="mr-2 w-4 h-4" />
-                {isExporting ? 'Gerando PDF...' : 'Baixar PDF'}
-              </Button>
-              
-              <Button
-                onClick={handleShareWhatsApp}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-              >
-                <MessageCircle className="mr-2 w-4 h-4" />
-                Compartilhar no WhatsApp
-              </Button>
-              
-              <Button
-                onClick={handleShareEmail}
-                variant="outline"
-                className="w-full"
-              >
-                <Mail className="mr-2 w-4 h-4" />
-                Enviar por Email
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
-            <CardHeader>
-              <CardTitle className="text-purple-900">Próximos Passos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ol className="space-y-2 text-sm">
-                <li className="flex items-start">
-                  <span className="bg-purple-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-3 mt-0.5">1</span>
-                  <span>Agende uma consulta para confirmação do grau</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="bg-purple-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-3 mt-0.5">2</span>
-                  <span>Escolha a armação que melhor combina com você</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="bg-purple-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-3 mt-0.5">3</span>
-                  <span>Finalize o pedido com as especificações recomendadas</span>
-                </li>
-              </ol>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Botões de Ação Final */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mt-8 space-y-4 sm:space-y-0 sm:space-x-4">
-        <div className="flex space-x-4">
-          <Button variant="outline" onClick={onBack} className="px-6">
-            <ArrowLeft className="mr-2 w-4 h-4" />
-            Voltar
+        {/* Footer */}
+        <div className="bg-white border-t px-4 py-4 space-y-3">
+          <Button 
+            onClick={generatePDF}
+            disabled={isGeneratingPDF}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {isGeneratingPDF ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Gerando PDF...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Baixar Relatório PDF
+              </>
+            )}
           </Button>
           
-          <Button variant="outline" onClick={onRestart} className="px-6">
-            <RotateCcw className="mr-2 w-4 h-4" />
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={onBack}
+              className="flex-1"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
+            </Button>
+            <Button 
+              onClick={onRestart}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Nova Simulação
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto">
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
+          <Star className="w-10 h-10 text-green-600" />
+        </div>
+        <h2 className="text-4xl font-bold text-gray-900 mb-4">
+          Simulação Concluída!
+        </h2>
+        <p className="text-xl text-gray-600">
+          Sua configuração personalizada de lentes está pronta
+        </p>
+        <Badge className="mt-4 bg-green-50 text-green-700 px-6 py-2">
+          <Sparkles className="w-4 h-4 mr-2" />
+          Análise IA Finalizada
+        </Badge>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-8 mb-8">
+        {/* Resumo do Cliente */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-3">
+              <Eye className="w-6 h-6 text-blue-600" />
+              <span>Resumo do Cliente</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="font-medium text-gray-600">Nome:</span>
+                <p className="text-lg font-semibold">{clientData.nome}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Idade:</span>
+                <p className="text-lg">{clientData.idade}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Profissão:</span>
+                <p className="text-lg">{clientData.profissao}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Tempo em Telas:</span>
+                <p className="text-lg">{clientData.tempoTela}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Configuração Final */}
+        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Shield className="w-6 h-6 text-green-600" />
+                <span className="text-green-900">Configuração Final</span>
+              </div>
+              <Badge className="bg-green-600 text-white text-lg px-4 py-2">
+                Score: {recommendations.score}/100
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <span className="font-medium text-gray-700">Tipo de Lente:</span>
+              <p className="text-2xl font-bold text-green-800 capitalize">
+                {recommendations.lente}
+              </p>
+            </div>
+            
+            {recommendations.tratamentos.length > 0 && (
+              <div>
+                <span className="font-medium text-gray-700 block mb-3">Tratamentos Aplicados:</span>
+                <div className="flex flex-wrap gap-3">
+                  {recommendations.tratamentos.map((treatment: string, index: number) => (
+                    <Badge key={index} className="bg-green-100 text-green-700 border border-green-300 px-3 py-1">
+                      {treatment}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recommendations.motivos.length > 0 && (
+              <div>
+                <span className="font-medium text-gray-700 block mb-3">Justificativas da IA:</span>
+                <ul className="space-y-2">
+                  {recommendations.motivos.map((motivo: string, index: number) => (
+                    <li key={index} className="flex items-start">
+                      <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5" />
+                      <span className="text-gray-700">{motivo}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Ações */}
+      <div className="flex justify-between items-center">
+        <Button 
+          variant="outline" 
+          onClick={onBack}
+          size="lg"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar
+        </Button>
+        
+        <div className="flex space-x-4">
+          <Button 
+            onClick={generatePDF}
+            disabled={isGeneratingPDF}
+            size="lg"
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {isGeneratingPDF ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Gerando PDF...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Baixar Relatório PDF
+              </>
+            )}
+          </Button>
+          
+          <Button 
+            onClick={onRestart}
+            size="lg"
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
             Nova Simulação
           </Button>
         </div>
-
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg">
-          Finalizar Pedido
-          <Check className="ml-2 w-5 h-5" />
-        </Button>
       </div>
     </div>
   );
