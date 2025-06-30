@@ -12,7 +12,7 @@ export const VisualLensDemo = ({ selectedTreatments, currentEnvironment }: Visua
   // URLs de imagens reais para cada ambiente
   const environmentImages = {
     rua: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=1200&h=800&fit=crop',
-    leitura: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=1200&h=800&fit=crop',
+    leitura: 'https://img.freepik.com/fotos-gratis/colher-as-maos-segurando-o-livro-aberto_23-2147767299.jpg',
     computador: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=1200&h=800&fit=crop',
     direcao: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=1200&h=800&fit=crop'
   };
