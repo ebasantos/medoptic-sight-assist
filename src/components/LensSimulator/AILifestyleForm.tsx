@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -123,7 +122,6 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
   };
 
   const generateAIRecommendations = (data: LifestyleData) => {
-    // Lógica simplificada de IA baseada no perfil
     const recommendations = {
       lente: 'progressiva',
       tratamentos: ['antirreflexo'],
@@ -131,19 +129,16 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
       motivos: []
     };
 
-    // Recomendações baseadas na idade
     if (data.idade.includes('45+') || data.idade.includes('56+')) {
       recommendations.lente = 'progressiva';
       recommendations.motivos.push('Idade compatível com presbiopia');
     }
 
-    // Recomendações baseadas no tempo de tela
     if (data.tempoTela.includes('4h') || data.tempoTela.includes('8h')) {
       recommendations.tratamentos.push('filtro-azul');
       recommendations.motivos.push('Alto tempo de exposição a telas');
     }
 
-    // Recomendações baseadas em atividades
     if (data.atividades.includes('Direção diária')) {
       recommendations.tratamentos.push('polarizado');
       recommendations.motivos.push('Direção frequente');
@@ -154,7 +149,6 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
       recommendations.motivos.push('Exposição solar');
     }
 
-    // Recomendações baseadas em problemas
     if (data.problemas.includes('Sensibilidade à luz')) {
       recommendations.tratamentos.push('fotossensiveis');
       recommendations.motivos.push('Sensibilidade à luz relatada');
@@ -167,17 +161,15 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Finalizar e gerar recomendações
+      console.log('Finalizando formulário com dados:', formData);
       const aiRecommendations = generateAIRecommendations(formData);
       onComplete(formData, aiRecommendations);
     }
   };
 
   const canProceed = () => {
-    const currentFields = steps[currentStep].fields;
-    
     if (currentStep === 0) {
-      return formData.nomeCompleto.trim() && formData.idade && formData.profissao;
+      return formData.nomeCompleto.trim().length > 0 && formData.idade && formData.profissao;
     }
     if (currentStep === 1) {
       return formData.tempoTela && formData.atividades.length > 0;
@@ -190,15 +182,24 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
 
   const renderPersonalInfo = () => (
     <div className="space-y-6">
-      <div>
-        <Label htmlFor="nome" className="text-base font-medium">Nome Completo *</Label>
+      <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
+        <Label htmlFor="nome" className="text-base font-semibold text-blue-900 mb-2 block">
+          Nome Completo do Cliente *
+        </Label>
         <Input
           id="nome"
           value={formData.nomeCompleto}
-          onChange={(e) => setFormData(prev => ({ ...prev, nomeCompleto: e.target.value }))}
-          placeholder="Digite o nome completo"
-          className="mt-2"
+          onChange={(e) => {
+            console.log('Nome alterado para:', e.target.value);
+            setFormData(prev => ({ ...prev, nomeCompleto: e.target.value }));
+          }}
+          placeholder="Digite o nome completo do cliente"
+          className="mt-2 text-lg p-3 border-2 border-blue-300 focus:border-blue-500"
+          required
         />
+        {!formData.nomeCompleto.trim() && (
+          <p className="text-red-600 text-sm mt-2">* Campo obrigatório</p>
+        )}
       </div>
 
       <div>
@@ -314,7 +315,6 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-white">
-        {/* Header móvel */}
         <div className="bg-white border-b px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -333,14 +333,12 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
           </div>
         </div>
 
-        {/* Conteúdo */}
         <div className="flex-1 px-4 py-6 overflow-y-auto">
           {currentStep === 0 && renderPersonalInfo()}
           {currentStep === 1 && renderScreenTime()}
           {currentStep === 2 && renderProblems()}
         </div>
 
-        {/* Botões de navegação */}
         <div className="bg-white border-t px-4 py-4">
           <div className="flex justify-between">
             <Button 
@@ -365,7 +363,6 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
     );
   }
 
-  // Layout desktop
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
@@ -384,7 +381,6 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
         </Badge>
       </div>
 
-      {/* Indicador de progresso */}
       <div className="mb-8">
         <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
           {steps.map((step, index) => (
@@ -416,7 +412,6 @@ export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
         </CardContent>
       </Card>
 
-      {/* Botões de navegação */}
       <div className="flex justify-between">
         <Button 
           variant="outline" 

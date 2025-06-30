@@ -36,17 +36,16 @@ export const FinalReport: React.FC<FinalReportProps> = ({
 
   console.log('Configuração recebida no relatório:', configuration);
 
-  // Dados baseados na configuração real
   const reportData = {
     client: {
-      name: configuration.clientName || 'Cliente',
+      name: configuration.clientName || configuration.lifestyleData?.nomeCompleto || 'Cliente',
       date: new Date().toLocaleDateString('pt-BR'),
       age: configuration.lifestyleData?.idade || 'Não informado',
       occupation: configuration.lifestyleData?.profissao || 'Não informado'
     },
     configuration: {
       lens: configuration.selectedLens || 'progressiva',
-      treatments: configuration.selectedTreatments || ['antireflexo'],
+      treatments: configuration.selectedTreatments || ['antirreflexo'],
       totalPrice: 850,
       installments: '12x R$ 70,83'
     },
@@ -77,9 +76,16 @@ export const FinalReport: React.FC<FinalReportProps> = ({
     try {
       console.log('Iniciando geração de PDF...');
       
+      // Verificar se temos os dados necessários
+      if (!reportData.client.name || reportData.client.name === 'Cliente') {
+        toast.error('Nome do cliente não encontrado. Refaça a simulação.');
+        setIsExporting(false);
+        return;
+      }
+      
       // Importar jsPDF dinamicamente
       const jsPDFModule = await import('jspdf');
-      const { jsPDF } = jsPDFModule;
+      const { jsPDF } = jsPDFModule.default || jsPDFModule;
       
       const doc = new jsPDF();
       
@@ -90,12 +96,12 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       
       // Cabeçalho
       doc.setFontSize(18);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('RELATÓRIO DE SIMULAÇÃO DE LENTES', pageWidth / 2, yPosition, { align: 'center' });
       
       yPosition += 15;
       doc.setFontSize(12);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.text('Simulador com Inteligência Artificial', pageWidth / 2, yPosition, { align: 'center' });
       
       // Linha separadora
@@ -106,12 +112,12 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       // Dados do cliente
       yPosition += 15;
       doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('DADOS DO CLIENTE', margin, yPosition);
       
       yPosition += 10;
       doc.setFontSize(12);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.text(`Nome: ${reportData.client.name}`, margin, yPosition);
       
       yPosition += 8;
@@ -124,12 +130,12 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       // Configuração recomendada
       yPosition += 20;
       doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('CONFIGURAÇÃO RECOMENDADA', margin, yPosition);
       
       yPosition += 10;
       doc.setFontSize(12);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.text(`Tipo de Lente: ${reportData.configuration.lens}`, margin, yPosition);
       
       yPosition += 8;
@@ -141,12 +147,12 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       // Investimento
       yPosition += 20;
       doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('INVESTIMENTO', margin, yPosition);
       
       yPosition += 10;
       doc.setFontSize(12);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.text(`Valor: R$ ${reportData.configuration.totalPrice}`, margin, yPosition);
       
       yPosition += 8;
@@ -155,15 +161,15 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       // Benefícios
       yPosition += 20;
       doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('PRINCIPAIS BENEFÍCIOS', margin, yPosition);
       
       yPosition += 10;
       doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       
-      reportData.benefits.forEach((benefit, index) => {
-        if (yPosition > 250) { // Nova página se necessário
+      reportData.benefits.forEach((benefit) => {
+        if (yPosition > 250) {
           doc.addPage();
           yPosition = 20;
         }
@@ -179,12 +185,12 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       }
       
       doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('ESPECIFICAÇÕES TÉCNICAS', margin, yPosition);
       
       yPosition += 10;
       doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       
       Object.entries(reportData.technicalSpecs).forEach(([key, value]) => {
         if (yPosition > 250) {
@@ -196,7 +202,7 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       });
       
       // Rodapé
-      const totalPages = doc.internal.pages.length - 1;
+      const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         const pageHeight = doc.internal.pageSize.height;
@@ -205,7 +211,7 @@ export const FinalReport: React.FC<FinalReportProps> = ({
         doc.line(margin, pageHeight - 30, pageWidth - margin, pageHeight - 30);
         
         doc.setFontSize(10);
-        doc.setFont(undefined, 'italic');
+        doc.setFont('helvetica', 'italic');
         doc.text('Relatório gerado automaticamente pelo Simulador de Lentes IA', pageWidth / 2, pageHeight - 20, { align: 'center' });
         doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, pageHeight - 14, { align: 'center' });
         doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
@@ -219,7 +225,7 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       toast.success('PDF gerado e baixado com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast.error('Erro ao gerar PDF. Tente novamente.');
+      toast.error(`Erro ao gerar PDF: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsExporting(false);
     }
@@ -285,7 +291,6 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Coluna Principal - Relatório */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Resumo Executivo */}
           <Card className="border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
             <CardHeader>
               <CardTitle className="flex items-center space-x-3 text-green-900">
@@ -354,7 +359,6 @@ export const FinalReport: React.FC<FinalReportProps> = ({
             </CardContent>
           </Card>
 
-          {/* Benefícios Completos */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-3">
@@ -377,7 +381,6 @@ export const FinalReport: React.FC<FinalReportProps> = ({
 
         {/* Coluna Lateral - Informações e Ações */}
         <div className="space-y-6">
-          {/* Informações do Cliente */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Informações da Simulação</CardTitle>
@@ -434,7 +437,6 @@ export const FinalReport: React.FC<FinalReportProps> = ({
             </CardContent>
           </Card>
 
-          {/* Ações de Compartilhamento */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -471,7 +473,6 @@ export const FinalReport: React.FC<FinalReportProps> = ({
             </CardContent>
           </Card>
 
-          {/* Próximos Passos */}
           <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
             <CardHeader>
               <CardTitle className="text-purple-900">Próximos Passos</CardTitle>
