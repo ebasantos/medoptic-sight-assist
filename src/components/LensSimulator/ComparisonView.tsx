@@ -57,45 +57,45 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
 
   if (isMobile) {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
-        {/* Header mobile */}
-        <div className="bg-white border-b px-4 py-4">
+      <div className="flex flex-col h-screen bg-white overflow-hidden">
+        {/* Header fixo */}
+        <div className="bg-white border-b px-4 py-3 flex-shrink-0">
           <div className="text-center">
-            <h1 className="text-xl font-bold text-gray-900 mb-2">
+            <h1 className="text-lg font-bold text-gray-900 mb-1">
               Comparação de Opções
             </h1>
-            <p className="text-sm text-gray-600">
+            <p className="text-xs text-gray-600">
               Compare para tomar a melhor decisão
             </p>
           </div>
         </div>
 
-        {/* Seletor de modo mobile */}
-        <div className="px-4 py-4 bg-gray-50 border-b">
+        {/* Seletor de modo fixo */}
+        <div className="px-4 py-3 bg-gray-50 border-b flex-shrink-0">
           <Tabs value={comparisonMode} onValueChange={(value) => setComparisonMode(value as any)}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 h-8">
               <TabsTrigger value="side-by-side" className="text-xs">Lado a Lado</TabsTrigger>
               <TabsTrigger value="before-after" className="text-xs">Antes/Depois</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
-        {/* Content mobile */}
-        <div className="flex-1 px-4 py-6 overflow-y-auto space-y-6">
+        {/* Content com scroll */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {comparisonMode === 'side-by-side' ? (
             <div className="space-y-4">
               {/* Sua Escolha */}
               <Card className="border-2 border-blue-500 bg-blue-50">
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg text-blue-900">Sua Escolha</CardTitle>
+                    <CardTitle className="text-base text-blue-900">Sua Escolha</CardTitle>
                     <Badge className="bg-blue-600 text-white text-xs">Recomendado</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 text-sm">
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Configuração:</h4>
-                    <Badge className="bg-blue-600 text-white mb-2">{currentConfig.lens}</Badge>
+                    <Badge className="bg-blue-600 text-white text-xs mb-2">{currentConfig.lens}</Badge>
                     <div className="flex flex-wrap gap-1">
                       {currentConfig.treatments.map((treatment: string, index: number) => (
                         <Badge key={index} variant="outline" className="border-blue-300 text-blue-700 text-xs">
@@ -109,17 +109,17 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                     <h4 className="font-medium text-gray-900 mb-2">Vantagens:</h4>
                     <ul className="space-y-1">
                       {currentConfig.pros.slice(0, 3).map((pro: string, index: number) => (
-                        <li key={index} className="flex items-start text-sm text-gray-700">
-                          <Check className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                        <li key={index} className="flex items-start text-xs text-gray-700">
+                          <Check className="w-3 h-3 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
                           {pro}
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="pt-3 border-t">
+                  <div className="pt-2 border-t">
                     <div className="flex justify-between items-center">
-                      <span className="text-lg font-semibold text-blue-900">
+                      <span className="text-base font-semibold text-blue-900">
                         R$ {currentConfig.price}
                       </span>
                       <Badge className="bg-green-600 text-white text-xs">
@@ -132,16 +132,16 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
 
               {/* Alternativa */}
               <Card className="border">
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg text-gray-700">Alternativa Econômica</CardTitle>
+                    <CardTitle className="text-base text-gray-700">Alternativa Econômica</CardTitle>
                     <Badge variant="outline" className="text-xs">Básica</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 text-sm">
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Configuração:</h4>
-                    <Badge variant="outline" className="mb-2">{alternativeConfig.lens}</Badge>
+                    <Badge variant="outline" className="text-xs mb-2">{alternativeConfig.lens}</Badge>
                     <div className="flex flex-wrap gap-1">
                       {alternativeConfig.treatments.map((treatment: string, index: number) => (
                         <Badge key={index} variant="outline" className="text-xs">
@@ -155,17 +155,17 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                     <h4 className="font-medium text-gray-900 mb-2">Vantagens:</h4>
                     <ul className="space-y-1">
                       {alternativeConfig.pros.slice(0, 3).map((pro: string, index: number) => (
-                        <li key={index} className="flex items-start text-sm text-gray-700">
-                          <Check className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                        <li key={index} className="flex items-start text-xs text-gray-700">
+                          <Check className="w-3 h-3 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
                           {pro}
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="pt-3 border-t">
+                  <div className="pt-2 border-t">
                     <div className="flex justify-between items-center">
-                      <span className="text-lg font-semibold text-gray-700">
+                      <span className="text-base font-semibold text-gray-700">
                         R$ {alternativeConfig.price}
                       </span>
                       <Badge variant="outline" className="text-xs">
@@ -185,23 +185,23 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
 
           {/* Simulação Visual Mobile */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center">
-                <Eye className="w-5 h-5 text-blue-600 mr-2" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center">
+                <Eye className="w-4 h-4 text-blue-600 mr-2" />
                 Simulação Visual
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center">
-                <h3 className="font-semibold mb-3 text-blue-900">Leitura - Sua Configuração</h3>
-                <div className="relative h-32 rounded-lg overflow-hidden mb-3">
+                <h3 className="font-semibold mb-2 text-blue-900 text-sm">Leitura - Sua Configuração</h3>
+                <div className="relative h-28 rounded-lg overflow-hidden mb-2">
                   <img 
-                    src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=600&fit=crop&crop=center" 
                     alt="Livro aberto para leitura"
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-green-600/20 to-transparent flex items-center justify-center">
-                    <div className="bg-white/90 px-3 py-1 rounded-full">
+                    <div className="bg-white/90 px-2 py-1 rounded-full">
                       <span className="text-xs font-medium text-green-800">Visão Nítida</span>
                     </div>
                   </div>
@@ -210,15 +210,15 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
               </div>
 
               <div className="text-center">
-                <h3 className="font-semibold mb-3 text-gray-700">Direção - Sua Configuração</h3>
-                <div className="relative h-32 rounded-lg overflow-hidden mb-3">
+                <h3 className="font-semibold mb-2 text-gray-700 text-sm">Direção - Sua Configuração</h3>
+                <div className="relative h-28 rounded-lg overflow-hidden mb-2">
                   <img 
-                    src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
-                    alt="Visão em primeira pessoa ao dirigir"
+                    src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&fit=crop&crop=center" 
+                    alt="Visão do motorista dentro do carro"
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 to-transparent flex items-center justify-center">
-                    <div className="bg-white/90 px-3 py-1 rounded-full">
+                    <div className="bg-white/90 px-2 py-1 rounded-full">
                       <span className="text-xs font-medium text-blue-800">Proteção UV</span>
                     </div>
                   </div>
@@ -230,27 +230,27 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
 
           {/* Recomendação IA Mobile */}
           <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2">
               <div className="flex items-center space-x-2">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <Star className="w-5 h-5 text-blue-600" />
+                <div className="bg-blue-100 p-1.5 rounded-lg">
+                  <Star className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg text-blue-900">Recomendação IA</CardTitle>
-                  <p className="text-sm text-blue-700">Baseada no seu perfil</p>
+                  <CardTitle className="text-base text-blue-900">Recomendação IA</CardTitle>
+                  <p className="text-xs text-blue-700">Baseada no seu perfil</p>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="bg-white p-4 rounded-lg">
-                <h3 className="text-lg font-semibold text-blue-900 mb-3">
+              <div className="bg-white p-3 rounded-lg">
+                <h3 className="text-base font-semibold text-blue-900 mb-2">
                   Recomendamos sua configuração
                 </h3>
-                <p className="text-sm text-gray-700 mb-3">
+                <p className="text-xs text-gray-700 mb-2">
                   Baseada na sua análise, oferece a melhor relação custo-benefício.
                 </p>
                 <div className="space-y-2">
-                  <h4 className="font-medium text-gray-900">Principais vantagens:</h4>
+                  <h4 className="font-medium text-gray-900 text-sm">Principais vantagens:</h4>
                   <ul className="space-y-1">
                     {currentConfig.pros.slice(0, 3).map((pro, index) => (
                       <li key={index} className="flex items-center text-xs text-gray-700">
@@ -265,20 +265,22 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
           </Card>
         </div>
 
-        {/* Footer mobile */}
-        <div className="bg-white border-t px-4 py-4">
-          <div className="flex gap-3">
+        {/* Footer fixo */}
+        <div className="bg-white border-t px-4 py-3 flex-shrink-0">
+          <div className="flex gap-2">
             <Button 
               variant="outline" 
               onClick={onBack}
-              className="flex-1"
+              className="flex-1 h-10"
+              size="sm"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar
             </Button>
             <Button
               onClick={onContinue}
-              className="flex-2 bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-2 bg-blue-600 hover:bg-blue-700 text-white h-10"
+              size="sm"
             >
               Finalizar
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -322,7 +324,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
         />
       )}
 
-      {/* Simulação Visual Comparativa com imagens atualizadas */}
+      {/* Simulação Visual Comparativa com imagens corretas */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle className="flex items-center space-x-3">
@@ -336,7 +338,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
               <h3 className="font-semibold mb-4 text-blue-900">Leitura - Sua Configuração</h3>
               <div className="relative h-48 rounded-lg overflow-hidden">
                 <img 
-                  src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
+                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=600&fit=crop&crop=center" 
                   alt="Livro aberto para leitura"
                   className="w-full h-full object-cover"
                 />
@@ -359,8 +361,8 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
               <h3 className="font-semibold mb-4 text-blue-900">Direção - Sua Configuração</h3>
               <div className="relative h-48 rounded-lg overflow-hidden">
                 <img 
-                  src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
-                  alt="Visão em primeira pessoa ao dirigir"
+                  src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&fit=crop&crop=center" 
+                  alt="Visão do motorista dentro do carro"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-blue-600/30 to-transparent flex items-center justify-center">
