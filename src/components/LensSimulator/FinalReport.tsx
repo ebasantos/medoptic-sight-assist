@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,17 +32,17 @@ export const FinalReport: React.FC<FinalReportProps> = ({
 }) => {
   const [isExporting, setIsExporting] = useState(false);
 
-  // Dados simulados baseados na configuração
+  // Dados baseados na configuração real
   const reportData = {
     client: {
-      name: 'Cliente Simulação',
+      name: configuration.clientName || 'Cliente',
       date: new Date().toLocaleDateString('pt-BR'),
-      age: configuration.lifestyleData?.age || '31-45',
-      occupation: configuration.lifestyleData?.occupation || 'office'
+      age: configuration.lifestyleData?.idade || 'Não informado',
+      occupation: configuration.lifestyleData?.profissao || 'Não informado'
     },
     configuration: {
       lens: configuration.selectedLens || 'progressiva',
-      treatments: configuration.selectedTreatments || ['antireflexo', 'uv'],
+      treatments: configuration.selectedTreatments || ['antireflexo'],
       totalPrice: 850,
       installments: '12x R$ 70,83'
     },
@@ -56,24 +55,131 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       'Adaptação natural e confortável'
     ],
     technicalSpecs: {
-      'Tipo de Lente': 'Progressiva Premium',
+      'Tipo de Lente': configuration.selectedLens || 'Progressiva Premium',
       'Material': 'Policarbonato CR-39',
       'Índice de Refração': '1.59',
-      'Tratamentos': 'Antirreflexo + UV + Hidrofóbico',
+      'Tratamentos': configuration.selectedTreatments?.join(', ') || 'Antirreflexo',
       'Garantia': '2 anos contra defeitos de fabricação'
     },
-    aiScore: 94,
-    lifestyle: configuration.lifestyleData?.lifestyle || 'moderate'
+    aiScore: configuration.aiRecommendations?.score || 94,
+    lifestyle: configuration.lifestyleData?.profissao || 'Não informado'
   };
 
   const handleExportPDF = async () => {
     setIsExporting(true);
-    // Simulação de exportação
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsExporting(false);
     
-    // Aqui seria integrado com jsPDF ou similar
-    console.log('Exportando relatório PDF...');
+    try {
+      // Importar jsPDF dinamicamente
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      // Configurações gerais
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 20;
+      let yPosition = 20;
+      
+      // Cabeçalho
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.text('RELATÓRIO DE SIMULAÇÃO DE LENTES', pageWidth / 2, yPosition, { align: 'center' });
+      
+      yPosition += 15;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text('Simulador com Inteligência Artificial', pageWidth / 2, yPosition, { align: 'center' });
+      
+      // Linha separadora
+      yPosition += 15;
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPosition, pageWidth - margin, yPosition);
+      
+      // Dados do cliente
+      yPosition += 15;
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('DADOS DO CLIENTE', margin, yPosition);
+      
+      yPosition += 10;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Nome: ${reportData.client.name}`, margin, yPosition);
+      
+      yPosition += 8;
+      doc.text(`Data: ${reportData.client.date}`, margin, yPosition);
+      doc.text(`Idade: ${reportData.client.age}`, margin + 80, yPosition);
+      
+      yPosition += 8;
+      doc.text(`Profissão: ${reportData.client.occupation}`, margin, yPosition);
+      
+      // Configuração recomendada
+      yPosition += 20;
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('CONFIGURAÇÃO RECOMENDADA', margin, yPosition);
+      
+      yPosition += 10;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Tipo de Lente: ${reportData.configuration.lens}`, margin, yPosition);
+      
+      yPosition += 8;
+      doc.text(`Tratamentos: ${reportData.configuration.treatments.join(', ')}`, margin, yPosition);
+      
+      yPosition += 8;
+      doc.text(`Score IA: ${reportData.aiScore}/100`, margin, yPosition);
+      
+      // Investimento
+      yPosition += 20;
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('INVESTIMENTO', margin, yPosition);
+      
+      yPosition += 10;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Valor: R$ ${reportData.configuration.totalPrice}`, margin, yPosition);
+      
+      yPosition += 8;
+      doc.text(`Parcelamento: ${reportData.configuration.installments}`, margin, yPosition);
+      
+      // Benefícios
+      yPosition += 20;
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('PRINCIPAIS BENEFÍCIOS', margin, yPosition);
+      
+      yPosition += 10;
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      
+      reportData.benefits.forEach((benefit, index) => {
+        doc.text(`• ${benefit}`, margin, yPosition);
+        yPosition += 6;
+      });
+      
+      // Rodapé
+      yPosition = doc.internal.pageSize.height - 30;
+      doc.setLineWidth(0.3);
+      doc.line(margin, yPosition, pageWidth - margin, yPosition);
+      
+      yPosition += 10;
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'italic');
+      doc.text('Relatório gerado automaticamente pelo Simulador de Lentes IA', pageWidth / 2, yPosition, { align: 'center' });
+      
+      yPosition += 6;
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, yPosition, { align: 'center' });
+      
+      // Baixar o PDF
+      doc.save(`relatorio-simulacao-${reportData.client.name.replace(/\s+/g, '-')}.pdf`);
+      
+      console.log('PDF gerado com sucesso');
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF. Tente novamente.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleShareWhatsApp = () => {
@@ -119,7 +225,7 @@ export const FinalReport: React.FC<FinalReportProps> = ({
           Relatório de Simulação Completo
         </h1>
         <p className="text-lg text-gray-600">
-          Sua configuração personalizada com análise de IA
+          Configuração personalizada para {reportData.client.name}
         </p>
         <Badge className="bg-green-600 text-white text-lg px-4 py-2 mt-4">
           <Star className="w-4 h-4 mr-2" />
@@ -247,16 +353,20 @@ export const FinalReport: React.FC<FinalReportProps> = ({
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between">
+                <span className="text-gray-600">Cliente:</span>
+                <span className="font-medium">{reportData.client.name}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-gray-600">Data:</span>
                 <span className="font-medium">{reportData.client.date}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Faixa Etária:</span>
-                <span className="font-medium">{reportData.client.age} anos</span>
+                <span className="text-gray-600">Idade:</span>
+                <span className="font-medium">{reportData.client.age}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Perfil:</span>
-                <span className="font-medium">{reportData.lifestyle}</span>
+                <span className="text-gray-600">Profissão:</span>
+                <span className="font-medium">{reportData.client.occupation}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
