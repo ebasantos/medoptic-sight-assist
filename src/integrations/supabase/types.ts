@@ -145,6 +145,39 @@ export type Database = {
         }
         Relationships: []
       }
+      simulacoes_lentes: {
+        Row: {
+          created_at: string
+          dados_estilo_vida: Json | null
+          id: string
+          nome_cliente: string
+          optica_id: string
+          recomendacoes_ia: Json | null
+          tipo_lente: string
+          tratamentos: string[]
+        }
+        Insert: {
+          created_at?: string
+          dados_estilo_vida?: Json | null
+          id?: string
+          nome_cliente: string
+          optica_id: string
+          recomendacoes_ia?: Json | null
+          tipo_lente: string
+          tratamentos?: string[]
+        }
+        Update: {
+          created_at?: string
+          dados_estilo_vida?: Json | null
+          id?: string
+          nome_cliente?: string
+          optica_id?: string
+          recomendacoes_ia?: Json | null
+          tipo_lente?: string
+          tratamentos?: string[]
+        }
+        Relationships: []
+      }
       usuarios_optica: {
         Row: {
           ativo: boolean

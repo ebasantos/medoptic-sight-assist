@@ -11,6 +11,9 @@ import { EnvironmentSimulator } from './EnvironmentSimulator';
 import { ComparisonView } from './ComparisonView';
 import { AILifestyleForm } from './AILifestyleForm';
 import { FinalReport } from './FinalReport';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface SimulatorState {
   step: 'intro' | 'lifestyle' | 'lens-selection' | 'treatment-selection' | 'environment-test' | 'comparison' | 'report';
@@ -20,9 +23,11 @@ interface SimulatorState {
   prescription: any;
   lifestyleData: any;
   aiRecommendations: any;
+  clientName: string;
 }
 
 export const LensSimulatorMain = () => {
+  const { user } = useAuth();
   const [simulatorState, setSimulatorState] = useState<SimulatorState>({
     step: 'intro',
     selectedLens: null,
@@ -30,8 +35,49 @@ export const LensSimulatorMain = () => {
     clientPhoto: null,
     prescription: null,
     lifestyleData: null,
-    aiRecommendations: null
+    aiRecommendations: null,
+    clientName: ''
   });
+
+  const saveSimulation = async () => {
+    if (!user || !simulatorState.selectedLens || !simulatorState.clientName) {
+      toast.error('Dados incompletos para salvar a simulação');
+      return;
+    }
+
+    try {
+      console.log('Salvando simulação...', {
+        optica_id: user.opticId,
+        nome_cliente: simulatorState.clientName,
+        tipo_lente: simulatorState.selectedLens,
+        tratamentos: simulatorState.selectedTreatments,
+        dados_estilo_vida: simulatorState.lifestyleData,
+        recomendacoes_ia: simulatorState.aiRecommendations
+      });
+
+      const { error } = await supabase
+        .from('simulacoes_lentes')
+        .insert({
+          optica_id: user.opticId,
+          nome_cliente: simulatorState.clientName,
+          tipo_lente: simulatorState.selectedLens,
+          tratamentos: simulatorState.selectedTreatments,
+          dados_estilo_vida: simulatorState.lifestyleData,
+          recomendacoes_ia: simulatorState.aiRecommendations
+        });
+
+      if (error) {
+        console.error('Erro ao salvar simulação:', error);
+        toast.error('Erro ao salvar simulação');
+      } else {
+        console.log('Simulação salva com sucesso');
+        toast.success('Simulação salva no histórico!');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar simulação:', error);
+      toast.error('Erro ao salvar simulação');
+    }
+  };
 
   const nextStep = () => {
     const steps = ['intro', 'lifestyle', 'lens-selection', 'treatment-selection', 'environment-test', 'comparison', 'report'];
@@ -53,6 +99,24 @@ export const LensSimulatorMain = () => {
         step: steps[currentIndex - 1] as any
       }));
     }
+  };
+
+  const handleComparisonContinue = async () => {
+    await saveSimulation();
+    nextStep();
+  };
+
+  const handleRestart = () => {
+    setSimulatorState({
+      step: 'intro',
+      selectedLens: null,
+      selectedTreatments: [],
+      clientPhoto: null,
+      prescription: null,
+      lifestyleData: null,
+      aiRecommendations: null,
+      clientName: ''
+    });
   };
 
   return (
@@ -114,7 +178,8 @@ export const LensSimulatorMain = () => {
               setSimulatorState(prev => ({
                 ...prev,
                 lifestyleData,
-                aiRecommendations
+                aiRecommendations,
+                clientName: lifestyleData?.nome || ''
               }));
               nextStep();
             }}
@@ -163,7 +228,7 @@ export const LensSimulatorMain = () => {
         {simulatorState.step === 'comparison' && (
           <ComparisonView
             configuration={simulatorState}
-            onContinue={() => nextStep()}
+            onContinue={handleComparisonContinue}
             onBack={prevStep}
           />
         )}
@@ -171,15 +236,7 @@ export const LensSimulatorMain = () => {
         {simulatorState.step === 'report' && (
           <FinalReport
             configuration={simulatorState}
-            onRestart={() => setSimulatorState({
-              step: 'intro',
-              selectedLens: null,
-              selectedTreatments: [],
-              clientPhoto: null,
-              prescription: null,
-              lifestyleData: null,
-              aiRecommendations: null
-            })}
+            onRestart={handleRestart}
             onBack={prevStep}
           />
         )}
