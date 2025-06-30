@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Download, 
   Star, 
@@ -164,14 +165,14 @@ export const FinalReport: React.FC<FinalReportProps> = ({
 
   if (isMobile) {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b px-4 py-6">
+      <div className="flex flex-col h-screen bg-white">
+        {/* Header fixo */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b px-4 py-4 flex-shrink-0">
           <div className="text-center">
-            <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Star className="w-8 h-8 text-green-600" />
+            <div className="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Star className="w-6 h-6 text-green-600" />
             </div>
-            <h1 className="text-xl font-bold text-green-900 mb-2">
+            <h1 className="text-lg font-bold text-green-900 mb-1">
               Simulação Concluída!
             </h1>
             <p className="text-sm text-green-700">
@@ -180,91 +181,93 @@ export const FinalReport: React.FC<FinalReportProps> = ({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
-          {/* Resumo do Cliente */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center">
-                <Eye className="w-5 h-5 text-blue-600 mr-2" />
-                Resumo do Cliente
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <span className="font-medium text-gray-600">Nome:</span>
-                  <p className="text-gray-900">{clientData.nome}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Idade:</span>
-                  <p className="text-gray-900">{clientData.idade}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Profissão:</span>
-                  <p className="text-gray-900">{clientData.profissao}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Tempo Tela:</span>
-                  <p className="text-gray-900">{clientData.tempoTela}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Configuração Recomendada */}
-          <Card className="border-2 border-green-200 bg-green-50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center justify-between">
-                <div className="flex items-center">
-                  <Shield className="w-5 h-5 text-green-600 mr-2" />
-                  Configuração Final
-                </div>
-                <Badge className="bg-green-600 text-white">
-                  Score: {recommendations.score}/100
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <span className="font-medium text-gray-700">Tipo de Lente:</span>
-                <p className="text-lg font-semibold text-green-800 capitalize">
-                  {recommendations.lente}
-                </p>
-              </div>
-              
-              {recommendations.tratamentos.length > 0 && (
-                <div>
-                  <span className="font-medium text-gray-700 block mb-2">Tratamentos:</span>
-                  <div className="flex flex-wrap gap-2">
-                    {recommendations.tratamentos.map((treatment: string, index: number) => (
-                      <Badge key={index} variant="outline" className="border-green-300 text-green-700">
-                        {treatment}
-                      </Badge>
-                    ))}
+        {/* Conteúdo com scroll */}
+        <ScrollArea className="flex-1">
+          <div className="px-4 py-4 space-y-4 pb-32">
+            {/* Resumo do Cliente */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center">
+                  <Eye className="w-4 h-4 text-blue-600 mr-2" />
+                  Resumo do Cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="font-medium text-gray-600">Nome:</span>
+                    <span className="text-gray-900">{clientData.nome}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium text-gray-600">Idade:</span>
+                    <span className="text-gray-900">{clientData.idade}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium text-gray-600">Profissão:</span>
+                    <span className="text-gray-900">{clientData.profissao}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium text-gray-600">Tempo Tela:</span>
+                    <span className="text-gray-900">{clientData.tempoTela}</span>
                   </div>
                 </div>
-              )}
+              </CardContent>
+            </Card>
 
-              {recommendations.motivos.length > 0 && (
+            {/* Configuração Recomendada */}
+            <Card className="border-2 border-green-200 bg-green-50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Shield className="w-4 h-4 text-green-600 mr-2" />
+                    Configuração Final
+                  </div>
+                  <Badge className="bg-green-600 text-white text-xs">
+                    Score: {recommendations.score}/100
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <span className="font-medium text-gray-700 block mb-2">Justificativas da IA:</span>
-                  <ul className="space-y-1">
-                    {recommendations.motivos.map((motivo: string, index: number) => (
-                      <li key={index} className="flex items-start text-sm text-gray-700">
-                        <Check className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                        {motivo}
-                      </li>
-                    ))}
-                  </ul>
+                  <span className="font-medium text-gray-700 text-sm">Tipo de Lente:</span>
+                  <p className="text-base font-semibold text-green-800 capitalize mt-1">
+                    {recommendations.lente}
+                  </p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                
+                {recommendations.tratamentos.length > 0 && (
+                  <div>
+                    <span className="font-medium text-gray-700 block mb-2 text-sm">Tratamentos:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {recommendations.tratamentos.map((treatment: string, index: number) => (
+                        <Badge key={index} variant="outline" className="border-green-300 text-green-700 text-xs">
+                          {treatment}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-        {/* Footer */}
-        <div className="bg-white border-t px-4 py-4 space-y-3">
+                {recommendations.motivos.length > 0 && (
+                  <div>
+                    <span className="font-medium text-gray-700 block mb-2 text-sm">Justificativas da IA:</span>
+                    <ul className="space-y-2">
+                      {recommendations.motivos.map((motivo: string, index: number) => (
+                        <li key={index} className="flex items-start text-sm text-gray-700">
+                          <Check className="w-3 h-3 text-green-500 mr-2 mt-1 flex-shrink-0" />
+                          <span>{motivo}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </ScrollArea>
+
+        {/* Footer fixo */}
+        <div className="bg-white border-t px-4 py-4 space-y-3 flex-shrink-0">
           <Button 
             onClick={generatePDF}
             disabled={isGeneratingPDF}
