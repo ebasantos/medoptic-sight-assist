@@ -2,22 +2,34 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
+import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { User, Briefcase, Clock, Eye, Camera, ArrowRight, ArrowLeft, Brain } from 'lucide-react';
-import { useCamera } from '@/hooks/useCamera';
+import { 
+  User, 
+  Briefcase, 
+  Car, 
+  Smartphone, 
+  Sun, 
+  Moon, 
+  Eye, 
+  Clock,
+  Sparkles,
+  ArrowRight,
+  ArrowLeft
+} from 'lucide-react';
 
 interface LifestyleData {
-  age: string;
-  occupation: string;
-  screenTime: number;
-  activities: string[];
-  visionConcerns: string[];
-  currentGlasses: string;
-  lifestyle: string;
+  idade: number;
+  profissao: string;
+  horasComputador: number;
+  dirigeNoturno: boolean;
+  esportes: string[];
+  problemas: string[];
+  prioridades: string[];
 }
 
 interface AILifestyleFormProps {
@@ -25,470 +37,337 @@ interface AILifestyleFormProps {
   onBack: () => void;
 }
 
-export const AILifestyleForm: React.FC<AILifestyleFormProps> = ({
-  onComplete,
-  onBack
-}) => {
-  const [step, setStep] = useState(1);
-  const [lifestyleData, setLifestyleData] = useState<LifestyleData>({
-    age: '',
-    occupation: '',
-    screenTime: 4,
-    activities: [],
-    visionConcerns: [],
-    currentGlasses: '',
-    lifestyle: ''
+export const AILifestyleForm = ({ onComplete, onBack }: AILifestyleFormProps) => {
+  const [formData, setFormData] = useState<LifestyleData>({
+    idade: 30,
+    profissao: '',
+    horasComputador: 4,
+    dirigeNoturno: false,
+    esportes: [],
+    problemas: [],
+    prioridades: []
   });
 
-  const { 
-    videoRef, 
-    canvasRef, 
-    isActive, 
-    capturedImage, 
-    startCamera, 
-    stopCamera, 
-    capturePhoto 
-  } = useCamera();
+  const [step, setStep] = useState(1);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const totalSteps = 4;
-
-  const occupations = [
-    { id: 'office', label: 'Trabalho de Escritório', icon: '💼' },
-    { id: 'education', label: 'Educação/Professor', icon: '🎓' },
-    { id: 'healthcare', label: 'Área da Saúde', icon: '⚕️' },
-    { id: 'retail', label: 'Comércio/Atendimento', icon: '🛍️' },
-    { id: 'creative', label: 'Área Criativa/Design', icon: '🎨' },
-    { id: 'technical', label: 'Técnico/Engenharia', icon: '🔧' },
-    { id: 'retired', label: 'Aposentado', icon: '🏖️' },
-    { id: 'other', label: 'Outros', icon: '💼' }
-  ];
-
-  const activities = [
-    { id: 'reading', label: 'Leitura Frequente' },
-    { id: 'driving', label: 'Dirigir Regularmente' },
-    { id: 'sports', label: 'Esportes/Exercícios' },
-    { id: 'crafts', label: 'Trabalhos Manuais' },
-    { id: 'music', label: 'Tocar Instrumentos' },
-    { id: 'cooking', label: 'Cozinhar' },
-    { id: 'gaming', label: 'Jogos/Gaming' },
-    { id: 'travel', label: 'Viajar com Frequência' }
-  ];
-
-  const visionConcerns = [
-    { id: 'eyestrain', label: 'Cansaço Visual' },
-    { id: 'headaches', label: 'Dores de Cabeça' },
-    { id: 'dry-eyes', label: 'Olhos Secos' },
-    { id: 'blurred', label: 'Visão Embaçada' },
-    { id: 'glare', label: 'Sensibilidade à Luz' },
-    { id: 'night-vision', label: 'Dificuldade Noturna' },
-    { id: 'reading', label: 'Dificuldade para Ler' },
-    { id: 'distance', label: 'Visão à Distância' }
-  ];
-
-  const handleActivityToggle = (activityId: string) => {
-    setLifestyleData(prev => ({
+  const handleSportChange = (sport: string, checked: boolean) => {
+    setFormData(prev => ({
       ...prev,
-      activities: prev.activities.includes(activityId)
-        ? prev.activities.filter(id => id !== activityId)
-        : [...prev.activities, activityId]
+      esportes: checked 
+        ? [...prev.esportes, sport]
+        : prev.esportes.filter(s => s !== sport)
     }));
   };
 
-  const handleConcernToggle = (concernId: string) => {
-    setLifestyleData(prev => ({
+  const handleProblemChange = (problem: string, checked: boolean) => {
+    setFormData(prev => ({
       ...prev,
-      visionConcerns: prev.visionConcerns.includes(concernId)
-        ? prev.visionConcerns.filter(id => id !== concernId)
-        : [...prev.visionConcerns, concernId]
+      problemas: checked 
+        ? [...prev.problemas, problem]
+        : prev.problemas.filter(p => p !== problem)
     }));
   };
 
-  const generateAIRecommendations = () => {
-    // Simulação de análise de IA baseada nos dados coletados
+  const handlePriorityChange = (priority: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      prioridades: checked 
+        ? [...prev.prioridades, priority]
+        : prev.prioridades.filter(p => p !== priority)
+    }));
+  };
+
+  const generateAIRecommendations = async () => {
+    setIsAnalyzing(true);
+    
+    // Simulação de análise de IA
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     const recommendations = {
-      lensType: 'progressiva', // Baseado na idade e atividades
-      treatments: ['antireflexo', 'luz-azul'], // Baseado no tempo de tela e preocupações
-      priorityScore: 85,
-      reasoning: [
-        'Baseado na sua idade e atividades, lentes progressivas oferecem melhor versatilidade',
-        'Tempo de tela elevado indica necessidade de filtro de luz azul',
-        'Preocupações com cansaço visual sugerem tratamento antirreflexo'
-      ]
+      lentesRecomendadas: ['progressiva', 'monofocal'],
+      tratamentosRecomendados: ['antirreflexo', 'filtro-azul'],
+      motivacao: 'Baseado no seu perfil profissional e hábitos diários',
+      score: 95
     };
 
-    return recommendations;
+    setIsAnalyzing(false);
+    onComplete(formData, recommendations);
   };
 
-  const handleComplete = () => {
-    const aiRecommendations = generateAIRecommendations();
-    onComplete(lifestyleData, aiRecommendations);
-  };
+  const sports = [
+    'Futebol', 'Tênis', 'Natação', 'Corrida', 'Ciclismo', 'Academia'
+  ];
 
-  const nextStep = () => {
-    if (step < totalSteps) setStep(step + 1);
-  };
+  const problems = [
+    'Dor de cabeça', 'Olhos secos', 'Visão embaçada', 'Fadiga ocular', 
+    'Dificuldade para ler', 'Sensibilidade à luz'
+  ];
 
-  const prevStep = () => {
-    if (step > 1) setStep(step - 1);
-  };
+  const priorities = [
+    'Conforto visual', 'Estética', 'Durabilidade', 'Preço', 
+    'Tecnologia avançada', 'Proteção UV'
+  ];
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">
-          Análise do Seu Perfil
-        </h2>
-        <p className="text-lg text-gray-600">
-          Nossa IA precisa conhecer você para fazer as melhores recomendações
-        </p>
-        
-        {/* Indicador de progresso */}
-        <div className="flex justify-center mt-6">
-          <div className="flex space-x-2">
-            {[1, 2, 3, 4].map((stepNum) => (
-              <div
-                key={stepNum}
-                className={`w-3 h-3 rounded-full ${
-                  stepNum <= step 
-                    ? 'bg-blue-600' 
-                    : stepNum === step 
-                      ? 'bg-blue-400' 
-                      : 'bg-gray-300'
-                }`}
-              />
-            ))}
+      <Card className="shadow-lg">
+        <CardHeader className="text-center pb-6">
+          <div className="flex items-center justify-center mb-4">
+            <div className="bg-blue-100 p-3 rounded-full">
+              <Sparkles className="h-8 w-8 text-blue-600" />
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Etapa 1: Informações Básicas */}
-      {step === 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-3">
-              <User className="w-6 h-6 text-blue-600" />
-              <span>Informações Pessoais</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label className="text-base font-medium mb-4 block">Qual sua faixa etária?</Label>
-              <RadioGroup
-                value={lifestyleData.age}
-                onValueChange={(value) => setLifestyleData(prev => ({ ...prev, age: value }))}
-                className="grid grid-cols-2 md:grid-cols-4 gap-4"
-              >
-                {['18-30', '31-45', '46-60', '60+'].map((ageRange) => (
-                  <div key={ageRange} className="flex items-center space-x-2">
-                    <RadioGroupItem value={ageRange} id={ageRange} />
-                    <Label htmlFor={ageRange}>{ageRange} anos</Label>
+          <CardTitle className="text-2xl font-bold text-gray-900">
+            Análise de Estilo de Vida com IA
+          </CardTitle>
+          <p className="text-gray-600 mt-2">
+            Vamos conhecer melhor seus hábitos para personalizar sua experiência visual
+          </p>
+          
+          {/* Progress indicator */}
+          <div className="flex justify-center mt-6">
+            <div className="flex items-center space-x-2">
+              {[1, 2, 3].map((num) => (
+                <div key={num} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    step >= num ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {num}
                   </div>
-                ))}
-              </RadioGroup>
+                  {num < 3 && (
+                    <div className={`w-12 h-1 mx-2 ${
+                      step > num ? 'bg-blue-600' : 'bg-gray-200'
+                    }`} />
+                  )}
+                </div>
+              ))}
             </div>
+          </div>
+        </CardHeader>
 
-            <div>
-              <Label className="text-base font-medium mb-4 block">Já usa óculos atualmente?</Label>
-              <RadioGroup
-                value={lifestyleData.currentGlasses}
-                onValueChange={(value) => setLifestyleData(prev => ({ ...prev, currentGlasses: value }))}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4"
-              >
-                {[
-                  { value: 'none', label: 'Não uso óculos' },
-                  { value: 'reading', label: 'Só para leitura' },
-                  { value: 'distance', label: 'Só para longe' },
-                  { value: 'multifocal', label: 'Multifocal/Progressiva' },
-                  { value: 'fulltime', label: 'Uso o tempo todo' }
-                ].map((option) => (
-                  <div key={option.value} className="flex items-center space-x-2">
-                    <RadioGroupItem value={option.value} id={option.value} />
-                    <Label htmlFor={option.value}>{option.label}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Etapa 2: Trabalho e Tempo de Tela */}
-      {step === 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-3">
-              <Briefcase className="w-6 h-6 text-blue-600" />
-              <span>Trabalho e Atividades Digitais</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label className="text-base font-medium mb-4 block">Qual sua área de trabalho?</Label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {occupations.map((occupation) => (
-                  <Card
-                    key={occupation.id}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
-                      lifestyleData.occupation === occupation.id
-                        ? 'border-2 border-blue-500 bg-blue-50'
-                        : 'border hover:border-blue-200'
-                    }`}
-                    onClick={() => setLifestyleData(prev => ({ ...prev, occupation: occupation.id }))}
-                  >
-                    <CardContent className="p-4 text-center">
-                      <div className="text-2xl mb-2">{occupation.icon}</div>
-                      <div className="text-sm font-medium">{occupation.label}</div>
-                    </CardContent>
-                  </Card>
-                ))}
+        <CardContent className="p-8">
+          {step === 1 && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold flex items-center">
+                <User className="mr-2 h-5 w-5 text-blue-600" />
+                Informações Pessoais
+              </h3>
+              
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="idade">Idade</Label>
+                  <Input
+                    id="idade"
+                    type="number"
+                    value={formData.idade}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      idade: parseInt(e.target.value) || 0
+                    }))}
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="profissao">Profissão</Label>
+                  <Input
+                    id="profissao"
+                    value={formData.profissao}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      profissao: e.target.value
+                    }))}
+                    placeholder="Ex: Designer, Contador, Professor..."
+                    className="mt-1"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <Label className="text-base font-medium mb-4 block">
-                Quantas horas por dia você usa telas (computador, celular, TV)?
-              </Label>
-              <div className="px-3">
-                <Slider
-                  value={[lifestyleData.screenTime]}
-                  onValueChange={(value) => setLifestyleData(prev => ({ ...prev, screenTime: value[0] }))}
-                  max={16}
-                  min={0}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-sm text-gray-600 mt-2">
-                  <span>0h</span>
-                  <span className="font-medium text-blue-600">{lifestyleData.screenTime}h por dia</span>
-                  <span>16h+</span>
+              <div>
+                <Label>Horas por dia em computador/celular</Label>
+                <div className="mt-2">
+                  <RadioGroup
+                    value={formData.horasComputador.toString()}
+                    onValueChange={(value) => setFormData(prev => ({
+                      ...prev,
+                      horasComputador: parseInt(value)
+                    }))}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="2" id="r1" />
+                      <Label htmlFor="r1">Menos de 2h</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="4" id="r2" />
+                      <Label htmlFor="r2">2-4 horas</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="6" id="r3" />
+                      <Label htmlFor="r3">4-6 horas</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="8" id="r4" />
+                      <Label htmlFor="r4">Mais de 6h</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </div>
+
+              <div>
+                <Label>Dirige frequentemente à noite?</Label>
+                <div className="mt-2">
+                  <RadioGroup
+                    value={formData.dirigeNoturno.toString()}
+                    onValueChange={(value) => setFormData(prev => ({
+                      ...prev,
+                      dirigeNoturno: value === 'true'
+                    }))}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="true" id="night1" />
+                      <Label htmlFor="night1">Sim, frequentemente</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="false" id="night2" />
+                      <Label htmlFor="night2">Raramente ou nunca</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
 
-      {/* Etapa 3: Atividades e Hobbies */}
-      {step === 3 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-3">
-              <Clock className="w-6 h-6 text-blue-600" />
-              <span>Suas Atividades Principais</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label className="text-base font-medium mb-4 block">
-                Quais atividades você faz regularmente? (Selecione todas que se aplicam)
-              </Label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {activities.map((activity) => (
-                  <Card
-                    key={activity.id}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
-                      lifestyleData.activities.includes(activity.id)
-                        ? 'border-2 border-blue-500 bg-blue-50'
-                        : 'border hover:border-blue-200'
-                    }`}
-                    onClick={() => handleActivityToggle(activity.id)}
-                  >
-                    <CardContent className="p-4 text-center">
-                      <div className="flex items-center justify-center mb-2">
-                        <Checkbox
-                          checked={lifestyleData.activities.includes(activity.id)}
-                          readOnly
-                        />
-                      </div>
-                      <div className="text-sm font-medium">{activity.label}</div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-base font-medium mb-4 block">Como você descreveria seu estilo de vida?</Label>
-              <RadioGroup
-                value={lifestyleData.lifestyle}
-                onValueChange={(value) => setLifestyleData(prev => ({ ...prev, lifestyle: value }))}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4"
-              >
-                {[
-                  { value: 'active', label: 'Muito Ativo - Sempre em movimento' },
-                  { value: 'moderate', label: 'Moderado - Equilibrio entre trabalho e lazer' },
-                  { value: 'sedentary', label: 'Mais Calmo - Atividades internas e relaxantes' }
-                ].map((option) => (
-                  <Card
-                    key={option.value}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
-                      lifestyleData.lifestyle === option.value
-                        ? 'border-2 border-blue-500 bg-blue-50'
-                        : 'border hover:border-blue-200'
-                    }`}
-                    onClick={() => setLifestyleData(prev => ({ ...prev, lifestyle: option.value }))}
-                  >
-                    <CardContent className="p-4 text-center">
-                      <RadioGroupItem value={option.value} id={option.value} className="mb-2" />
-                      <Label htmlFor={option.value} className="text-sm font-medium cursor-pointer">
-                        {option.label}
-                      </Label>
-                    </CardContent>
-                  </Card>
-                ))}
-              </RadioGroup>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Etapa 4: Preocupações Visuais e Captura de Foto */}
-      {step === 4 && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-3">
-                <Eye className="w-6 h-6 text-blue-600" />
-                <span>Preocupações com a Visão</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          {step === 2 && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold flex items-center">
+                <Briefcase className="mr-2 h-5 w-5 text-blue-600" />
+                Atividades e Hobbies
+              </h3>
+              
               <div>
-                <Label className="text-base font-medium mb-4 block">
-                  Que problemas visuais você tem sentido? (Selecione todos que se aplicam)
-                </Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {visionConcerns.map((concern) => (
-                    <Card
-                      key={concern.id}
-                      className={`cursor-pointer transition-all hover:shadow-md ${
-                        lifestyleData.visionConcerns.includes(concern.id)
-                          ? 'border-2 border-blue-500 bg-blue-50'
-                          : 'border hover:border-blue-200'
-                      }`}
-                      onClick={() => handleConcernToggle(concern.id)}
-                    >
-                      <CardContent className="p-4 text-center">
-                        <div className="flex items-center justify-center mb-2">
-                          <Checkbox
-                            checked={lifestyleData.visionConcerns.includes(concern.id)}
-                            readOnly
-                          />
-                        </div>
-                        <div className="text-sm font-medium">{concern.label}</div>
-                      </CardContent>
-                    </Card>
+                <Label>Esportes que pratica (selecione todos que se aplicam)</Label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                  {sports.map((sport) => (
+                    <div key={sport} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={sport}
+                        checked={formData.esportes.includes(sport)}
+                        onCheckedChange={(checked) => 
+                          handleSportChange(sport, checked as boolean)
+                        }
+                      />
+                      <Label htmlFor={sport} className="text-sm">{sport}</Label>
+                    </div>
                   ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-3">
-                <Camera className="w-6 h-6 text-blue-600" />
-                <span>Captura Facial (Opcional)</span>
-              </CardTitle>
-              <p className="text-gray-600">
-                Para uma análise mais precisa, capture uma foto do seu rosto para medições automáticas
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center space-y-4">
-                {!isActive && !capturedImage && (
-                  <Button
-                    onClick={startCamera}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    <Camera className="mr-2 w-4 h-4" />
-                    Iniciar Câmera
-                  </Button>
-                )}
+              <Separator />
 
-                {isActive && (
-                  <div className="space-y-4">
-                    <div className="relative inline-block">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-80 h-60 rounded-lg border-2 border-blue-200"
+              <div>
+                <Label>Problemas visuais que você tem enfrentado</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                  {problems.map((problem) => (
+                    <div key={problem} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={problem}
+                        checked={formData.problemas.includes(problem)}
+                        onCheckedChange={(checked) => 
+                          handleProblemChange(problem, checked as boolean)
+                        }
                       />
-                      <div className="absolute inset-0 border-2 border-blue-400 rounded-lg pointer-events-none">
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-32 border-2 border-blue-600 rounded-lg opacity-50"></div>
-                      </div>
+                      <Label htmlFor={problem} className="text-sm">{problem}</Label>
                     </div>
-                    <div className="space-x-4">
-                      <Button onClick={capturePhoto} className="bg-green-600 hover:bg-green-700 text-white">
-                        Capturar Foto
-                      </Button>
-                      <Button onClick={stopCamera} variant="outline">
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {capturedImage && (
-                  <div className="space-y-4">
-                    <img
-                      src={capturedImage}
-                      alt="Foto capturada"
-                      className="w-80 h-60 rounded-lg border-2 border-green-200 mx-auto"
-                    />
-                    <div className="space-x-4">
-                      <Badge className="bg-green-600 text-white">Foto capturada com sucesso!</Badge>
-                      <Button
-                        onClick={() => {
-                          startCamera();
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Tirar outra foto
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                <canvas ref={canvasRef} className="hidden" />
+                  ))}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          )}
 
-      {/* Botões de navegação */}
-      <div className="flex justify-between mt-8">
-        <Button variant="outline" onClick={step === 1 ? onBack : prevStep} className="px-6">
-          <ArrowLeft className="mr-2 w-4 h-4" />
-          {step === 1 ? 'Voltar' : 'Anterior'}
-        </Button>
-        
-        {step < totalSteps ? (
-          <Button
-            onClick={nextStep}
-            disabled={
-              (step === 1 && (!lifestyleData.age || !lifestyleData.currentGlasses)) ||
-              (step === 2 && !lifestyleData.occupation)
-            }
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6"
-          >
-            Próximo
-            <ArrowRight className="ml-2 w-4 h-4" />
-          </Button>
-        ) : (
-          <Button
-            onClick={handleComplete}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6"
-          >
-            <Brain className="mr-2 w-4 h-4" />
-            Analisar com IA
-          </Button>
-        )}
-      </div>
+          {step === 3 && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold flex items-center">
+                <Eye className="mr-2 h-5 w-5 text-blue-600" />
+                Suas Prioridades
+              </h3>
+              
+              <div>
+                <Label>O que é mais importante para você nas lentes?</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                  {priorities.map((priority) => (
+                    <div key={priority} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={priority}
+                        checked={formData.prioridades.includes(priority)}
+                        onCheckedChange={(checked) => 
+                          handlePriorityChange(priority, checked as boolean)
+                        }
+                      />
+                      <Label htmlFor={priority} className="text-sm">{priority}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">Resumo do seu perfil:</h4>
+                <div className="space-y-2 text-sm text-blue-800">
+                  <p><strong>Idade:</strong> {formData.idade} anos</p>
+                  <p><strong>Profissão:</strong> {formData.profissao || 'Não informado'}</p>
+                  <p><strong>Uso de telas:</strong> {formData.horasComputador}h por dia</p>
+                  <p><strong>Direção noturna:</strong> {formData.dirigeNoturno ? 'Sim' : 'Não'}</p>
+                  {formData.esportes.length > 0 && (
+                    <p><strong>Esportes:</strong> {formData.esportes.join(', ')}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation buttons */}
+          <div className="flex justify-between pt-8">
+            <Button 
+              variant="outline" 
+              onClick={step === 1 ? onBack : () => setStep(step - 1)}
+              disabled={isAnalyzing}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {step === 1 ? 'Voltar' : 'Anterior'}
+            </Button>
+
+            {step < 3 ? (
+              <Button 
+                onClick={() => setStep(step + 1)}
+                disabled={isAnalyzing}
+              >
+                Próximo
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button 
+                onClick={generateAIRecommendations}
+                disabled={isAnalyzing}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Analisando com IA...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Gerar Recomendações
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

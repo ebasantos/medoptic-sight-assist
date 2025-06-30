@@ -11,6 +11,7 @@ import OpticDashboard from "./pages/OpticDashboard";
 import MeasurementPage from "./pages/MeasurementPage";
 import FrameSuggestionPage from "./pages/FrameSuggestionPage";
 import HistoryPage from "./pages/HistoryPage";
+import LensSimulatorPage from "./pages/LensSimulatorPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => {
               <Route path="/aferir" element={<MeasurementPage />} />
               <Route path="/sugestao" element={<FrameSuggestionPage />} />
               <Route path="/historico" element={<HistoryPage />} />
+              <Route path="/simulador-lentes" element={<LensSimulatorPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <Toaster />

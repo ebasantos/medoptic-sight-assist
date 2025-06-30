@@ -11,7 +11,8 @@ import {
   Ruler,
   Users,
   Calendar,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -122,7 +123,7 @@ const OpticDashboard = () => {
         </div>
 
         {/* Main Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer animate-slide-in" 
                 onClick={() => navigate('/aferir')}>
             <CardHeader className="text-center pb-4">
@@ -159,11 +160,30 @@ const OpticDashboard = () => {
               </Button>
             </CardContent>
           </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer animate-slide-in" 
+                style={{ animationDelay: '0.4s' }}
+                onClick={() => navigate('/simulador-lentes')}>
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto mb-4 p-4 bg-blue-100 rounded-full w-fit">
+                <Sparkles className="h-12 w-12 text-blue-600" />
+              </div>
+              <CardTitle className="text-xl">Simulador de Lentes IA</CardTitle>
+              <CardDescription className="text-base">
+                Simule diferentes tipos de lentes e tratamentos com inteligência artificial
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full h-14 text-lg font-medium bg-blue-600 hover:bg-blue-700">
+                Iniciar Simulação
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Secondary Actions & Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+          <Card className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5" />
@@ -189,7 +209,7 @@ const OpticDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
+          <Card className="animate-fade-in" style={{ animationDelay: '0.8s' }}>
             <CardHeader>
               <CardTitle>Aferições Recentes</CardTitle>
               <CardDescription>Últimos clientes atendidos</CardDescription>
