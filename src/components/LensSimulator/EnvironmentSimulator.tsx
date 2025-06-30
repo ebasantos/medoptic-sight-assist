@@ -28,28 +28,32 @@ export const EnvironmentSimulator = ({
       name: 'Ambiente Externo',
       icon: Sun,
       description: 'Sol forte, reflexos intensos',
-      color: 'from-yellow-400 to-orange-500'
+      color: 'from-yellow-400 to-orange-500',
+      image: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=800&h=600&fit=crop'
     },
     {
       id: 'reading' as const,
       name: 'Leitura',
       icon: Book,
-      description: 'Luz ambiente, foco próximo',
-      color: 'from-blue-400 to-blue-600'
+      description: 'Livros, luz ambiente, foco próximo',
+      color: 'from-blue-400 to-blue-600',
+      image: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&h=600&fit=crop'
     },
     {
       id: 'digital' as const,
       name: 'Telas Digitais',
       icon: Monitor,
       description: 'Luz azul, uso prolongado',
-      color: 'from-purple-400 to-purple-600'
+      color: 'from-purple-400 to-purple-600',
+      image: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=800&h=600&fit=crop'
     },
     {
       id: 'driving' as const,
       name: 'Direção',
       icon: Car,
-      description: 'Reflexos do para-brisa, faróis',
-      color: 'from-gray-400 to-gray-600'
+      description: 'Visão do motorista, reflexos do para-brisa',
+      color: 'from-gray-400 to-gray-600',
+      image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&h=600&fit=crop'
     }
   ];
 
@@ -89,20 +93,32 @@ export const EnvironmentSimulator = ({
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-gray-900">
-        {/* Simulação em tela cheia */}
+        {/* Simulação em tela cheia com imagem real */}
         <div className="flex-1 relative overflow-hidden">
-          {/* Imagem de fundo baseada no ambiente */}
-          <div className={`absolute inset-0 bg-gradient-to-br ${currentEnv?.color} opacity-20`} />
+          {/* Imagem de fundo real do ambiente */}
+          <div className="absolute inset-0">
+            <img 
+              src={currentEnv?.image} 
+              alt={currentEnv?.name}
+              className="w-full h-full object-cover"
+            />
+            <div className={`absolute inset-0 bg-gradient-to-br ${currentEnv?.color} opacity-20`} />
+          </div>
           
           {/* Círculo da lente com efeitos */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative">
               <div className="w-64 h-64 rounded-full border-4 border-white shadow-2xl overflow-hidden">
-                <div className={`w-full h-full bg-gradient-to-br ${currentEnv?.color} opacity-30`}>
-                  <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-full h-full relative">
+                  <img 
+                    src={currentEnv?.image} 
+                    alt="Visão através da lente"
+                    className="w-full h-full object-cover brightness-110 contrast-110"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-10">
                     <div className="text-center text-white">
-                      <Eye className="w-12 h-12 mx-auto mb-2" />
-                      <p className="text-sm font-medium">Visão Otimizada</p>
+                      <Eye className="w-12 h-12 mx-auto mb-2 drop-shadow-lg" />
+                      <p className="text-sm font-medium drop-shadow-lg">Visão Otimizada</p>
                     </div>
                   </div>
                 </div>
@@ -186,7 +202,7 @@ export const EnvironmentSimulator = ({
     );
   }
 
-  // Layout desktop (mantém o existente)
+  // Layout desktop com imagens reais
   return (
     <div className="max-w-6xl mx-auto">
       <div className="text-center mb-8">
@@ -198,7 +214,7 @@ export const EnvironmentSimulator = ({
         </p>
       </div>
 
-      {/* Seletor de ambiente */}
+      {/* Seletor de ambiente com imagens */}
       <div className="mb-8">
         <div className="grid md:grid-cols-4 gap-4">
           {environments.map((env) => {
@@ -213,10 +229,19 @@ export const EnvironmentSimulator = ({
                 }`}
                 onClick={() => setCurrentEnvironment(env.id)}
               >
-                <CardContent className="p-4 text-center">
-                  <Icon className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                  <h3 className="font-medium">{env.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{env.description}</p>
+                <CardContent className="p-4">
+                  <div className="relative h-32 mb-4 rounded-lg overflow-hidden">
+                    <img 
+                      src={env.image} 
+                      alt={env.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
+                      <Icon className="w-8 h-8 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="font-medium text-center">{env.name}</h3>
+                  <p className="text-sm text-gray-500 mt-1 text-center">{env.description}</p>
                 </CardContent>
               </Card>
             );
@@ -224,7 +249,7 @@ export const EnvironmentSimulator = ({
         </div>
       </div>
 
-      {/* Simulação visual */}
+      {/* Simulação visual com imagem real */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -234,16 +259,26 @@ export const EnvironmentSimulator = ({
         </CardHeader>
         <CardContent>
           <div className="relative h-96 rounded-lg overflow-hidden">
-            <div className={`absolute inset-0 bg-gradient-to-br ${currentEnv?.color} opacity-30`} />
+            <img 
+              src={currentEnv?.image} 
+              alt={currentEnv?.name}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className={`absolute inset-0 bg-gradient-to-br ${currentEnv?.color} opacity-20`} />
             
             {/* Círculo da lente */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-48 h-48 rounded-full border-4 border-white shadow-2xl bg-white/10 backdrop-blur-sm">
-                <div className="w-full h-full rounded-full overflow-hidden">
-                  <div className={`w-full h-full bg-gradient-to-br ${currentEnv?.color} opacity-50 flex items-center justify-center`}>
+              <div className="w-48 h-48 rounded-full border-4 border-white shadow-2xl overflow-hidden">
+                <div className="w-full h-full relative">
+                  <img 
+                    src={currentEnv?.image} 
+                    alt="Visão através da lente"
+                    className="w-full h-full object-cover brightness-110 contrast-110"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-10">
                     <div className="text-center text-white">
-                      <Eye className="w-8 h-8 mx-auto mb-2" />
-                      <p className="text-sm font-medium">Visão Otimizada</p>
+                      <Eye className="w-8 h-8 mx-auto mb-2 drop-shadow-lg" />
+                      <p className="text-sm font-medium drop-shadow-lg">Visão Otimizada</p>
                     </div>
                   </div>
                 </div>

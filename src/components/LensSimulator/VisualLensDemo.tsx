@@ -9,7 +9,7 @@ interface VisualLensDemoProps {
 export const VisualLensDemo = ({ selectedTreatments, currentEnvironment }: VisualLensDemoProps) => {
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // URLs de imagens base para cada ambiente
+  // URLs de imagens reais para cada ambiente
   const environmentImages = {
     rua: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=1200&h=800&fit=crop',
     leitura: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=1200&h=800&fit=crop',
