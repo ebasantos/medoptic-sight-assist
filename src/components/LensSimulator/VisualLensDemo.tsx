@@ -23,33 +23,37 @@ export const VisualLensDemo = ({ selectedTreatments, currentEnvironment }: Visua
     let overlayEffects = [];
 
     if (selectedTreatments.includes('antirreflexo')) {
-      filters.push('brightness(1.2)');
-      filters.push('contrast(1.1)');
+      filters.push('brightness(1.3)');
+      filters.push('contrast(1.2)');
+      overlayEffects.push('antirreflexo');
     }
 
     if (selectedTreatments.includes('filtro-azul')) {
-      filters.push('sepia(0.15)');
-      filters.push('hue-rotate(-8deg)');
-      filters.push('saturate(0.9)');
+      filters.push('sepia(0.25)');
+      filters.push('hue-rotate(-12deg)');
+      filters.push('saturate(0.85)');
+      overlayEffects.push('filtro-azul');
     }
 
     if (selectedTreatments.includes('protecao-uv')) {
-      filters.push('saturate(1.05)');
+      filters.push('saturate(1.1)');
+      filters.push('brightness(1.05)');
     }
 
     if (selectedTreatments.includes('fotossensiveis')) {
       if (currentEnvironment === 'rua') {
-        filters.push('brightness(0.6)');
-        filters.push('contrast(1.2)');
+        filters.push('brightness(0.5)');
+        filters.push('contrast(1.3)');
+        overlayEffects.push('fotossensiveis-dark');
       } else {
         filters.push('brightness(1.1)');
       }
     }
 
     if (selectedTreatments.includes('polarizado')) {
-      filters.push('contrast(1.25)');
-      filters.push('saturate(1.15)');
-      overlayEffects.push('reduced-glare');
+      filters.push('contrast(1.4)');
+      filters.push('saturate(1.3)');
+      overlayEffects.push('polarizado');
     }
 
     return { filters: filters.join(' '), overlayEffects };
@@ -82,7 +86,7 @@ export const VisualLensDemo = ({ selectedTreatments, currentEnvironment }: Visua
         <div className="relative">
           {/* Área da lente */}
           <div 
-            className="w-80 h-80 rounded-full overflow-hidden border-4 border-gray-300 shadow-2xl relative"
+            className="w-96 h-96 rounded-full overflow-hidden border-4 border-gray-400 shadow-2xl relative bg-black"
             style={{
               clipPath: 'circle(50% at 50% 50%)',
             }}
@@ -94,52 +98,64 @@ export const VisualLensDemo = ({ selectedTreatments, currentEnvironment }: Visua
                 alt="Visão através da lente"
                 className="w-full h-full object-cover"
                 style={{
-                  filter: filters,
-                  transform: 'scale(1.2)',
+                  filter: filters || 'none',
+                  transform: 'scale(1.1)',
                   transformOrigin: 'center'
                 }}
               />
 
               {/* Overlay para efeito polarizado */}
-              {overlayEffects.includes('reduced-glare') && (
+              {overlayEffects.includes('polarizado') && (
                 <div className="absolute inset-0">
-                  <div className="absolute top-1/4 left-1/3 w-20 h-10 bg-white opacity-15 blur-xl animate-pulse"></div>
-                  <div className="absolute top-1/2 right-1/4 w-16 h-8 bg-white opacity-8 blur-lg"></div>
+                  <div className="absolute top-1/4 left-1/3 w-24 h-12 bg-white opacity-5 blur-xl"></div>
+                  <div className="absolute top-1/2 right-1/4 w-20 h-10 bg-white opacity-3 blur-lg"></div>
+                  <div className="absolute bottom-1/3 left-1/2 w-16 h-8 bg-yellow-300 opacity-2 blur-md"></div>
                 </div>
               )}
 
               {/* Reflexos reduzidos para antirreflexo */}
-              {selectedTreatments.includes('antirreflexo') && currentEnvironment === 'direcao' && (
+              {overlayEffects.includes('antirreflexo') && (
                 <div className="absolute inset-0">
-                  <div className="absolute top-1/3 left-1/2 w-12 h-6 bg-yellow-300 opacity-3 blur-md"></div>
-                  <div className="absolute bottom-1/3 right-1/3 w-8 h-4 bg-white opacity-3 blur-sm"></div>
+                  <div className="absolute top-1/3 left-1/2 w-8 h-4 bg-yellow-300 opacity-1 blur-sm"></div>
+                  <div className="absolute bottom-1/3 right-1/3 w-6 h-3 bg-white opacity-1 blur-xs"></div>
                 </div>
               )}
 
-              {/* Indicador de filtro azul */}
-              {selectedTreatments.includes('filtro-azul') && (
-                <div className="absolute top-4 right-4 w-2 h-2 bg-blue-400 rounded-full animate-pulse opacity-40"></div>
+              {/* Indicador visual de filtro azul */}
+              {overlayEffects.includes('filtro-azul') && (
+                <div className="absolute inset-0">
+                  <div className="absolute top-4 right-4 w-3 h-3 bg-blue-400 rounded-full animate-pulse opacity-50"></div>
+                  <div className="absolute inset-0 bg-yellow-50 opacity-5"></div>
+                </div>
+              )}
+
+              {/* Efeito escurecimento para fotossensíveis */}
+              {overlayEffects.includes('fotossensiveis-dark') && (
+                <div className="absolute inset-0 bg-gray-900 opacity-30"></div>
               )}
             </div>
           </div>
 
-          {/* Moldura da lente */}
-          <div className="absolute inset-0 w-80 h-80 rounded-full border-8 border-gray-600 shadow-inner pointer-events-none"></div>
+          {/* Moldura da lente mais robusta */}
+          <div className="absolute inset-0 w-96 h-96 rounded-full border-8 border-gray-700 shadow-inner pointer-events-none"></div>
+          
+          {/* Reflexo na moldura da lente */}
+          <div className="absolute top-8 left-12 w-16 h-8 bg-white opacity-20 rounded-full blur-sm pointer-events-none"></div>
         </div>
       </div>
 
-      {/* Comparação visual - área sem lente */}
-      <div className="absolute top-4 left-4 bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg">
+      {/* Comparação visual - contador de tratamentos */}
+      <div className="absolute top-4 right-4 bg-black bg-opacity-80 text-white px-4 py-2 rounded-lg">
         <p className="text-sm font-medium">
           {selectedTreatments.length > 0 
-            ? `${selectedTreatments.length} tratamento(s) aplicado(s)`
-            : 'Nenhum tratamento selecionado'
+            ? `${selectedTreatments.length} tratamento(s) ativo(s)`
+            : 'Nenhum tratamento aplicado'
           }
         </p>
       </div>
 
       {/* Label do ambiente atual */}
-      <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg">
+      <div className="absolute bottom-4 right-4 bg-black bg-opacity-80 text-white px-4 py-2 rounded-lg">
         <p className="text-sm font-medium">
           {currentEnvironment === 'rua' && '🌅 Ambiente Externo'}
           {currentEnvironment === 'leitura' && '📚 Leitura'}
