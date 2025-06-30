@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import {
   Calculator,
   ShieldCheck
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface FinalReportProps {
   configuration: any;
@@ -31,6 +33,8 @@ export const FinalReport: React.FC<FinalReportProps> = ({
   onBack
 }) => {
   const [isExporting, setIsExporting] = useState(false);
+
+  console.log('Configuração recebida no relatório:', configuration);
 
   // Dados baseados na configuração real
   const reportData = {
@@ -58,7 +62,9 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       'Tipo de Lente': configuration.selectedLens || 'Progressiva Premium',
       'Material': 'Policarbonato CR-39',
       'Índice de Refração': '1.59',
-      'Tratamentos': configuration.selectedTreatments?.join(', ') || 'Antirreflexo',
+      'Tratamentos': Array.isArray(configuration.selectedTreatments) 
+        ? configuration.selectedTreatments.join(', ') 
+        : 'Antirreflexo',
       'Garantia': '2 anos contra defeitos de fabricação'
     },
     aiScore: configuration.aiRecommendations?.score || 94,
@@ -69,8 +75,12 @@ export const FinalReport: React.FC<FinalReportProps> = ({
     setIsExporting(true);
     
     try {
+      console.log('Iniciando geração de PDF...');
+      
       // Importar jsPDF dinamicamente
-      const { jsPDF } = await import('jspdf');
+      const jsPDFModule = await import('jspdf');
+      const { jsPDF } = jsPDFModule;
+      
       const doc = new jsPDF();
       
       // Configurações gerais
@@ -123,7 +133,7 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       doc.text(`Tipo de Lente: ${reportData.configuration.lens}`, margin, yPosition);
       
       yPosition += 8;
-      doc.text(`Tratamentos: ${reportData.configuration.treatments.join(', ')}`, margin, yPosition);
+      doc.text(`Tratamentos: ${reportData.technicalSpecs.Tratamentos}`, margin, yPosition);
       
       yPosition += 8;
       doc.text(`Score IA: ${reportData.aiScore}/100`, margin, yPosition);
@@ -153,30 +163,63 @@ export const FinalReport: React.FC<FinalReportProps> = ({
       doc.setFont(undefined, 'normal');
       
       reportData.benefits.forEach((benefit, index) => {
+        if (yPosition > 250) { // Nova página se necessário
+          doc.addPage();
+          yPosition = 20;
+        }
         doc.text(`• ${benefit}`, margin, yPosition);
         yPosition += 6;
       });
       
-      // Rodapé
-      yPosition = doc.internal.pageSize.height - 30;
-      doc.setLineWidth(0.3);
-      doc.line(margin, yPosition, pageWidth - margin, yPosition);
+      // Especificações técnicas
+      yPosition += 15;
+      if (yPosition > 200) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('ESPECIFICAÇÕES TÉCNICAS', margin, yPosition);
       
       yPosition += 10;
       doc.setFontSize(10);
-      doc.setFont(undefined, 'italic');
-      doc.text('Relatório gerado automaticamente pelo Simulador de Lentes IA', pageWidth / 2, yPosition, { align: 'center' });
+      doc.setFont(undefined, 'normal');
       
-      yPosition += 6;
-      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, yPosition, { align: 'center' });
+      Object.entries(reportData.technicalSpecs).forEach(([key, value]) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(`${key}: ${value}`, margin, yPosition);
+        yPosition += 6;
+      });
+      
+      // Rodapé
+      const totalPages = doc.internal.pages.length - 1;
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        const pageHeight = doc.internal.pageSize.height;
+        
+        doc.setLineWidth(0.3);
+        doc.line(margin, pageHeight - 30, pageWidth - margin, pageHeight - 30);
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'italic');
+        doc.text('Relatório gerado automaticamente pelo Simulador de Lentes IA', pageWidth / 2, pageHeight - 20, { align: 'center' });
+        doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, pageHeight - 14, { align: 'center' });
+        doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+      }
       
       // Baixar o PDF
-      doc.save(`relatorio-simulacao-${reportData.client.name.replace(/\s+/g, '-')}.pdf`);
+      const fileName = `relatorio-simulacao-${reportData.client.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      doc.save(fileName);
       
       console.log('PDF gerado com sucesso');
+      toast.success('PDF gerado e baixado com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      alert('Erro ao gerar PDF. Tente novamente.');
+      toast.error('Erro ao gerar PDF. Tente novamente.');
     } finally {
       setIsExporting(false);
     }
@@ -185,9 +228,10 @@ export const FinalReport: React.FC<FinalReportProps> = ({
   const handleShareWhatsApp = () => {
     const message = encodeURIComponent(
       `🔍 *Relatório de Simulação de Lentes*\n\n` +
+      `👤 Cliente: ${reportData.client.name}\n` +
       `✨ Configuração Recomendada:\n` +
       `📱 Lente: ${reportData.configuration.lens}\n` +
-      `🛡️ Tratamentos: ${reportData.configuration.treatments.join(', ')}\n` +
+      `🛡️ Tratamentos: ${reportData.technicalSpecs.Tratamentos}\n` +
       `⭐ Score IA: ${reportData.aiScore}/100\n\n` +
       `💰 Investimento: R$ ${reportData.configuration.totalPrice}\n` +
       `💳 Ou ${reportData.configuration.installments}\n\n` +
@@ -198,16 +242,21 @@ export const FinalReport: React.FC<FinalReportProps> = ({
   };
 
   const handleShareEmail = () => {
-    const subject = encodeURIComponent('Relatório de Simulação de Lentes - Ótica Digital');
+    const subject = encodeURIComponent(`Relatório de Simulação de Lentes - ${reportData.client.name}`);
     const body = encodeURIComponent(
-      `Olá!\n\nSegue o relatório da sua simulação de lentes com IA:\n\n` +
-      `Configuração Recomendada:\n` +
+      `Olá!\n\nSegue o relatório da simulação de lentes com IA para ${reportData.client.name}:\n\n` +
+      `CONFIGURAÇÃO RECOMENDADA:\n` +
       `- Lente: ${reportData.configuration.lens}\n` +
-      `- Tratamentos: ${reportData.configuration.treatments.join(', ')}\n` +
+      `- Tratamentos: ${reportData.technicalSpecs.Tratamentos}\n` +
       `- Score de Compatibilidade: ${reportData.aiScore}/100\n\n` +
-      `Investimento: R$ ${reportData.configuration.totalPrice}\n` +
-      `Parcelamento: ${reportData.configuration.installments}\n\n` +
-      `Entre em contato para finalizar seu pedido!\n\n` +
+      `INVESTIMENTO:\n` +
+      `- Valor: R$ ${reportData.configuration.totalPrice}\n` +
+      `- Parcelamento: ${reportData.configuration.installments}\n\n` +
+      `DADOS DO CLIENTE:\n` +
+      `- Nome: ${reportData.client.name}\n` +
+      `- Idade: ${reportData.client.age}\n` +
+      `- Profissão: ${reportData.client.occupation}\n\n` +
+      `Entre em contato para finalizar o pedido!\n\n` +
       `Atenciosamente,\nEquipe Ótica Digital`
     );
     
@@ -256,11 +305,16 @@ export const FinalReport: React.FC<FinalReportProps> = ({
                     <div className="space-y-1">
                       <span className="text-green-700">Tratamentos:</span>
                       <div className="flex flex-wrap gap-1">
-                        {reportData.configuration.treatments.map((treatment, index) => (
-                          <Badge key={index} variant="outline" className="border-green-300 text-green-700 text-xs">
-                            {treatment}
+                        {Array.isArray(reportData.configuration.treatments) ? 
+                          reportData.configuration.treatments.map((treatment, index) => (
+                            <Badge key={index} variant="outline" className="border-green-300 text-green-700 text-xs">
+                              {treatment}
+                            </Badge>
+                          )) :
+                          <Badge variant="outline" className="border-green-300 text-green-700 text-xs">
+                            {reportData.technicalSpecs.Tratamentos}
                           </Badge>
-                        ))}
+                        }
                       </div>
                     </div>
                   </div>
@@ -316,29 +370,6 @@ export const FinalReport: React.FC<FinalReportProps> = ({
                     <span className="text-blue-900 font-medium">{benefit}</span>
                   </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Simulação Visual Final */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Simulação Visual Final</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="text-center">
-                  <h4 className="font-medium mb-3 text-gray-700">Sem Correção</h4>
-                  <div className="h-32 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg flex items-center justify-center">
-                    <span className="text-gray-600 font-medium opacity-75">Visão Limitada</span>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <h4 className="font-medium mb-3 text-green-700">Com Sua Configuração</h4>
-                  <div className="h-32 bg-gradient-to-br from-green-200 to-emerald-300 rounded-lg flex items-center justify-center">
-                    <span className="text-green-800 font-medium">Visão Otimizada ✨</span>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>

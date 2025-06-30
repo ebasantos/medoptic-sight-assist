@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,42 +44,55 @@ export const LensSimulatorMain = () => {
   });
 
   const saveSimulation = async () => {
-    if (!user || !simulatorState.selectedLens || !simulatorState.clientName) {
-      toast.error('Dados incompletos para salvar a simulação');
-      return;
-    }
-
     try {
-      console.log('Salvando simulação...', {
+      console.log('Iniciando salvamento da simulação...');
+      console.log('Estado atual:', simulatorState);
+
+      if (!user?.opticId) {
+        console.error('Usuário não tem ótica associada');
+        toast.error('Erro: usuário não tem ótica associada');
+        return;
+      }
+
+      if (!simulatorState.clientName) {
+        console.error('Nome do cliente não informado');
+        toast.error('Nome do cliente é obrigatório');
+        return;
+      }
+
+      if (!simulatorState.selectedLens) {
+        console.error('Lente não selecionada');
+        toast.error('Tipo de lente é obrigatório');
+        return;
+      }
+
+      const dataToSave = {
         optica_id: user.opticId,
         nome_cliente: simulatorState.clientName,
         tipo_lente: simulatorState.selectedLens,
-        tratamentos: simulatorState.selectedTreatments,
+        tratamentos: simulatorState.selectedTreatments || [],
         dados_estilo_vida: simulatorState.lifestyleData,
         recomendacoes_ia: simulatorState.aiRecommendations
-      });
+      };
 
-      const { error } = await supabase
+      console.log('Dados para salvar:', dataToSave);
+
+      const { data, error } = await supabase
         .from('simulacoes_lentes')
-        .insert({
-          optica_id: user.opticId,
-          nome_cliente: simulatorState.clientName,
-          tipo_lente: simulatorState.selectedLens,
-          tratamentos: simulatorState.selectedTreatments,
-          dados_estilo_vida: simulatorState.lifestyleData,
-          recomendacoes_ia: simulatorState.aiRecommendations
-        });
+        .insert(dataToSave)
+        .select();
 
       if (error) {
-        console.error('Erro ao salvar simulação:', error);
-        toast.error('Erro ao salvar simulação');
-      } else {
-        console.log('Simulação salva com sucesso');
-        toast.success('Simulação salva no histórico!');
+        console.error('Erro no Supabase:', error);
+        toast.error(`Erro ao salvar simulação: ${error.message}`);
+        return;
       }
+
+      console.log('Simulação salva com sucesso:', data);
+      toast.success('Simulação salva no histórico!');
     } catch (error) {
-      console.error('Erro ao salvar simulação:', error);
-      toast.error('Erro ao salvar simulação');
+      console.error('Erro geral ao salvar simulação:', error);
+      toast.error('Erro inesperado ao salvar simulação');
     }
   };
 
@@ -249,6 +263,7 @@ export const LensSimulatorMain = () => {
         {simulatorState.step === 'lifestyle' && (
           <AILifestyleForm 
             onComplete={(lifestyleData, aiRecommendations) => {
+              console.log('Dados recebidos do formulário:', lifestyleData);
               setSimulatorState(prev => ({
                 ...prev,
                 lifestyleData,
