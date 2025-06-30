@@ -3,7 +3,9 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Zap, Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Eye, Zap, Sparkles, ArrowRight, ArrowLeft, Info } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileDrawer } from './MobileDrawer';
 
 interface LensType {
   id: string;
@@ -66,6 +68,9 @@ export const LensTypeSelector: React.FC<LensTypeSelectorProps> = ({
   onBack
 }) => {
   const [selectedLens, setSelectedLens] = useState<string | null>(null);
+  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [selectedForDetails, setSelectedForDetails] = useState<LensType | null>(null);
+  const isMobile = useIsMobile();
 
   // Aplicar pontuação da IA (simulado)
   const lensTypesWithAI = lensTypes.map(lens => ({
@@ -75,6 +80,198 @@ export const LensTypeSelector: React.FC<LensTypeSelectorProps> = ({
 
   const topRecommendation = lensTypesWithAI[0];
 
+  const handleLensSelect = (lensId: string) => {
+    setSelectedLens(lensId);
+    if (isMobile) {
+      // Em mobile, seleciona e continua automaticamente
+      onSelect(lensId);
+    }
+  };
+
+  const showLensDetails = (lens: LensType) => {
+    setSelectedForDetails(lens);
+    setShowDetailsDrawer(true);
+  };
+
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">
+            Escolha o Tipo de Lente
+          </h2>
+          <p className="text-base text-gray-600">
+            IA analisou seu perfil e recomenda as melhores opções
+          </p>
+        </div>
+
+        {/* Recomendação Principal da IA - Mobile */}
+        <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="bg-blue-100 p-2 rounded-lg">
+                  <Zap className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-blue-900 text-lg">Recomendação IA</CardTitle>
+                  <p className="text-blue-700 text-sm">Baseado no seu perfil</p>
+                </div>
+              </div>
+              <Badge className="bg-blue-600 text-white text-xs">
+                {Math.round(topRecommendation.aiScore)}%
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">
+              {topRecommendation.name}
+            </h3>
+            <p className="text-blue-700 text-sm mb-3">{topRecommendation.description}</p>
+            <div className="flex justify-between items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => showLensDetails(topRecommendation)}
+                className="border-blue-300 text-blue-700"
+              >
+                <Info className="w-4 h-4 mr-1" />
+                Detalhes
+              </Button>
+              <Button
+                onClick={() => handleLensSelect(topRecommendation.id)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Escolher
+                <Sparkles className="ml-2 w-4 h-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lista de todas as opções - Mobile */}
+        <div className="space-y-3">
+          <h3 className="font-semibold text-gray-900 text-lg mb-3">Todas as Opções</h3>
+          {lensTypesWithAI.map((lens) => (
+            <Card
+              key={lens.id}
+              className={`cursor-pointer transition-all duration-300 ${
+                selectedLens === lens.id
+                  ? 'border-2 border-blue-500 shadow-lg bg-blue-50'
+                  : 'border hover:border-blue-200 hover:shadow-md'
+              }`}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-base">{lens.name}</h4>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${lens === topRecommendation ? 'border-blue-500 text-blue-700' : ''}`}
+                  >
+                    {Math.round(lens.aiScore)}%
+                  </Badge>
+                </div>
+                <p className="text-gray-600 text-sm mb-3">{lens.description}</p>
+                
+                <div className="flex justify-between items-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => showLensDetails(lens)}
+                  >
+                    <Info className="w-4 h-4 mr-1" />
+                    Ver Detalhes
+                  </Button>
+                  <Button
+                    onClick={() => handleLensSelect(lens.id)}
+                    variant={selectedLens === lens.id ? "default" : "outline"}
+                    size="sm"
+                  >
+                    {selectedLens === lens.id ? 'Selecionado' : 'Escolher'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Drawer de detalhes para mobile */}
+        <MobileDrawer
+          isOpen={showDetailsDrawer}
+          onClose={() => setShowDetailsDrawer(false)}
+          title={selectedForDetails?.name || ''}
+          description={selectedForDetails?.description}
+          footerContent={
+            <div className="flex space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowDetailsDrawer(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedForDetails) {
+                    handleLensSelect(selectedForDetails.id);
+                  }
+                  setShowDetailsDrawer(false);
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                Escolher Esta Lente
+              </Button>
+            </div>
+          }
+        >
+          {selectedForDetails && (
+            <div className="space-y-4">
+              {/* Simulação Visual */}
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="text-sm font-medium text-gray-700 mb-2">Simulação Visual:</div>
+                <LensVisualization type={selectedForDetails.visualDemo} />
+              </div>
+
+              {/* Benefícios */}
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-2">Benefícios:</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedForDetails.benefits.map((benefit, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs justify-start">
+                      {benefit}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ideal para */}
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-2">Ideal para:</div>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {selectedForDetails.idealFor.map((ideal, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2 mt-2 flex-shrink-0" />
+                      {ideal}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </MobileDrawer>
+
+        {/* Botões de navegação mobile */}
+        <div className="flex justify-between pt-4 border-t sticky bottom-0 bg-white pb-4">
+          <Button variant="outline" onClick={onBack} className="px-6">
+            <ArrowLeft className="mr-2 w-4 h-4" />
+            Voltar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Layout desktop (mantém o existente mas otimizado para tablet)
   return (
     <div className="max-w-6xl mx-auto">
       <div className="text-center mb-8">
