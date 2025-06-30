@@ -179,7 +179,7 @@ export const LensSimulatorMain = () => {
                 ...prev,
                 lifestyleData,
                 aiRecommendations,
-                clientName: lifestyleData?.nome || ''
+                clientName: lifestyleData?.nomeCompleto || lifestyleData?.nome || ''
               }));
               nextStep();
             }}
