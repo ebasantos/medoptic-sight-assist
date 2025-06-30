@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import {
   Sun, 
   Monitor, 
   Zap, 
-  Sunglasses, 
+  Glasses, 
   ArrowRight, 
   ArrowLeft, 
   Sparkles,
@@ -66,7 +65,7 @@ export const TreatmentSelector = ({ selectedLens, aiRecommendations, onSelect, o
     {
       id: 'polarizado',
       name: 'Polarizado',
-      icon: Sunglasses,
+      icon: Glasses,
       description: 'Elimina reflexos de superfícies como água e asfalto',
       benefits: ['Ideal para direção', 'Reduz ofuscamento', 'Cores mais vivas'],
       price: 'R$ 180',
