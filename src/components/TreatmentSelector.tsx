@@ -17,7 +17,7 @@ import {
   Check,
   Eye
 } from 'lucide-react';
-import { VisualLensDemo } from './VisualLensDemo';
+import { VisualLensDemo } from './LensSimulator/VisualLensDemo';
 
 interface TreatmentSelectorProps {
   selectedLens: string | null;
