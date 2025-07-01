@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -21,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 import { LensSimulatorStats } from '@/components/LensSimulatorStats';
 import { OpticLensUsageStats } from '@/components/OpticLensUsageStats';
+import { UsageReportModal } from '@/components/UsageReportModal';
 import CreateOpticModal from '@/components/CreateOpticModal';
 import CreateUserModal from '@/components/CreateUserModal';
 
@@ -157,10 +157,11 @@ const AdminDashboard = () => {
                     opticas={opticas.map(o => ({ id: o.id, nome: o.nome }))} 
                     onUserCreated={fetchDashboardData} 
                   />
-                  <Button className="w-full justify-start h-12" variant="outline">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Relatório de Uso
-                  </Button>
+                  <UsageReportModal 
+                    opticas={opticas}
+                    stats={stats}
+                    opticUsageData={opticUsageData}
+                  />
                 </CardContent>
               </Card>
 
