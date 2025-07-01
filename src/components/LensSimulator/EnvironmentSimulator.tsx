@@ -38,7 +38,7 @@ export const EnvironmentSimulator = ({
       icon: Book,
       description: 'Livros, luz ambiente, foco próximo',
       color: 'from-blue-400 to-blue-600',
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=600&fit=crop'
+      image: 'https://img.freepik.com/fotos-gratis/colher-as-maos-segurando-o-livro-aberto_23-2147767299.jpg'
     },
     {
       id: 'digital' as const,
