@@ -153,19 +153,6 @@ export const LensSimulatorMain = () => {
       {/* Header adaptável */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-40">
         <div className={`${isMobile ? 'px-4' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}`}>
-          <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => step === 'analysis' ? setStep('camera') : navigate('/optica')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {step === 'camera' ? 'Capturar Foto do Cliente' : 'Análise Facial Automática'}
-          </h1>
-        </div>
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
               <div className="bg-blue-100 p-2 rounded-lg">
