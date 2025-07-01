@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Camera, Settings, FileText, Sparkles, Menu } from 'lucide-react';
+import { Eye, Camera, Settings, FileText, Sparkles, Menu, ArrowLeft } from 'lucide-react';
 import { LensTypeSelector } from './LensTypeSelector';
 import { TreatmentSelector } from './TreatmentSelector';
 import { EnvironmentSimulator } from './EnvironmentSimulator';
@@ -30,6 +30,7 @@ interface SimulatorState {
 
 export const LensSimulatorMain = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [simulatorState, setSimulatorState] = useState<SimulatorState>({
@@ -165,16 +166,16 @@ export const LensSimulatorMain = () => {
                 {!isMobile && <p className="text-sm text-gray-500">Tecnologia avançada para visualização</p>}
               </div>
             </div>
-            <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/optica')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button> 
-        </div>
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/optica')}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Button> 
+            </div>
             
             <div className="flex items-center space-x-2">
               {isMobile && (
