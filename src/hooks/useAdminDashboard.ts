@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +12,7 @@ interface OpticData {
   created_at: string;
   users: number;
   measurements: number;
+  lensSimulations: number;
 }
 
 interface DashboardStats {
@@ -21,6 +21,21 @@ interface DashboardStats {
   opticasBloqueadas: number;
   totalUsuarios: number;
   totalAfericoes: number;
+  totalSimulacoes: number;
+}
+
+interface LensSimulationStats {
+  totalSimulacoes: number;
+  simulacoesHoje: number;
+  simulacoesSemana: number;
+  opticasMaisAtivas: Array<{
+    nome: string;
+    simulacoes: number;
+  }>;
+  tiposLentePopulares: Array<{
+    tipo: string;
+    quantidade: number;
+  }>;
 }
 
 export const useAdminDashboard = () => {
@@ -30,7 +45,15 @@ export const useAdminDashboard = () => {
     opticasAtivas: 0,
     opticasBloqueadas: 0,
     totalUsuarios: 0,
-    totalAfericoes: 0
+    totalAfericoes: 0,
+    totalSimulacoes: 0
+  });
+  const [lensSimulationStats, setLensSimulationStats] = useState<LensSimulationStats>({
+    totalSimulacoes: 0,
+    simulacoesHoje: 0,
+    simulacoesSemana: 0,
+    opticasMaisAtivas: [],
+    tiposLentePopulares: []
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -85,16 +108,29 @@ export const useAdminDashboard = () => {
         console.log('✅ Análises encontradas:', analisesData?.length || 0);
       }
 
+      // Buscar simulações de lentes
+      const { data: simulacoesData, error: simulacoesError } = await supabase
+        .from('simulacoes_lentes')
+        .select('optica_id, id, nome_cliente, tipo_lente, created_at');
+
+      if (simulacoesError) {
+        console.error('❌ Erro ao buscar simulações:', simulacoesError);
+      } else {
+        console.log('✅ Simulações encontradas:', simulacoesData?.length || 0);
+      }
+
       // Usar os dados que conseguimos buscar
       const afericoesList = afericoesData || [];
       const analisesList = analisesData || [];
       const usuariosList = usuariosData || [];
+      const simulacoesList = simulacoesData || [];
 
       console.log('📈 Dados coletados:', {
         opticas: opticasData?.length || 0,
         usuarios: usuariosList.length,
         afericoesTradicionais: afericoesList.length,
         analisesFaciais: analisesList.length,
+        simulacoesLentes: simulacoesList.length,
         totalMedicoes: afericoesList.length + analisesList.length
       });
 
@@ -107,13 +143,17 @@ export const useAdminDashboard = () => {
         const afericoesCount = afericoesList.filter(a => a.optica_id === optica.id).length;
         const analisesCount = analisesList.filter(a => a.optica_id === optica.id).length;
         const measurements = afericoesCount + analisesCount;
+
+        // Contar simulações de lentes por ótica
+        const lensSimulations = simulacoesList.filter(s => s.optica_id === optica.id).length;
         
-        console.log(`🏪 Ótica ${optica.nome}: ${users} usuários, ${measurements} medições (${afericoesCount} aferições + ${analisesCount} análises)`);
+        console.log(`🏪 Ótica ${optica.nome}: ${users} usuários, ${measurements} medições, ${lensSimulations} simulações`);
         
         return {
           ...optica,
           users,
-          measurements
+          measurements,
+          lensSimulations
         };
       }) || [];
 
@@ -123,19 +163,69 @@ export const useAdminDashboard = () => {
       const opticasBloqueadas = totalOpticas - opticasAtivas;
       const totalUsuarios = usuariosList.length;
       const totalMedicoes = afericoesList.length + analisesList.length;
+      const totalSimulacoes = simulacoesList.length;
 
       const newStats = {
         totalOpticas,
         opticasAtivas,
         opticasBloqueadas,
         totalUsuarios,
-        totalAfericoes: totalMedicoes
+        totalAfericoes: totalMedicoes,
+        totalSimulacoes
+      };
+
+      // Calcular estatísticas específicas das simulações de lentes
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      
+      const semanaAtras = new Date();
+      semanaAtras.setDate(semanaAtras.getDate() - 7);
+
+      const simulacoesHoje = simulacoesList.filter(s => {
+        const dataSimulacao = new Date(s.created_at);
+        dataSimulacao.setHours(0, 0, 0, 0);
+        return dataSimulacao.getTime() === hoje.getTime();
+      }).length;
+
+      const simulacoesSemana = simulacoesList.filter(s => 
+        new Date(s.created_at) >= semanaAtras
+      ).length;
+
+      // Óticas mais ativas em simulações
+      const opticasSimulacoes = opticasProcessed
+        .filter(o => o.lensSimulations > 0)
+        .sort((a, b) => b.lensSimulations - a.lensSimulations)
+        .slice(0, 5)
+        .map(o => ({
+          nome: o.nome,
+          simulacoes: o.lensSimulations
+        }));
+
+      // Tipos de lente mais populares
+      const tiposLenteCount = simulacoesList.reduce((acc, sim) => {
+        acc[sim.tipo_lente] = (acc[sim.tipo_lente] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const tiposLentePopulares = Object.entries(tiposLenteCount)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([tipo, quantidade]) => ({ tipo, quantidade }));
+
+      const newLensStats = {
+        totalSimulacoes,
+        simulacoesHoje,
+        simulacoesSemana,
+        opticasMaisAtivas: opticasSimulacoes,
+        tiposLentePopulares
       };
 
       console.log('📊 Estatísticas finais:', newStats);
+      console.log('👓 Estatísticas simulações:', newLensStats);
 
       setOpticas(opticasProcessed);
       setStats(newStats);
+      setLensSimulationStats(newLensStats);
 
     } catch (error: any) {
       console.error('❌ Erro ao carregar dados do dashboard:', error);
@@ -188,6 +278,7 @@ export const useAdminDashboard = () => {
   return {
     opticas,
     stats,
+    lensSimulationStats,
     loading,
     fetchDashboardData,
     toggleOpticStatus
