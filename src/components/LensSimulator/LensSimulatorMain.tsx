@@ -165,6 +165,16 @@ export const LensSimulatorMain = () => {
                 {!isMobile && <p className="text-sm text-gray-500">Tecnologia avançada para visualização</p>}
               </div>
             </div>
+            <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/optica')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button> 
+        </div>
             
             <div className="flex items-center space-x-2">
               {isMobile && (
