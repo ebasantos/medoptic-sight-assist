@@ -20,13 +20,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 import { LensSimulatorStats } from '@/components/LensSimulatorStats';
+import { OpticLensUsageStats } from '@/components/OpticLensUsageStats';
 import CreateOpticModal from '@/components/CreateOpticModal';
 import CreateUserModal from '@/components/CreateUserModal';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { opticas, stats, lensSimulationStats, loading, fetchDashboardData, toggleOpticStatus } = useAdminDashboard();
+  const { opticas, stats, lensSimulationStats, opticUsageData, loading, fetchDashboardData, toggleOpticStatus } = useAdminDashboard();
 
   const handleLogout = () => {
     logout();
@@ -133,9 +134,10 @@ const AdminDashboard = () => {
 
         {/* Tabs para organizar conteúdo */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="lens-simulator">Simulador de Lentes</TabsTrigger>
+            <TabsTrigger value="detailed-usage">Uso por Ótica</TabsTrigger>
             <TabsTrigger value="optics">Gerenciar Óticas</TabsTrigger>
           </TabsList>
 
@@ -204,6 +206,23 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <LensSimulatorStats stats={lensSimulationStats} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="detailed-usage" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-indigo-600" />
+                  Análise Detalhada por Ótica
+                </CardTitle>
+                <CardDescription>
+                  Visualização completa do uso do simulador de lentes por cada ótica individual
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <OpticLensUsageStats opticUsageData={opticUsageData} />
               </CardContent>
             </Card>
           </TabsContent>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +39,20 @@ interface LensSimulationStats {
   }>;
 }
 
+interface OpticUsageData {
+  id: string;
+  nome: string;
+  totalSimulacoes: number;
+  simulacoesHoje: number;
+  simulacoesSemana: number;
+  tiposLenteMaisUsados: Array<{
+    tipo: string;
+    quantidade: number;
+  }>;
+  usuariosAtivos: number;
+  ultimaSimulacao?: string;
+}
+
 export const useAdminDashboard = () => {
   const [opticas, setOpticas] = useState<OpticData[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
@@ -55,6 +70,7 @@ export const useAdminDashboard = () => {
     opticasMaisAtivas: [],
     tiposLentePopulares: []
   });
+  const [opticUsageData, setOpticUsageData] = useState<OpticUsageData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -220,12 +236,58 @@ export const useAdminDashboard = () => {
         tiposLentePopulares
       };
 
+      // Processar dados detalhados por ótica
+      const detailedOpticUsage: OpticUsageData[] = opticasProcessed.map(optica => {
+        const opticaSimulacoes = simulacoesList.filter(s => s.optica_id === optica.id);
+        
+        // Simulações hoje
+        const simulacoesHojeOptica = opticaSimulacoes.filter(s => {
+          const dataSimulacao = new Date(s.created_at);
+          dataSimulacao.setHours(0, 0, 0, 0);
+          return dataSimulacao.getTime() === hoje.getTime();
+        }).length;
+
+        // Simulações na semana
+        const simulacoesSemanaOptica = opticaSimulacoes.filter(s => 
+          new Date(s.created_at) >= semanaAtras
+        ).length;
+
+        // Tipos de lente mais usados por ótica
+        const tiposLenteOptica = opticaSimulacoes.reduce((acc, sim) => {
+          acc[sim.tipo_lente] = (acc[sim.tipo_lente] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const tiposLenteMaisUsados = Object.entries(tiposLenteOptica)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 3)
+          .map(([tipo, quantidade]) => ({ tipo, quantidade }));
+
+        // Usuários ativos (que fizeram simulações)
+        const usuariosQueSimularam = new Set(opticaSimulacoes.map(s => s.nome_cliente)).size;
+
+        return {
+          id: optica.id,
+          nome: optica.nome,
+          totalSimulacoes: optica.lensSimulations,
+          simulacoesHoje: simulacoesHojeOptica,
+          simulacoesSemana: simulacoesSemanaOptica,
+          tiposLenteMaisUsados,
+          usuariosAtivos: usuariosQueSimularam,
+          ultimaSimulacao: opticaSimulacoes.length > 0 ? 
+            opticaSimulacoes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at :
+            undefined
+        };
+      });
+
       console.log('📊 Estatísticas finais:', newStats);
       console.log('👓 Estatísticas simulações:', newLensStats);
+      console.log('🏪 Dados detalhados por ótica:', detailedOpticUsage);
 
       setOpticas(opticasProcessed);
       setStats(newStats);
       setLensSimulationStats(newLensStats);
+      setOpticUsageData(detailedOpticUsage);
 
     } catch (error: any) {
       console.error('❌ Erro ao carregar dados do dashboard:', error);
@@ -279,6 +341,7 @@ export const useAdminDashboard = () => {
     opticas,
     stats,
     lensSimulationStats,
+    opticUsageData,
     loading,
     fetchDashboardData,
     toggleOpticStatus
