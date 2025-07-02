@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import CameraCapture from '@/components/CameraCapture';
 import FaceAnalysisLoader from '@/components/FaceAnalysisLoader';
-import FrameSimulation from '@/components/FrameSimulation';
+import VirtualTryOn from '@/components/VirtualTryOn';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
 
 const FrameSuggestionPage = () => {
@@ -585,7 +585,7 @@ const FrameSuggestionPage = () => {
 
         {step === 'simulation' && capturedImage && (
           <div className="space-y-6">
-            <FrameSimulation
+            <VirtualTryOn
               originalImage={capturedImage}
               faceAnalysis={faceAnalysis || {
                 formatoRosto: 'oval',
