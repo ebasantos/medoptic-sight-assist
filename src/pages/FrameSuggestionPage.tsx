@@ -1,16 +1,16 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Camera, Glasses, Brain, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Glasses, Brain, CheckCircle, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import CameraCapture from '@/components/CameraCapture';
 import FaceAnalysisLoader from '@/components/FaceAnalysisLoader';
+import FrameSimulation from '@/components/FrameSimulation';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
 
 const FrameSuggestionPage = () => {
@@ -19,9 +19,10 @@ const FrameSuggestionPage = () => {
   const { toast } = useToast();
   const { isAnalyzing, faceAnalysis, error, analyzeFaceCharacteristics } = useFacialMeasurements();
   
-  const [step, setStep] = useState<'camera' | 'analysis'>('camera');
+  const [step, setStep] = useState<'camera' | 'analysis' | 'simulation'>('camera');
   const [saving, setSaving] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [simulatedImage, setSimulatedImage] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStage, setAnalysisStage] = useState<'capturing' | 'compressing' | 'analyzing' | 'processing'>('capturing');
   
@@ -272,12 +273,18 @@ const FrameSuggestionPage = () => {
   };
 
   const handleSave = async () => {
-    if (!user || !capturedImage || !faceAnalysis) return;
+    if (!user || !capturedImage) return;
 
     setSaving(true);
     try {
-      // Upload da imagem
+      // Upload da imagem original
       const fotoUrl = await uploadImage(capturedImage);
+      
+      // Upload da imagem simulada se existir
+      let simulacaoUrl = null;
+      if (simulatedImage) {
+        simulacaoUrl = await uploadImage(simulatedImage);
+      }
       
       if (!fotoUrl) {
         toast({
@@ -307,13 +314,16 @@ const FrameSuggestionPage = () => {
         .from('analises_faciais')
         .insert({
           optica_id: user.opticId!,
-          usuario_id: authUser.id, // Usar o ID do auth, não da tabela usuarios_optica
+          usuario_id: authUser.id,
           nome_cliente: formData.nomeCliente,
           foto_url: fotoUrl,
-          formato_rosto: faceAnalysis.formatoRosto,
-          tom_pele: faceAnalysis.tomPele,
-          distancia_olhos: faceAnalysis.distanciaOlhos,
-          sugestoes
+          formato_rosto: faceAnalysis?.formatoRosto || 'indefinido',
+          tom_pele: faceAnalysis?.tomPele || 'indefinido',
+          distancia_olhos: faceAnalysis?.distanciaOlhos || 'indefinido',
+          sugestoes: {
+            ...sugestoes,
+            simulacao_url: simulacaoUrl
+          }
         });
 
       if (error) {
@@ -344,6 +354,14 @@ const FrameSuggestionPage = () => {
     }
   };
 
+  const handleSimulatedImageSave = (imageData: string) => {
+    setSimulatedImage(imageData);
+    toast({
+      title: "Simulação Salva",
+      description: "Imagem com armação simulada foi salva!"
+    });
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -368,13 +386,23 @@ const FrameSuggestionPage = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => step === 'analysis' ? setStep('camera') : navigate('/optica')}
+            onClick={() => {
+              if (step === 'simulation') {
+                setStep('analysis');
+              } else if (step === 'analysis') {
+                setStep('camera');
+              } else {
+                navigate('/optica');
+              }
+            }}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">
-            {step === 'camera' ? 'Capturar Foto do Cliente' : 'Análise Facial Automática'}
+            {step === 'camera' ? 'Capturar Foto do Cliente' : 
+             step === 'analysis' ? 'Análise Facial Automática' : 
+             'Simulação de Armação'}
           </h1>
         </div>
 
@@ -499,14 +527,28 @@ const FrameSuggestionPage = () => {
                   />
                 </div>
 
-                <Button 
-                  onClick={handleSave}
-                  disabled={saving || !formData.nomeCliente}
-                  className="w-full"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? 'Salvando...' : 'Salvar Análise'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSave}
+                    disabled={saving || !formData.nomeCliente}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {saving ? 'Salvando...' : 'Salvar Apenas Análise'}
+                  </Button>
+                  
+                  {(faceAnalysis || error) && (
+                    <Button
+                      onClick={() => setStep('simulation')}
+                      disabled={!formData.nomeCliente}
+                      className="flex-1"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Simular Armação
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -536,6 +578,50 @@ const FrameSuggestionPage = () => {
                     </p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {step === 'simulation' && capturedImage && (
+          <div className="space-y-6">
+            <FrameSimulation
+              originalImage={capturedImage}
+              faceAnalysis={faceAnalysis || {
+                formatoRosto: 'oval',
+                tomPele: 'médio',
+                distanciaOlhos: 'normal',
+                confiabilidade: 0.8,
+                observacoes: 'Análise genérica'
+              }}
+              onSave={handleSimulatedImageSave}
+            />
+            
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="nomeClienteSimulacao">Nome do Cliente *</Label>
+                    <Input
+                      id="nomeClienteSimulacao"
+                      value={formData.nomeCliente}
+                      onChange={(e) => setFormData({ ...formData, nomeCliente: e.target.value })}
+                      placeholder="Digite o nome do cliente"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button 
+                      onClick={handleSave}
+                      disabled={saving || !formData.nomeCliente}
+                      className="h-10"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Salvando...' : 'Salvar com Simulação'}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
