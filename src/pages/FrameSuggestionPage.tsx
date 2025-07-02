@@ -187,34 +187,34 @@ const FrameSuggestionPage = () => {
           motivo: 'Complementa a harmonia natural do rosto oval'
         });
         suggestions.push({
-          tipo: 'Armação Redonda',
+          tipo: 'Armação Redonda Vintage',
           motivo: 'Mantém o equilíbrio das proporções'
         });
         break;
       case 'redondo':
         suggestions.push({
-          tipo: 'Armação Quadrada/Angular',
+          tipo: 'Armação Quadrada Angular',
           motivo: 'Adiciona definição e estrutura ao rosto'
         });
         suggestions.push({
-          tipo: 'Armação Retangular',
+          tipo: 'Armação Retangular Moderna',
           motivo: 'Alonga visualmente o rosto'
         });
         break;
       case 'quadrado':
         suggestions.push({
-          tipo: 'Armação Redonda',
+          tipo: 'Armação Redonda Clássica',
           motivo: 'Suaviza os ângulos marcantes'
         });
         suggestions.push({
-          tipo: 'Armação Oval',
+          tipo: 'Armação Oval Elegante',
           motivo: 'Cria harmonia com as linhas faciais'
         });
         break;
       case 'coração':
       case 'triangular':
         suggestions.push({
-          tipo: 'Armação com Base Larga',
+          tipo: 'Armação Cat-Eye',
           motivo: 'Equilibra a testa mais larga'
         });
         suggestions.push({
@@ -228,7 +228,7 @@ const FrameSuggestionPage = () => {
           motivo: 'Suaviza os ângulos e alarga o rosto'
         });
         suggestions.push({
-          tipo: 'Armação Cat-Eye',
+          tipo: 'Armação Aviador',
           motivo: 'Equilibra as proporções do rosto'
         });
         break;
@@ -254,17 +254,17 @@ const FrameSuggestionPage = () => {
     const tomPele = faceAnalysis.tomPele.toLowerCase();
     if (tomPele.includes('claro')) {
       suggestions.push({
-        tipo: 'Cores Suaves',
-        motivo: 'Tons pastéis e neutros harmonizam com pele clara'
+        tipo: 'Cores Suaves (Marrom/Dourado)',
+        motivo: 'Tons mais suaves harmonizam com pele clara'
       });
     } else if (tomPele.includes('escuro') || tomPele.includes('bronzeado')) {
       suggestions.push({
-        tipo: 'Cores Vibrantes',
+        tipo: 'Cores Vibrantes (Dourado/Bronze)',
         motivo: 'Tons mais intensos realçam a beleza natural da pele'
       });
     } else if (tomPele.includes('médio')) {
       suggestions.push({
-        tipo: 'Cores Versáteis',
+        tipo: 'Cores Versáteis (Preto/Marrom)',
         motivo: 'Tom de pele médio permite grande variedade de cores'
       });
     }
@@ -594,6 +594,7 @@ const FrameSuggestionPage = () => {
                 confiabilidade: 0.8,
                 observacoes: 'Análise genérica'
               }}
+              suggestions={sugestoes}
               onSave={handleSimulatedImageSave}
             />
             
