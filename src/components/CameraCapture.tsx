@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Camera, AlertCircle } from 'lucide-react';
+import { Camera, AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCamera } from '@/hooks/useCamera';
@@ -25,8 +25,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     hasPermission,
     error,
     capturedImage,
+    facingMode,
+    hasMultipleCameras,
     startCamera,
     stopCamera,
+    switchCamera,
     capturePhoto
   } = useCamera({ onCapture });
 
@@ -104,7 +107,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               playsInline
               muted
               className={`w-full h-full object-cover ${isActive ? 'block' : 'hidden'}`}
-              style={{ transform: 'scaleX(-1)' }}
+              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
               onLoadedMetadata={() => console.log('Video onLoadedMetadata - componente')}
               onCanPlay={() => console.log('Video onCanPlay - componente')}
               onPlay={() => console.log('Video onPlay - componente')}
@@ -118,6 +121,21 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
                   <Camera className="h-16 w-16 mx-auto mb-4" />
                   <p className="text-lg">Pressione o botão para ativar a câmera</p>
                 </div>
+              </div>
+            )}
+            
+            {/* Botão para trocar câmera */}
+            {isActive && hasMultipleCameras && (
+              <div className="absolute top-4 right-4">
+                <Button
+                  onClick={switchCamera}
+                  size="sm"
+                  variant="secondary"
+                  className="bg-black/50 hover:bg-black/70 text-white border-0"
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  {facingMode === 'user' ? 'Traseira' : 'Frontal'}
+                </Button>
               </div>
             )}
             
@@ -151,7 +169,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               <div className="absolute top-4 left-4">
                 <div className="flex items-center gap-2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  Câmera Ativa
+                  Câmera {facingMode === 'user' ? 'Frontal' : 'Traseira'}
                 </div>
               </div>
             )}
@@ -174,6 +192,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
             <Button onClick={stopCamera} variant="outline" className="h-14">
               Parar
             </Button>
+            {hasMultipleCameras && (
+              <Button onClick={switchCamera} variant="outline" className="h-14">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Trocar
+              </Button>
+            )}
             <Button onClick={handleCapture} className="flex-1 h-14 text-lg">
               <Camera className="h-5 w-5 mr-2" />
               Capturar Foto

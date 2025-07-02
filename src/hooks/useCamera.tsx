@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface UseCameraProps {
@@ -9,16 +10,32 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // Detectar câmeras disponíveis
+  const detectCameras = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setAvailableCameras(videoDevices);
+      setHasMultipleCameras(videoDevices.length > 1);
+      console.log('Câmeras detectadas:', videoDevices.length);
+    } catch (err) {
+      console.warn('Erro ao detectar câmeras:', err);
+    }
+  }, []);
+
   const startCamera = useCallback(async () => {
     try {
       setError(null);
       setHasPermission(null);
-      console.log('Tentando iniciar câmera...');
+      console.log('Tentando iniciar câmera...', facingMode);
       
       // Verificar se getUserMedia está disponível
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -34,10 +51,19 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
       const video = videoRef.current;
       console.log('Elemento de vídeo encontrado, solicitando stream...');
 
-      // Solicitar permissão para usar a câmera
+      // Parar stream anterior se existir
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
+      // Detectar câmeras disponíveis
+      await detectCameras();
+
+      // Solicitar permissão para usar a câmera com o facingMode correto
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'user',
+          facingMode: facingMode,
           width: { ideal: 1280, min: 640 },
           height: { ideal: 720, min: 480 }
         },
@@ -100,7 +126,7 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
         setError('Erro desconhecido ao acessar a câmera');
       }
     }
-  }, []);
+  }, [facingMode, detectCameras]);
 
   const stopCamera = useCallback(() => {
     console.log('Parando câmera...');
@@ -120,6 +146,30 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
     
     setIsActive(false);
   }, []);
+
+  const switchCamera = useCallback(async () => {
+    if (!hasMultipleCameras) return;
+    
+    console.log('Trocando câmera...');
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+    
+    // Se a câmera estiver ativa, reiniciar com a nova configuração
+    if (isActive) {
+      stopCamera();
+      // Pequeno delay para garantir que a câmera anterior foi liberada
+      setTimeout(() => {
+        setFacingMode(newFacingMode);
+      }, 100);
+    }
+  }, [facingMode, hasMultipleCameras, isActive, stopCamera]);
+
+  // Reiniciar câmera quando facingMode mudar
+  useEffect(() => {
+    if (isActive && streamRef.current) {
+      startCamera();
+    }
+  }, [facingMode]);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current || !isActive) {
@@ -172,6 +222,11 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
     };
   }, [stopCamera]);
 
+  // Detectar câmeras quando o hook é inicializado
+  useEffect(() => {
+    detectCameras();
+  }, [detectCameras]);
+
   return {
     videoRef,
     canvasRef,
@@ -179,8 +234,11 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
     hasPermission,
     error,
     capturedImage,
+    facingMode,
+    hasMultipleCameras,
     startCamera,
     stopCamera,
+    switchCamera,
     capturePhoto,
     setCapturedImage
   };
