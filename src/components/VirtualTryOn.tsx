@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Glasses, RotateCcw, Download, Sparkles, Eye, Palette, Settings, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Tables } from '@/integrations/supabase/types';
 
 interface FaceDetection {
   leftEye: { x: number; y: number };
@@ -33,21 +33,13 @@ interface VirtualTryOnProps {
   onSave?: (simulatedImage: string) => void;
 }
 
-interface GlassesModel {
-  id: string;
+// Usar o tipo do Supabase diretamente
+type GlassesModel = Tables<'modelos_oculos'>;
+
+// Interface para as cores (para type safety)
+interface CorDisponivel {
   nome: string;
-  categoria: string;
-  formato_recomendado: string;
-  tom_pele_recomendado: string[];
-  imagem_url: string;
-  cores_disponiveis: Array<{
-    nome: string;
-    codigo: string;
-  }>;
-  largura_mm: number;
-  altura_mm: number;
-  ponte_mm: number;
-  popular: boolean;
+  codigo: string;
 }
 
 const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
@@ -130,8 +122,11 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
       if (finalModels.length > 0) {
         const firstModel = finalModels[0];
         setSelectedModel(firstModel.id);
-        if (firstModel.cores_disponiveis && firstModel.cores_disponiveis.length > 0) {
-          setSelectedColor(firstModel.cores_disponiveis[0].codigo);
+        
+        // Parse das cores disponíveis com verificação de tipo
+        const cores = firstModel.cores_disponiveis as CorDisponivel[] | null;
+        if (cores && Array.isArray(cores) && cores.length > 0) {
+          setSelectedColor(cores[0].codigo);
         }
       }
       
@@ -146,6 +141,17 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
       setLoadingModels(false);
     }
   }, [suggestions, faceAnalysis, toast]);
+
+  // Função auxiliar para obter cores disponíveis de forma segura
+  const getCoresDisponiveis = (model: GlassesModel): CorDisponivel[] => {
+    try {
+      const cores = model.cores_disponiveis as CorDisponivel[] | null;
+      return Array.isArray(cores) ? cores : [];
+    } catch (error) {
+      console.error('Erro ao parsear cores:', error);
+      return [];
+    }
+  };
 
   // Detectar características faciais na imagem
   const detectFaceFeatures = useCallback(async () => {
@@ -441,8 +447,9 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                       }`}
                       onClick={() => {
                         setSelectedModel(model.id);
-                        if (model.cores_disponiveis && model.cores_disponiveis.length > 0) {
-                          setSelectedColor(model.cores_disponiveis[0].codigo);
+                        const cores = getCoresDisponiveis(model);
+                        if (cores.length > 0) {
+                          setSelectedColor(cores[0].codigo);
                         }
                       }}
                     >
@@ -473,14 +480,14 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
               </div>
               
               {/* Seleção de Cor */}
-              {currentModel && currentModel.cores_disponiveis && (
+              {currentModel && (
                 <div>
                   <Label className="text-base font-semibold mb-3 block flex items-center gap-2">
                     <Palette className="h-4 w-4" />
                     Cores Disponíveis
                   </Label>
                   <div className="grid grid-cols-2 gap-2">
-                    {currentModel.cores_disponiveis.map((cor) => (
+                    {getCoresDisponiveis(currentModel).map((cor) => (
                       <button
                         key={cor.codigo}
                         className={`p-2 border-2 rounded-lg text-xs font-medium transition-all ${
