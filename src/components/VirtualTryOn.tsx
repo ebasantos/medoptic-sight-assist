@@ -8,7 +8,6 @@ import { Glasses, RotateCcw, Download, Sparkles, Eye, Palette, Settings, Refresh
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
-import { removeBackground, loadImage, normalizeGlassesPosition } from '@/utils/imageProcessing';
 
 interface FaceDetection {
   leftEye: { x: number; y: number };
@@ -34,24 +33,12 @@ interface VirtualTryOnProps {
   onSave?: (simulatedImage: string) => void;
 }
 
-// Usar o tipo do Supabase diretamente
 type GlassesModel = Tables<'modelos_oculos'>;
 
-// Interface para as cores (para type safety)
 interface CorDisponivel {
   nome: string;
   codigo: string;
 }
-
-// URLs de backup para imagens de óculos que funcionam
-const FALLBACK_GLASSES_IMAGES = {
-  'quadrada': 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=200&fit=crop&crop=center',
-  'redonda': 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=200&fit=crop&crop=center',
-  'cat-eye': 'https://images.unsplash.com/photo-1577803645773-f96470509666?w=400&h=200&fit=crop&crop=center',
-  'aviador': 'https://images.unsplash.com/photo-1508296695146-257a814070b4?w=400&h=200&fit=crop&crop=center',
-  'oval': 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=200&fit=crop&crop=center',
-  'retangular': 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=200&fit=crop&crop=center'
-};
 
 const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   originalImage,
@@ -70,17 +57,14 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [loadingModels, setLoadingModels] = useState(true);
   const [imageLoadError, setImageLoadError] = useState<string | null>(null);
-  const [processingImage, setProcessingImage] = useState(false);
-  const [processedImages, setProcessedImages] = useState<Map<string, string>>(new Map());
   
   const [adjustments, setAdjustments] = useState({
-    position: { x: 0, y: -10 },
-    scale: 1.0,
+    position: { x: 0, y: -15 },
+    scale: 1.2,
     rotation: 0,
-    opacity: 0.85
+    opacity: 0.9
   });
 
-  // Função auxiliar para obter cores disponíveis de forma segura
   const getCoresDisponiveis = (model: GlassesModel): CorDisponivel[] => {
     try {
       const cores = model.cores_disponiveis as unknown as CorDisponivel[] | null;
@@ -91,88 +75,10 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     }
   };
 
-  // Função para obter URL de imagem válida
-  const getValidImageUrl = (model: GlassesModel): string => {
-    // Se a URL original funcionar, usar ela
-    if (model.imagem_url && !model.imagem_url.includes('svgsilh.com')) {
-      return model.imagem_url;
-    }
-    
-    // Caso contrário, usar imagem de fallback baseada na categoria
-    const categoria = model.categoria.toLowerCase();
-    return FALLBACK_GLASSES_IMAGES[categoria as keyof typeof FALLBACK_GLASSES_IMAGES] || 
-           FALLBACK_GLASSES_IMAGES.oval;
-  };
-
-  // Função para processar imagem da armação com melhor qualidade
-  const processGlassesImage = useCallback(async (model: GlassesModel): Promise<string> => {
-    // Verificar se já foi processada
-    if (processedImages.has(model.id)) {
-      return processedImages.get(model.id)!;
-    }
-
-    try {
-      setProcessingImage(true);
-      console.log('Processando imagem da armação:', model.nome);
-      
-      // Carregar imagem original com CORS
-      const response = await fetch(getValidImageUrl(model), { mode: 'cors' });
-      const blob = await response.blob();
-      const img = await loadImage(blob);
-      
-      // Remover fundo mantendo qualidade
-      const processedBlob = await removeBackground(img);
-      
-      // Criar canvas para processar imagem final
-      const canvas = document.createElement('canvas');
-      // Manter dimensões maiores para melhor qualidade
-      canvas.width = Math.max(400, img.naturalWidth);
-      canvas.height = Math.max(200, img.naturalHeight);
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        // Desenhar imagem processada mantendo proporções
-        const processedImg = await loadImage(processedBlob);
-        
-        // Centralizar imagem no canvas
-        const scale = Math.min(canvas.width / processedImg.width, canvas.height / processedImg.height);
-        const scaledWidth = processedImg.width * scale;
-        const scaledHeight = processedImg.height * scale;
-        const x = (canvas.width - scaledWidth) / 2;
-        const y = (canvas.height - scaledHeight) / 2;
-        
-        ctx.drawImage(processedImg, x, y, scaledWidth, scaledHeight);
-        
-        // Normalizar posição se necessário
-        normalizeGlassesPosition(canvas, ctx);
-        
-        // Converter para URL
-        const processedUrl = canvas.toDataURL('image/png', 1.0);
-        
-        // Armazenar no cache
-        setProcessedImages(prev => new Map(prev).set(model.id, processedUrl));
-        
-        console.log('Imagem processada com sucesso para:', model.nome);
-        return processedUrl;
-      }
-      
-      throw new Error('Não foi possível obter contexto do canvas');
-      
-    } catch (error) {
-      console.error('Erro ao processar imagem:', error);
-      // Retornar URL original em caso de erro
-      return getValidImageUrl(model);
-    } finally {
-      setProcessingImage(false);
-    }
-  }, [processedImages]);
-
-  // Buscar modelos de óculos do banco de dados
   const fetchGlassesModels = useCallback(async () => {
     try {
       setLoadingModels(true);
       
-      // Mapear sugestões da IA para categorias no banco
       const categorias = suggestions.map(suggestion => {
         const tipo = suggestion.tipo.toLowerCase();
         if (tipo.includes('quadrada') || tipo.includes('angular')) return 'quadrada';
@@ -183,7 +89,6 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         return 'oval';
       });
 
-      // Buscar modelos recomendados para o formato de rosto
       const formatoRosto = faceAnalysis.formatoRosto.toLowerCase();
       const tomPele = faceAnalysis.tomPele.toLowerCase();
       
@@ -206,7 +111,6 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         return;
       }
 
-      // Filtrar modelos por tom de pele se disponível
       const filteredModels = models?.filter(model => {
         if (!model.tom_pele_recomendado) return true;
         return model.tom_pele_recomendado.some(tom => 
@@ -214,17 +118,14 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         );
       }) || [];
 
-      // Se não há modelos filtrados, usar todos
       const finalModels = filteredModels.length > 0 ? filteredModels : (models || []);
       
       setAvailableModels(finalModels);
       
-      // Selecionar primeiro modelo automaticamente
       if (finalModels.length > 0) {
         const firstModel = finalModels[0];
         setSelectedModel(firstModel.id);
         
-        // Parse das cores disponíveis com verificação de tipo
         const cores = getCoresDisponiveis(firstModel);
         if (cores.length > 0) {
           setSelectedColor(cores[0].codigo);
@@ -243,13 +144,11 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     }
   }, [suggestions, faceAnalysis, toast]);
 
-  // Detectar características faciais na imagem
   const detectFaceFeatures = useCallback(async () => {
     if (!canvasRef.current || !imageRef.current) return;
     
     setIsDetecting(true);
     
-    // Simular detecção facial baseada no tamanho da imagem
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     const img = imageRef.current;
@@ -273,15 +172,14 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     setIsDetecting(false);
   }, []);
 
-  // Calcular posição automática baseada na detecção facial
   const calculateAutoPosition = useCallback(() => {
     if (!faceDetection || !canvasRef.current) return;
     
     const canvas = canvasRef.current;
     const centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
-    const centerY = faceDetection.leftEye.y - 8;
+    const centerY = faceDetection.leftEye.y - 15;
     
-    const scale = Math.max(0.7, Math.min(1.3, faceDetection.eyeDistance / 80));
+    const scale = Math.max(0.8, Math.min(1.5, faceDetection.eyeDistance / 80));
     
     setAdjustments(prev => ({
       ...prev,
@@ -293,7 +191,6 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     }));
   }, [faceDetection]);
 
-  // Renderizar a simulação
   const renderSimulation = useCallback(async () => {
     if (!canvasRef.current || !imageRef.current || !selectedModel || !selectedColor) return;
     
@@ -303,14 +200,11 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     
     const img = imageRef.current;
     
-    // Configurar canvas
     canvas.width = img.naturalWidth || img.width;
     canvas.height = img.naturalHeight || img.height;
     
-    // Desenhar imagem original
     ctx.drawImage(img, 0, 0);
     
-    // Encontrar modelo selecionado
     const currentModel = availableModels.find(m => m.id === selectedModel);
     if (currentModel) {
       await renderGlassesImage(ctx, currentModel, canvas.width, canvas.height);
@@ -320,14 +214,13 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
 
   const renderGlassesImage = async (ctx: CanvasRenderingContext2D, model: GlassesModel, canvasWidth: number, canvasHeight: number) => {
     try {
-      // Processar imagem da armação
-      const processedImageUrl = await processGlassesImage(model);
+      console.log('Carregando imagem da armação:', model.nome, model.imagem_url);
       
       const glassesImg = new Image();
       glassesImg.crossOrigin = 'anonymous';
       
       glassesImg.onload = () => {
-        console.log('Imagem processada da armação carregada:', model.nome);
+        console.log('Imagem da armação carregada com sucesso:', model.nome);
         setImageLoadError(null);
         
         ctx.save();
@@ -344,16 +237,14 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         
         // Aplicar filtro de cor se necessário
         if (selectedColor && selectedColor !== '#000000') {
-          ctx.globalCompositeOperation = 'multiply';
-          ctx.fillStyle = selectedColor;
-          ctx.fillRect(-glassesImg.width / 2, -glassesImg.height / 2, glassesImg.width, glassesImg.height);
-          ctx.globalCompositeOperation = 'destination-atop';
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.filter = `hue-rotate(${getHueRotation(selectedColor)}deg) saturate(150%)`;
         }
         
-        // Desenhar óculos com tamanho proporcional ao rosto
-        const faceScale = Math.min(canvasWidth, canvasHeight) / 800; // Escala baseada no tamanho da face
-        const finalWidth = glassesImg.width * faceScale;
-        const finalHeight = glassesImg.height * faceScale;
+        // Calcular tamanho proporcional ao rosto
+        const faceScale = Math.min(canvasWidth, canvasHeight) / 600;
+        const finalWidth = Math.max(200, glassesImg.width * faceScale);
+        const finalHeight = Math.max(80, glassesImg.height * faceScale);
         
         ctx.drawImage(
           glassesImg, 
@@ -367,12 +258,12 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
       };
       
       glassesImg.onerror = (error) => {
-        console.error('Erro ao carregar imagem processada:', error);
+        console.error('Erro ao carregar imagem da armação:', error);
         setImageLoadError(`Erro ao carregar imagem do modelo ${model.nome}`);
         drawFallbackGlasses(ctx, canvasWidth, canvasHeight);
       };
       
-      glassesImg.src = processedImageUrl;
+      glassesImg.src = model.imagem_url;
       
     } catch (error) {
       console.error('Erro no processamento da imagem:', error);
@@ -381,7 +272,16 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     }
   };
 
-  // Função para desenhar óculos de fallback simples
+  const getHueRotation = (color: string): number => {
+    switch (color) {
+      case '#8B4513': return 30; // marrom
+      case '#FFD700': return 50; // dourado
+      case '#C0C0C0': return 0;  // prata
+      case '#000080': return 240; // azul
+      default: return 0;
+    }
+  };
+
   const drawFallbackGlasses = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
     ctx.save();
     
@@ -393,18 +293,17 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     ctx.scale(adjustments.scale, adjustments.scale);
     ctx.globalAlpha = adjustments.opacity;
     
-    // Desenhar óculos simples com formas geométricas
     ctx.strokeStyle = selectedColor || '#000000';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     
     // Lente esquerda
     ctx.beginPath();
-    ctx.arc(-30, 0, 25, 0, 2 * Math.PI);
+    ctx.arc(-40, 0, 35, 0, 2 * Math.PI);
     ctx.stroke();
     
     // Lente direita
     ctx.beginPath();
-    ctx.arc(30, 0, 25, 0, 2 * Math.PI);
+    ctx.arc(40, 0, 35, 0, 2 * Math.PI);
     ctx.stroke();
     
     // Ponte
@@ -415,19 +314,18 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     
     // Hastes
     ctx.beginPath();
-    ctx.moveTo(-55, 0);
-    ctx.lineTo(-80, -5);
+    ctx.moveTo(-75, 0);
+    ctx.lineTo(-100, -8);
     ctx.stroke();
     
     ctx.beginPath();
-    ctx.moveTo(55, 0);
-    ctx.lineTo(80, -5);
+    ctx.moveTo(75, 0);
+    ctx.lineTo(100, -8);
     ctx.stroke();
     
     ctx.restore();
   };
 
-  // Carregar imagem e detectar face
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
@@ -439,19 +337,16 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     img.src = originalImage;
   }, [originalImage, detectFaceFeatures]);
 
-  // Buscar modelos quando componente carrega
   useEffect(() => {
     fetchGlassesModels();
   }, [fetchGlassesModels]);
 
-  // Auto-posicionar quando a detecção facial estiver pronta
   useEffect(() => {
     if (faceDetection) {
       calculateAutoPosition();
     }
   }, [faceDetection, calculateAutoPosition]);
 
-  // Re-renderizar quando qualquer parâmetro mudar
   useEffect(() => {
     const timer = setTimeout(() => {
       renderSimulation();
@@ -478,10 +373,10 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
 
   const resetAdjustments = () => {
     setAdjustments({
-      position: { x: 0, y: -10 },
-      scale: 1.0,
+      position: { x: 0, y: -15 },
+      scale: 1.2,
       rotation: 0,
-      opacity: 0.85
+      opacity: 0.9
     });
     if (faceDetection) {
       setTimeout(() => calculateAutoPosition(), 100);
@@ -521,19 +416,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
           {imageLoadError && (
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-yellow-800 text-sm">
-                ⚠️ {imageLoadError}. Usando visualização de fallback.
+                ⚠️ {imageLoadError}. Usando visualização alternativa.
               </p>
-            </div>
-          )}
-          
-          {processingImage && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                <p className="text-blue-800 text-sm">
-                  Processando imagem da armação... (removendo fundo e centralizando)
-                </p>
-              </div>
             </div>
           )}
           
@@ -640,7 +524,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                           <img 
                             src={model.imagem_url} 
                             alt={model.nome}
-                            className="w-8 h-6 object-contain opacity-60"
+                            className="w-12 h-8 object-contain opacity-80"
                           />
                         </div>
                       </div>
@@ -732,8 +616,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                       onValueChange={(value) => 
                         setAdjustments(prev => ({ ...prev, scale: value[0] }))
                       }
-                      min={0.6}
-                      max={1.4}
+                      min={0.8}
+                      max={2.0}
                       step={0.05}
                       className="w-full"
                     />
@@ -764,7 +648,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                       onValueChange={(value) => 
                         setAdjustments(prev => ({ ...prev, opacity: value[0] }))
                       }
-                      min={0.3}
+                      min={0.5}
                       max={1.0}
                       step={0.05}
                       className="w-full"
