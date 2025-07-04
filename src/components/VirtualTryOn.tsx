@@ -66,6 +66,17 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     opacity: 0.85
   });
 
+  // Função auxiliar para obter cores disponíveis de forma segura
+  const getCoresDisponiveis = (model: GlassesModel): CorDisponivel[] => {
+    try {
+      const cores = model.cores_disponiveis as unknown as CorDisponivel[] | null;
+      return Array.isArray(cores) ? cores : [];
+    } catch (error) {
+      console.error('Erro ao parsear cores:', error);
+      return [];
+    }
+  };
+
   // Buscar modelos de óculos do banco de dados
   const fetchGlassesModels = useCallback(async () => {
     try {
@@ -124,8 +135,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         setSelectedModel(firstModel.id);
         
         // Parse das cores disponíveis com verificação de tipo
-        const cores = firstModel.cores_disponiveis as CorDisponivel[] | null;
-        if (cores && Array.isArray(cores) && cores.length > 0) {
+        const cores = getCoresDisponiveis(firstModel);
+        if (cores.length > 0) {
           setSelectedColor(cores[0].codigo);
         }
       }
@@ -141,17 +152,6 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
       setLoadingModels(false);
     }
   }, [suggestions, faceAnalysis, toast]);
-
-  // Função auxiliar para obter cores disponíveis de forma segura
-  const getCoresDisponiveis = (model: GlassesModel): CorDisponivel[] => {
-    try {
-      const cores = model.cores_disponiveis as CorDisponivel[] | null;
-      return Array.isArray(cores) ? cores : [];
-    } catch (error) {
-      console.error('Erro ao parsear cores:', error);
-      return [];
-    }
-  };
 
   // Detectar características faciais na imagem
   const detectFaceFeatures = useCallback(async () => {
