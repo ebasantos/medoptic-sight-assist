@@ -42,6 +42,16 @@ interface CorDisponivel {
   codigo: string;
 }
 
+// URLs de backup para imagens de óculos que funcionam
+const FALLBACK_GLASSES_IMAGES = {
+  'quadrada': 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=200&fit=crop&crop=center',
+  'redonda': 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=200&fit=crop&crop=center',
+  'cat-eye': 'https://images.unsplash.com/photo-1577803645773-f96470509666?w=400&h=200&fit=crop&crop=center',
+  'aviador': 'https://images.unsplash.com/photo-1508296695146-257a814070b4?w=400&h=200&fit=crop&crop=center',
+  'oval': 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=200&fit=crop&crop=center',
+  'retangular': 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=200&fit=crop&crop=center'
+};
+
 const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   originalImage,
   faceAnalysis,
@@ -58,6 +68,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [loadingModels, setLoadingModels] = useState(true);
+  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
   
   const [adjustments, setAdjustments] = useState({
     position: { x: 0, y: -10 },
@@ -75,6 +86,19 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
       console.error('Erro ao parsear cores:', error);
       return [];
     }
+  };
+
+  // Função para obter URL de imagem válida
+  const getValidImageUrl = (model: GlassesModel): string => {
+    // Se a URL original funcionar, usar ela
+    if (model.imagem_url && !model.imagem_url.includes('svgsilh.com')) {
+      return model.imagem_url;
+    }
+    
+    // Caso contrário, usar imagem de fallback baseada na categoria
+    const categoria = model.categoria.toLowerCase();
+    return FALLBACK_GLASSES_IMAGES[categoria as keyof typeof FALLBACK_GLASSES_IMAGES] || 
+           FALLBACK_GLASSES_IMAGES.oval;
   };
 
   // Buscar modelos de óculos do banco de dados
@@ -233,6 +257,9 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     glassesImg.crossOrigin = 'anonymous';
     
     glassesImg.onload = () => {
+      console.log('Imagem do óculos carregada com sucesso:', model.nome);
+      setImageLoadError(null);
+      
       ctx.save();
       
       // Calcular posição central
@@ -269,11 +296,63 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
       ctx.restore();
     };
     
-    glassesImg.onerror = () => {
-      console.error('Erro ao carregar imagem do óculos:', model.imagem_url);
+    glassesImg.onerror = (error) => {
+      console.error('Erro ao carregar imagem do óculos:', getValidImageUrl(model), error);
+      setImageLoadError(`Erro ao carregar imagem do modelo ${model.nome}`);
+      
+      // Tentar usar uma imagem de fallback simples
+      drawFallbackGlasses(ctx, canvasWidth, canvasHeight);
     };
     
-    glassesImg.src = model.imagem_url;
+    const imageUrl = getValidImageUrl(model);
+    console.log('Tentando carregar imagem:', imageUrl);
+    glassesImg.src = imageUrl;
+  };
+
+  // Função para desenhar óculos de fallback simples
+  const drawFallbackGlasses = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
+    ctx.save();
+    
+    const centerX = canvasWidth / 2 + (adjustments.position.x * canvasWidth / 100);
+    const centerY = canvasHeight / 2 + (adjustments.position.y * canvasHeight / 100);
+    
+    ctx.translate(centerX, centerY);
+    ctx.rotate((adjustments.rotation * Math.PI) / 180);
+    ctx.scale(adjustments.scale, adjustments.scale);
+    ctx.globalAlpha = adjustments.opacity;
+    
+    // Desenhar óculos simples com formas geométricas
+    ctx.strokeStyle = selectedColor || '#000000';
+    ctx.lineWidth = 3;
+    
+    // Lente esquerda
+    ctx.beginPath();
+    ctx.arc(-30, 0, 25, 0, 2 * Math.PI);
+    ctx.stroke();
+    
+    // Lente direita
+    ctx.beginPath();
+    ctx.arc(30, 0, 25, 0, 2 * Math.PI);
+    ctx.stroke();
+    
+    // Ponte
+    ctx.beginPath();
+    ctx.moveTo(-5, 0);
+    ctx.lineTo(5, 0);
+    ctx.stroke();
+    
+    // Hastes
+    ctx.beginPath();
+    ctx.moveTo(-55, 0);
+    ctx.lineTo(-80, -5);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(55, 0);
+    ctx.lineTo(80, -5);
+    ctx.stroke();
+    
+    ctx.restore();
   };
 
   // Carregar imagem e detectar face
@@ -367,6 +446,14 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {imageLoadError && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-800 text-sm">
+                ⚠️ {imageLoadError}. Usando visualização de fallback.
+              </p>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Canvas Principal */}
             <div className="xl:col-span-2 space-y-4">
