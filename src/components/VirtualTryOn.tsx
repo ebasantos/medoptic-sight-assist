@@ -104,7 +104,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
            FALLBACK_GLASSES_IMAGES.oval;
   };
 
-  // Função para processar imagem da armação
+  // Função para processar imagem da armação com melhor qualidade
   const processGlassesImage = useCallback(async (model: GlassesModel): Promise<string> => {
     // Verificar se já foi processada
     if (processedImages.has(model.id)) {
@@ -115,30 +115,39 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
       setProcessingImage(true);
       console.log('Processando imagem da armação:', model.nome);
       
-      // Carregar imagem original
-      const response = await fetch(getValidImageUrl(model));
+      // Carregar imagem original com CORS
+      const response = await fetch(getValidImageUrl(model), { mode: 'cors' });
       const blob = await response.blob();
       const img = await loadImage(blob);
       
-      // Remover fundo
+      // Remover fundo mantendo qualidade
       const processedBlob = await removeBackground(img);
       
-      // Criar canvas para normalizar posição
+      // Criar canvas para processar imagem final
       const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 200;
+      // Manter dimensões maiores para melhor qualidade
+      canvas.width = Math.max(400, img.naturalWidth);
+      canvas.height = Math.max(200, img.naturalHeight);
       const ctx = canvas.getContext('2d');
       
       if (ctx) {
-        // Desenhar imagem processada
+        // Desenhar imagem processada mantendo proporções
         const processedImg = await loadImage(processedBlob);
-        ctx.drawImage(processedImg, 0, 0, canvas.width, canvas.height);
         
-        // Normalizar posição
+        // Centralizar imagem no canvas
+        const scale = Math.min(canvas.width / processedImg.width, canvas.height / processedImg.height);
+        const scaledWidth = processedImg.width * scale;
+        const scaledHeight = processedImg.height * scale;
+        const x = (canvas.width - scaledWidth) / 2;
+        const y = (canvas.height - scaledHeight) / 2;
+        
+        ctx.drawImage(processedImg, x, y, scaledWidth, scaledHeight);
+        
+        // Normalizar posição se necessário
         normalizeGlassesPosition(canvas, ctx);
         
         // Converter para URL
-        const processedUrl = canvas.toDataURL('image/png');
+        const processedUrl = canvas.toDataURL('image/png', 1.0);
         
         // Armazenar no cache
         setProcessedImages(prev => new Map(prev).set(model.id, processedUrl));
@@ -341,10 +350,10 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
           ctx.globalCompositeOperation = 'destination-atop';
         }
         
-        // Desenhar óculos com tamanho padronizado
-        const scale = Math.min(canvasWidth, canvasHeight) / 600; // Ajuste para melhor proporção
-        const finalWidth = glassesImg.width * scale;
-        const finalHeight = glassesImg.height * scale;
+        // Desenhar óculos com tamanho proporcional ao rosto
+        const faceScale = Math.min(canvasWidth, canvasHeight) / 800; // Escala baseada no tamanho da face
+        const finalWidth = glassesImg.width * faceScale;
+        const finalHeight = glassesImg.height * faceScale;
         
         ctx.drawImage(
           glassesImg, 

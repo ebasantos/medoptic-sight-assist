@@ -1,11 +1,11 @@
 
 import { pipeline, env } from '@huggingface/transformers';
 
-// Configurar transformers.js para sempre baixar modelos
+// Configurar transformers.js para funcionar corretamente no browser
 env.allowLocalModels = false;
-env.useBrowserCache = false;
+env.useBrowserCache = true;
 
-const MAX_IMAGE_DIMENSION = 1024;
+const MAX_IMAGE_DIMENSION = 512; // Reduzir para melhor performance
 
 function resizeImageIfNeeded(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, image: HTMLImageElement) {
   let width = image.naturalWidth;
@@ -35,25 +35,27 @@ function resizeImageIfNeeded(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
 export const removeBackground = async (imageElement: HTMLImageElement): Promise<Blob> => {
   try {
     console.log('Iniciando processo de remoção de fundo...');
+    
+    // Usar 'wasm' ao invés de 'webgpu' para compatibilidade
     const segmenter = await pipeline('image-segmentation', 'Xenova/segformer-b0-finetuned-ade-512-512', {
-      device: 'webgpu',
+      device: 'wasm',
     });
     
-    // Converter HTMLImageElement para canvas
+    // Converter HTMLImageElement para canvas mantendo tamanho original
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
     if (!ctx) throw new Error('Não foi possível obter contexto do canvas');
     
-    // Redimensionar imagem se necessário e desenhar no canvas
+    // Redimensionar apenas se necessário
     const wasResized = resizeImageIfNeeded(canvas, ctx, imageElement);
-    console.log(`Imagem ${wasResized ? 'foi' : 'não foi'} redimensionada. Dimensões finais: ${canvas.width}x${canvas.height}`);
+    console.log(`Imagem ${wasResized ? 'foi' : 'não foi'} redimensionada. Dimensões: ${canvas.width}x${canvas.height}`);
     
-    // Obter dados da imagem como base64
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
-    console.log('Imagem convertida para base64');
+    // Obter dados da imagem
+    const imageData = canvas.toDataURL('image/png', 1.0);
+    console.log('Imagem convertida para processamento');
     
-    // Processar a imagem com o modelo de segmentação
+    // Processar com o modelo
     console.log('Processando com modelo de segmentação...');
     const result = await segmenter(imageData);
     
@@ -63,7 +65,7 @@ export const removeBackground = async (imageElement: HTMLImageElement): Promise<
       throw new Error('Resultado de segmentação inválido');
     }
     
-    // Criar novo canvas para a imagem mascarada
+    // Criar canvas de saída com tamanho original
     const outputCanvas = document.createElement('canvas');
     outputCanvas.width = canvas.width;
     outputCanvas.height = canvas.height;
@@ -74,25 +76,22 @@ export const removeBackground = async (imageElement: HTMLImageElement): Promise<
     // Desenhar imagem original
     outputCtx.drawImage(canvas, 0, 0);
     
-    // Aplicar a máscara
-    const outputImageData = outputCtx.getImageData(
-      0, 0,
-      outputCanvas.width,
-      outputCanvas.height
-    );
+    // Aplicar máscara para remover fundo
+    const outputImageData = outputCtx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
     const data = outputImageData.data;
     
-    // Aplicar máscara invertida ao canal alpha
+    // Aplicar máscara mais agressiva para melhor remoção de fundo
     for (let i = 0; i < result[0].mask.data.length; i++) {
-      // Inverter o valor da máscara (1 - valor) para manter o objeto ao invés do fundo
-      const alpha = Math.round((1 - result[0].mask.data[i]) * 255);
+      const maskValue = result[0].mask.data[i];
+      // Inverter máscara e aplicar threshold mais forte
+      const alpha = maskValue > 0.3 ? 0 : 255; // Remover fundo mais agressivamente
       data[i * 4 + 3] = alpha;
     }
     
     outputCtx.putImageData(outputImageData, 0, 0);
     console.log('Máscara aplicada com sucesso');
     
-    // Converter canvas para blob
+    // Converter para blob mantendo qualidade
     return new Promise((resolve, reject) => {
       outputCanvas.toBlob(
         (blob) => {
@@ -104,7 +103,7 @@ export const removeBackground = async (imageElement: HTMLImageElement): Promise<
           }
         },
         'image/png',
-        1.0
+        1.0 // Máxima qualidade
       );
     });
   } catch (error) {
@@ -116,13 +115,14 @@ export const removeBackground = async (imageElement: HTMLImageElement): Promise<
 export const loadImage = (file: Blob): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = URL.createObjectURL(file);
   });
 };
 
-// Função para centralizar e padronizar posicionamento da armação
+// Função melhorada para centralizar armação
 export const normalizeGlassesPosition = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void => {
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
@@ -134,7 +134,7 @@ export const normalizeGlassesPosition = (canvas: HTMLCanvasElement, ctx: CanvasR
   for (let y = 0; y < canvas.height; y++) {
     for (let x = 0; x < canvas.width; x++) {
       const alpha = data[(y * canvas.width + x) * 4 + 3];
-      if (alpha > 50) { // Pixel não transparente
+      if (alpha > 100) { // Threshold mais alto para melhor detecção
         hasContent = true;
         minX = Math.min(minX, x);
         maxX = Math.max(maxX, x);
@@ -155,24 +155,17 @@ export const normalizeGlassesPosition = (canvas: HTMLCanvasElement, ctx: CanvasR
   const canvasCenterY = canvas.height / 2;
   
   // Calcular deslocamento necessário
-  const offsetX = canvasCenterX - objectCenterX;
-  const offsetY = canvasCenterY - objectCenterY;
+  const offsetX = Math.round(canvasCenterX - objectCenterX);
+  const offsetY = Math.round(canvasCenterY - objectCenterY);
   
-  // Criar novo canvas para o resultado centralizado
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = canvas.width;
-  tempCanvas.height = canvas.height;
-  const tempCtx = tempCanvas.getContext('2d');
-  
-  if (tempCtx) {
-    // Limpar canvas temporário
-    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+  // Aplicar centralização apenas se necessário
+  if (Math.abs(offsetX) > 5 || Math.abs(offsetY) > 5) {
+    // Limpar canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     // Desenhar imagem centralizada
-    tempCtx.putImageData(imageData, offsetX, offsetY);
+    ctx.putImageData(imageData, offsetX, offsetY);
     
-    // Copiar resultado de volta para o canvas original
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(tempCanvas, 0, 0);
+    console.log(`Armação centralizada: offset X=${offsetX}, Y=${offsetY}`);
   }
 };
