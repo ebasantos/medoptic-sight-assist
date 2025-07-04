@@ -8,6 +8,7 @@ import { Glasses, RotateCcw, Download, Sparkles, Eye, Palette, Settings, Refresh
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
+import { removeBackground, loadImage, normalizeGlassesPosition } from '@/utils/imageProcessing';
 
 interface FaceDetection {
   leftEye: { x: number; y: number };
@@ -69,6 +70,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [loadingModels, setLoadingModels] = useState(true);
   const [imageLoadError, setImageLoadError] = useState<string | null>(null);
+  const [processingImage, setProcessingImage] = useState(false);
+  const [processedImages, setProcessedImages] = useState<Map<string, string>>(new Map());
   
   const [adjustments, setAdjustments] = useState({
     position: { x: 0, y: -10 },
@@ -100,6 +103,60 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     return FALLBACK_GLASSES_IMAGES[categoria as keyof typeof FALLBACK_GLASSES_IMAGES] || 
            FALLBACK_GLASSES_IMAGES.oval;
   };
+
+  // Função para processar imagem da armação
+  const processGlassesImage = useCallback(async (model: GlassesModel): Promise<string> => {
+    // Verificar se já foi processada
+    if (processedImages.has(model.id)) {
+      return processedImages.get(model.id)!;
+    }
+
+    try {
+      setProcessingImage(true);
+      console.log('Processando imagem da armação:', model.nome);
+      
+      // Carregar imagem original
+      const response = await fetch(getValidImageUrl(model));
+      const blob = await response.blob();
+      const img = await loadImage(blob);
+      
+      // Remover fundo
+      const processedBlob = await removeBackground(img);
+      
+      // Criar canvas para normalizar posição
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 200;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Desenhar imagem processada
+        const processedImg = await loadImage(processedBlob);
+        ctx.drawImage(processedImg, 0, 0, canvas.width, canvas.height);
+        
+        // Normalizar posição
+        normalizeGlassesPosition(canvas, ctx);
+        
+        // Converter para URL
+        const processedUrl = canvas.toDataURL('image/png');
+        
+        // Armazenar no cache
+        setProcessedImages(prev => new Map(prev).set(model.id, processedUrl));
+        
+        console.log('Imagem processada com sucesso para:', model.nome);
+        return processedUrl;
+      }
+      
+      throw new Error('Não foi possível obter contexto do canvas');
+      
+    } catch (error) {
+      console.error('Erro ao processar imagem:', error);
+      // Retornar URL original em caso de erro
+      return getValidImageUrl(model);
+    } finally {
+      setProcessingImage(false);
+    }
+  }, [processedImages]);
 
   // Buscar modelos de óculos do banco de dados
   const fetchGlassesModels = useCallback(async () => {
@@ -228,7 +285,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   }, [faceDetection]);
 
   // Renderizar a simulação
-  const renderSimulation = useCallback(() => {
+  const renderSimulation = useCallback(async () => {
     if (!canvasRef.current || !imageRef.current || !selectedModel || !selectedColor) return;
     
     const canvas = canvasRef.current;
@@ -247,66 +304,72 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     // Encontrar modelo selecionado
     const currentModel = availableModels.find(m => m.id === selectedModel);
     if (currentModel) {
-      renderGlassesImage(ctx, currentModel, canvas.width, canvas.height);
+      await renderGlassesImage(ctx, currentModel, canvas.width, canvas.height);
     }
     
   }, [selectedModel, selectedColor, adjustments, availableModels]);
 
-  const renderGlassesImage = (ctx: CanvasRenderingContext2D, model: GlassesModel, canvasWidth: number, canvasHeight: number) => {
-    const glassesImg = new Image();
-    glassesImg.crossOrigin = 'anonymous';
-    
-    glassesImg.onload = () => {
-      console.log('Imagem do óculos carregada com sucesso:', model.nome);
-      setImageLoadError(null);
+  const renderGlassesImage = async (ctx: CanvasRenderingContext2D, model: GlassesModel, canvasWidth: number, canvasHeight: number) => {
+    try {
+      // Processar imagem da armação
+      const processedImageUrl = await processGlassesImage(model);
       
-      ctx.save();
+      const glassesImg = new Image();
+      glassesImg.crossOrigin = 'anonymous';
       
-      // Calcular posição central
-      const centerX = canvasWidth / 2 + (adjustments.position.x * canvasWidth / 100);
-      const centerY = canvasHeight / 2 + (adjustments.position.y * canvasHeight / 100);
+      glassesImg.onload = () => {
+        console.log('Imagem processada da armação carregada:', model.nome);
+        setImageLoadError(null);
+        
+        ctx.save();
+        
+        // Calcular posição central
+        const centerX = canvasWidth / 2 + (adjustments.position.x * canvasWidth / 100);
+        const centerY = canvasHeight / 2 + (adjustments.position.y * canvasHeight / 100);
+        
+        // Aplicar transformações
+        ctx.translate(centerX, centerY);
+        ctx.rotate((adjustments.rotation * Math.PI) / 180);
+        ctx.scale(adjustments.scale, adjustments.scale);
+        ctx.globalAlpha = adjustments.opacity;
+        
+        // Aplicar filtro de cor se necessário
+        if (selectedColor && selectedColor !== '#000000') {
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.fillStyle = selectedColor;
+          ctx.fillRect(-glassesImg.width / 2, -glassesImg.height / 2, glassesImg.width, glassesImg.height);
+          ctx.globalCompositeOperation = 'destination-atop';
+        }
+        
+        // Desenhar óculos com tamanho padronizado
+        const scale = Math.min(canvasWidth, canvasHeight) / 600; // Ajuste para melhor proporção
+        const finalWidth = glassesImg.width * scale;
+        const finalHeight = glassesImg.height * scale;
+        
+        ctx.drawImage(
+          glassesImg, 
+          -finalWidth / 2, 
+          -finalHeight / 2, 
+          finalWidth, 
+          finalHeight
+        );
+        
+        ctx.restore();
+      };
       
-      // Aplicar transformações
-      ctx.translate(centerX, centerY);
-      ctx.rotate((adjustments.rotation * Math.PI) / 180);
-      ctx.scale(adjustments.scale, adjustments.scale);
-      ctx.globalAlpha = adjustments.opacity;
+      glassesImg.onerror = (error) => {
+        console.error('Erro ao carregar imagem processada:', error);
+        setImageLoadError(`Erro ao carregar imagem do modelo ${model.nome}`);
+        drawFallbackGlasses(ctx, canvasWidth, canvasHeight);
+      };
       
-      // Aplicar filtro de cor se necessário
-      if (selectedColor !== '#000000') {
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.fillStyle = selectedColor;
-        ctx.fillRect(-glassesImg.width / 2, -glassesImg.height / 2, glassesImg.width, glassesImg.height);
-        ctx.globalCompositeOperation = 'destination-atop';
-      }
+      glassesImg.src = processedImageUrl;
       
-      // Desenhar óculos
-      const scale = Math.min(canvasWidth, canvasHeight) / 400;
-      const finalWidth = glassesImg.width * scale;
-      const finalHeight = glassesImg.height * scale;
-      
-      ctx.drawImage(
-        glassesImg, 
-        -finalWidth / 2, 
-        -finalHeight / 2, 
-        finalWidth, 
-        finalHeight
-      );
-      
-      ctx.restore();
-    };
-    
-    glassesImg.onerror = (error) => {
-      console.error('Erro ao carregar imagem do óculos:', getValidImageUrl(model), error);
-      setImageLoadError(`Erro ao carregar imagem do modelo ${model.nome}`);
-      
-      // Tentar usar uma imagem de fallback simples
+    } catch (error) {
+      console.error('Erro no processamento da imagem:', error);
+      setImageLoadError(`Erro ao processar imagem do modelo ${model.nome}`);
       drawFallbackGlasses(ctx, canvasWidth, canvasHeight);
-    };
-    
-    const imageUrl = getValidImageUrl(model);
-    console.log('Tentando carregar imagem:', imageUrl);
-    glassesImg.src = imageUrl;
+    }
   };
 
   // Função para desenhar óculos de fallback simples
@@ -451,6 +514,17 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
               <p className="text-yellow-800 text-sm">
                 ⚠️ {imageLoadError}. Usando visualização de fallback.
               </p>
+            </div>
+          )}
+          
+          {processingImage && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                <p className="text-blue-800 text-sm">
+                  Processando imagem da armação... (removendo fundo e centralizando)
+                </p>
+              </div>
             </div>
           )}
           
