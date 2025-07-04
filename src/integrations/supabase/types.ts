@@ -112,6 +112,54 @@ export type Database = {
           },
         ]
       }
+      modelos_oculos: {
+        Row: {
+          altura_mm: number | null
+          ativo: boolean | null
+          categoria: string
+          cores_disponiveis: Json
+          created_at: string
+          formato_recomendado: string
+          id: string
+          imagem_url: string
+          largura_mm: number | null
+          nome: string
+          ponte_mm: number | null
+          popular: boolean | null
+          tom_pele_recomendado: string[] | null
+        }
+        Insert: {
+          altura_mm?: number | null
+          ativo?: boolean | null
+          categoria: string
+          cores_disponiveis?: Json
+          created_at?: string
+          formato_recomendado: string
+          id?: string
+          imagem_url: string
+          largura_mm?: number | null
+          nome: string
+          ponte_mm?: number | null
+          popular?: boolean | null
+          tom_pele_recomendado?: string[] | null
+        }
+        Update: {
+          altura_mm?: number | null
+          ativo?: boolean | null
+          categoria?: string
+          cores_disponiveis?: Json
+          created_at?: string
+          formato_recomendado?: string
+          id?: string
+          imagem_url?: string
+          largura_mm?: number | null
+          nome?: string
+          ponte_mm?: number | null
+          popular?: boolean | null
+          tom_pele_recomendado?: string[] | null
+        }
+        Relationships: []
+      }
       opticas: {
         Row: {
           ativo: boolean
