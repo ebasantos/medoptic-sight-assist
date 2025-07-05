@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +23,10 @@ import { VisualLensDemo } from './VisualLensDemo';
 
 interface TreatmentSelectorProps {
   selectedLens: string | null;
-  aiRecommendations: any;
+  aiRecommendations: {
+    tratamentosRecomendados?: string[];
+    motivacao?: string;
+  } | null;
   onSelect: (treatments: string[]) => void;
   onBack: () => void;
 }
@@ -33,7 +35,11 @@ export const TreatmentSelector = ({ selectedLens, aiRecommendations, onSelect, o
   const [selectedTreatments, setSelectedTreatments] = useState<string[]>([]);
   const [currentEnvironment, setCurrentEnvironment] = useState<'rua' | 'leitura' | 'computador' | 'direcao'>('rua');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [recentlySelected, setRecentlySelected] = useState<string | null>(null);
   const isMobile = useIsMobile();
+
+  // Refs para cada cartão de tratamento
+  const treatmentRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const treatments = [
     {
@@ -103,19 +109,47 @@ export const TreatmentSelector = ({ selectedLens, aiRecommendations, onSelect, o
     }
   ];
 
-  const environments = [
+  const environments: Array<{id: 'rua' | 'leitura' | 'computador' | 'direcao', name: string, icon: string}> = [
     { id: 'rua', name: 'Externo', icon: '🌅' },
     { id: 'leitura', name: 'Leitura', icon: '📚' },
     { id: 'computador', name: 'Digital', icon: '💻' },
     { id: 'direcao', name: 'Direção', icon: '🚗' }
   ];
 
+  const scrollToTreatment = (treatmentId: string) => {
+    const element = treatmentRefs.current[treatmentId];
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'nearest'
+      });
+    }
+  };
+
   const handleTreatmentToggle = (treatmentId: string) => {
+    const wasSelected = selectedTreatments.includes(treatmentId);
+    
     setSelectedTreatments(prev => 
-      prev.includes(treatmentId)
+      wasSelected
         ? prev.filter(id => id !== treatmentId)
         : [...prev, treatmentId]
     );
+    
+    // Se está sendo selecionado (não desselecionado), aplicar efeitos
+    if (!wasSelected) {
+      setRecentlySelected(treatmentId);
+      
+      // Scroll suave para o tratamento selecionado após um pequeno delay
+      setTimeout(() => {
+        scrollToTreatment(treatmentId);
+      }, 150);
+      
+      // Remover o destaque após 2 segundos
+      setTimeout(() => {
+        setRecentlySelected(null);
+      }, 2000);
+    }
   };
 
   const handleContinue = () => {
@@ -129,16 +163,22 @@ export const TreatmentSelector = ({ selectedLens, aiRecommendations, onSelect, o
           const Icon = treatment.icon;
           const isSelected = selectedTreatments.includes(treatment.id);
           const isRecommended = treatment.recommended;
+          const isRecentlySelected = recentlySelected === treatment.id;
 
           return (
             <div 
               key={treatment.id}
-              className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+              ref={el => treatmentRefs.current[treatment.id] = el}
+              className={`flex items-center justify-between p-3 rounded-lg border-2 cursor-pointer transition-all duration-300 transform ${
                 isSelected 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 hover:border-gray-300'
-              } ${isRecommended ? 'ring-1 ring-blue-200' : ''}`}
-              onClick={() => handleTreatmentToggle(treatment.id)}
+                  ? 'border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200 ring-opacity-50 scale-[1.02]' 
+                  : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+              } ${isRecommended ? 'ring-1 ring-green-200' : ''} ${
+                isRecentlySelected ? 'animate-pulse bg-blue-100 border-blue-600' : ''
+              }`}
+              onClick={() => {
+                handleTreatmentToggle(treatment.id);
+              }}
             >
               <div className="flex items-center space-x-3">
                 <div className={`p-2 rounded-full ${
@@ -239,7 +279,7 @@ export const TreatmentSelector = ({ selectedLens, aiRecommendations, onSelect, o
                       <Button
                         key={env.id}
                         variant={currentEnvironment === env.id ? 'default' : 'outline'}
-                        onClick={() => setCurrentEnvironment(env.id as any)}
+                        onClick={() => setCurrentEnvironment(env.id)}
                         className="text-xs h-8"
                       >
                         <span className="mr-1">{env.icon}</span>
@@ -320,7 +360,7 @@ export const TreatmentSelector = ({ selectedLens, aiRecommendations, onSelect, o
               <Button
                 key={env.id}
                 variant={currentEnvironment === env.id ? 'default' : 'outline'}
-                onClick={() => setCurrentEnvironment(env.id as any)}
+                onClick={() => setCurrentEnvironment(env.id)}
                 className="text-xs h-8"
               >
                 <span className="mr-1">{env.icon}</span>
