@@ -1,11 +1,10 @@
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, RotateCcw, Download, Glasses, Zap, Palette, Move } from 'lucide-react';
+import { Camera, RotateCcw, Download, Glasses, Zap, Palette, Move, Upload } from 'lucide-react';
 import { FaceDetection, FaceDetector } from './VirtualTryOn/FaceDetector';
 import { GlassesRenderer } from './VirtualTryOn/GlassesRenderer';
 import { supabase } from '@/integrations/supabase/client';

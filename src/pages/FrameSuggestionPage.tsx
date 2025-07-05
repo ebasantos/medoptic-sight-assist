@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import CameraCapture from '@/components/CameraCapture';
 import FaceAnalysisLoader from '@/components/FaceAnalysisLoader';
-import VirtualTryOn from '@/components/VirtualTryOn';
+import { VirtualTryOn } from '@/components/VirtualTryOn';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
 
 const FrameSuggestionPage = () => {
