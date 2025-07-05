@@ -60,7 +60,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   
   const [adjustments, setAdjustments] = useState({
     position: { x: 0, y: -10 },
-    scale: 0.8, // Escala menor por padrão
+    scale: 1.2, // Aumentar escala padrão
     rotation: 0,
     opacity: 0.9
   });
@@ -153,12 +153,12 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     
     const img = imageRef.current;
     
-    // Melhorar detecção baseada no tamanho real da imagem
-    const eyeDistance = Math.min(img.width, img.height) * 0.12; // Reduzir proporção
+    // Aumentar proporção para óculos maiores
+    const eyeDistance = Math.min(img.width, img.height) * 0.18; // Aumentar de 0.12 para 0.18
     
     const mockDetection: FaceDetection = {
       leftEye: { 
-        x: img.width * 0.37,  // Ajustar posições dos olhos
+        x: img.width * 0.37,
         y: img.height * 0.42
       },
       rightEye: { 
@@ -166,7 +166,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         y: img.height * 0.42
       },
       eyeDistance: eyeDistance,
-      faceWidth: img.width * 0.35, // Reduzir largura do rosto
+      faceWidth: img.width * 0.45, // Aumentar largura do rosto de 0.35 para 0.45
       confidence: 0.88
     };
     
@@ -179,15 +179,15 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     
     const canvas = canvasRef.current;
     const centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
-    const centerY = faceDetection.leftEye.y - 8; // Posição um pouco acima dos olhos
+    const centerY = faceDetection.leftEye.y - 8;
     
-    // Calcular escala baseada na distância entre os olhos e largura da face
+    // Calcular escala mais generosa
     const eyeDistancePixels = Math.abs(faceDetection.rightEye.x - faceDetection.leftEye.x);
-    const idealGlassesWidth = eyeDistancePixels * 1.4; // Óculos deve ser 1.4x a distância dos olhos
-    const baseGlassesWidth = 200; // Largura base dos óculos em pixels
-    const calculatedScale = Math.max(0.4, Math.min(1.2, idealGlassesWidth / baseGlassesWidth));
+    const idealGlassesWidth = eyeDistancePixels * 1.8; // Aumentar de 1.4 para 1.8
+    const baseGlassesWidth = 200;
+    const calculatedScale = Math.max(0.8, Math.min(2.0, idealGlassesWidth / baseGlassesWidth)); // Aumentar mínimo
     
-    console.log('Cálculos de escala:', {
+    console.log('Cálculos de escala (aumentados):', {
       eyeDistancePixels,
       idealGlassesWidth,
       calculatedScale,
@@ -238,42 +238,38 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         
         ctx.save();
         
-        // Calcular posição central
         const centerX = canvasWidth / 2 + (adjustments.position.x * canvasWidth / 100);
         const centerY = canvasHeight / 2 + (adjustments.position.y * canvasHeight / 100);
         
         console.log('Posição calculada:', { centerX, centerY, canvasWidth, canvasHeight });
         
-        // Aplicar transformações
         ctx.translate(centerX, centerY);
         ctx.rotate((adjustments.rotation * Math.PI) / 180);
         ctx.scale(adjustments.scale, adjustments.scale);
         ctx.globalAlpha = adjustments.opacity;
         
-        // Aplicar filtro de cor se necessário
         if (selectedColor && selectedColor !== '#000000') {
           ctx.globalCompositeOperation = 'source-over';
           ctx.filter = `hue-rotate(${getHueRotation(selectedColor)}deg) saturate(150%)`;
         }
         
-        // Calcular tamanho proporcional - mais conservador
-        const baseFaceScale = Math.min(canvasWidth, canvasHeight) / 800; // Aumentar divisor
+        // Tamanho mais generoso dos óculos
+        const baseFaceScale = Math.min(canvasWidth, canvasHeight) / 500; // Reduzir divisor de 800 para 500
         const glassesAspectRatio = glassesImg.width / glassesImg.height;
         
-        // Tamanho baseado na distância dos olhos se disponível
         let finalWidth, finalHeight;
         
         if (faceDetection) {
           const eyeDistance = Math.abs(faceDetection.rightEye.x - faceDetection.leftEye.x);
-          finalWidth = eyeDistance * 1.3; // Óculos 1.3x a distância dos olhos
+          finalWidth = eyeDistance * 1.8; // Aumentar de 1.3 para 1.8
           finalHeight = finalWidth / glassesAspectRatio;
         } else {
-          // Fallback para tamanho baseado no canvas
-          finalWidth = Math.max(150, Math.min(300, glassesImg.width * baseFaceScale));
-          finalHeight = Math.max(60, Math.min(120, glassesImg.height * baseFaceScale));
+          // Fallback com tamanhos maiores
+          finalWidth = Math.max(200, Math.min(400, glassesImg.width * baseFaceScale)); // Aumentar mínimo e máximo
+          finalHeight = Math.max(80, Math.min(160, glassesImg.height * baseFaceScale)); // Aumentar mínimo e máximo
         }
         
-        console.log('Dimensões finais dos óculos:', { finalWidth, finalHeight, baseFaceScale });
+        console.log('Dimensões finais dos óculos (aumentadas):', { finalWidth, finalHeight, baseFaceScale });
         
         ctx.drawImage(
           glassesImg, 
@@ -315,7 +311,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     ctx.save();
     
     const centerX = canvasWidth / 2 + (adjustments.position.x * canvasWidth / 100);
-    const centerY = canvasHeight / 2 + (adjustments.position.y * canvasHeight / 100);
+    const centerY = canvasWidth / 2 + (adjustments.position.y * canvasHeight / 100);
     
     ctx.translate(centerX, centerY);
     ctx.rotate((adjustments.rotation * Math.PI) / 180);
@@ -323,11 +319,11 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     ctx.globalAlpha = adjustments.opacity;
     
     ctx.strokeStyle = selectedColor || '#000000';
-    ctx.lineWidth = 3; // Linha mais fina
+    ctx.lineWidth = 3;
     
-    // Lentes menores e mais proporcionais
-    const lensRadius = 28;
-    const lensDistance = 35;
+    // Lentes maiores para fallback
+    const lensRadius = 40; // Aumentar de 28 para 40
+    const lensDistance = 50; // Aumentar de 35 para 50
     
     // Lente esquerda
     ctx.beginPath();
@@ -341,19 +337,19 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     
     // Ponte
     ctx.beginPath();
-    ctx.moveTo(-8, 0);
-    ctx.lineTo(8, 0);
+    ctx.moveTo(-12, 0); // Aumentar ponte
+    ctx.lineTo(12, 0);
     ctx.stroke();
     
-    // Hastes proporcionais
+    // Hastes proporcionais maiores
     ctx.beginPath();
     ctx.moveTo(-(lensDistance + lensRadius), 0);
-    ctx.lineTo(-(lensDistance + lensRadius + 20), -6);
+    ctx.lineTo(-(lensDistance + lensRadius + 30), -8); // Hastes maiores
     ctx.stroke();
     
     ctx.beginPath();
     ctx.moveTo((lensDistance + lensRadius), 0);
-    ctx.lineTo((lensDistance + lensRadius + 20), -6);
+    ctx.lineTo((lensDistance + lensRadius + 30), -8);
     ctx.stroke();
     
     ctx.restore();
@@ -407,7 +403,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   const resetAdjustments = () => {
     setAdjustments({
       position: { x: 0, y: -10 },
-      scale: 0.8, // Escala menor por padrão
+      scale: 1.2, // Escala padrão maior
       rotation: 0,
       opacity: 0.9
     });
