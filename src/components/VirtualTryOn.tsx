@@ -1,587 +1,558 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Glasses, RotateCcw, Download, Sparkles, Eye, Palette, Settings, RefreshCw } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Tables } from '@/integrations/supabase/types';
-import { FaceDetector, FaceDetection } from './VirtualTryOn/FaceDetector';
+import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Camera, RotateCcw, Download, Glasses, Zap, Palette, Move } from 'lucide-react';
+import { FaceDetection, FaceDetector } from './VirtualTryOn/FaceDetector';
 import { GlassesRenderer } from './VirtualTryOn/GlassesRenderer';
-
-interface FaceDetection {
-  leftEye: { x: number; y: number };
-  rightEye: { x: number; y: number };
-  eyeDistance: number;
-  faceWidth: number;
-  confidence: number;
-}
-
-interface VirtualTryOnProps {
-  originalImage: string;
-  faceAnalysis: {
-    formatoRosto: string;
-    tomPele: string;
-    distanciaOlhos: string;
-    confiabilidade: number;
-    observacoes: string;
-  };
-  suggestions: Array<{
-    tipo: string;
-    motivo: string;
-  }>;
-  onSave?: (simulatedImage: string) => void;
-}
+import { supabase } from '@/integrations/supabase/client';
+import { Tables } from '@/integrations/supabase/types';
+import { useToast } from '@/hooks/use-toast';
 
 type GlassesModel = Tables<'modelos_oculos'>;
 
-interface CorDisponivel {
-  nome: string;
-  codigo: string;
+interface VirtualTryOnProps {
+  onCapture?: (imageData: string) => void;
+  selectedModel?: GlassesModel | null;
 }
 
-const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
-  originalImage,
-  faceAnalysis,
-  suggestions = [],
-  onSave
-}) => {
+export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedModel }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [currentFaceDetection, setCurrentFaceDetection] = useState<FaceDetection | null>(null);
+  const [glassesModels, setGlassesModels] = useState<GlassesModel[]>([]);
+  const [selectedGlasses, setSelectedGlasses] = useState<GlassesModel | null>(selectedModel || null);
+  
+  // Controles de ajuste
+  const [glassesScale, setGlassesScale] = useState([1.0]);
+  const [glassesRotation, setGlassesRotation] = useState([0]);
+  const [glassesOpacity, setGlassesOpacity] = useState([0.9]);
+  const [glassesPosition, setGlassesPosition] = useState({ x: 0, y: 0 });
+  const [selectedColor, setSelectedColor] = useState('#000000');
+  
   const { toast } = useToast();
-  
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [faceDetection, setFaceDetection] = useState<FaceDetection | null>(null);
-  const [availableModels, setAvailableModels] = useState<GlassesModel[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('');
-  const [selectedColor, setSelectedColor] = useState<string>('');
-  const [loadingModels, setLoadingModels] = useState(true);
-  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
-  
-  const [adjustments, setAdjustments] = useState({
-    position: { x: 0, y: -8 },
-    scale: 1.0, // Escala inicial mais conservadora  
-    rotation: 0,
-    opacity: 0.9
-  });
 
-  const getCoresDisponiveis = (model: GlassesModel): CorDisponivel[] => {
+  // Carregar modelos de óculos
+  useEffect(() => {
+    const loadGlassesModels = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('modelos_oculos')
+          .select('*')
+          .eq('ativo', true)
+          .order('popular', { ascending: false });
+
+        if (error) throw error;
+        setGlassesModels(data || []);
+        
+        if (!selectedGlasses && data && data.length > 0) {
+          setSelectedGlasses(data[0]);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar modelos:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os modelos de óculos",
+          variant: "destructive"
+        });
+      }
+    };
+
+    loadGlassesModels();
+  }, [selectedGlasses, toast]);
+
+  // Definir óculos selecionado quando prop muda
+  useEffect(() => {
+    if (selectedModel) {
+      setSelectedGlasses(selectedModel);
+    }
+  }, [selectedModel]);
+
+  const startCamera = async () => {
     try {
-      const cores = model.cores_disponiveis as unknown as CorDisponivel[] | null;
-      return Array.isArray(cores) ? cores : [];
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        setIsStreaming(true);
+        setCapturedImage(null);
+      }
     } catch (error) {
-      console.error('Erro ao parsear cores:', error);
+      console.error('Erro ao acessar câmera:', error);
+      toast({
+        title: "Erro de Câmera",
+        description: "Não foi possível acessar sua câmera",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsStreaming(false);
+  };
+
+  const processImageForFaceDetection = async (imageSrc: string): Promise<FaceDetection | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = async () => {
+        try {
+          const detection = await FaceDetector.detectFaceFeatures(img);
+          console.log('Detecção facial completa:', detection);
+          resolve(detection);
+        } catch (error) {
+          console.error('Erro na detecção facial:', error);
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = imageSrc;
+    });
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    ctx.drawImage(video, 0, 0);
+    
+    const imageData = canvas.toDataURL('image/jpeg', 0.9);
+    setCapturedImage(imageData);
+    
+    // Processar detecção facial na imagem capturada
+    const faceDetection = await processImageForFaceDetection(imageData);
+    if (faceDetection) {
+      setCurrentFaceDetection(faceDetection);
+      
+      // Calcular escala automática baseada na detecção facial
+      const faceMeasurements = {
+        eyeDistancePixels: faceDetection.eyeDistance,
+        faceWidthPixels: faceDetection.faceWidth,
+        faceHeightPixels: faceDetection.faceHeight,
+        eyeLevel: faceDetection.leftEye.y,
+        centerX: (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2,
+        centerY: faceDetection.leftEye.y
+      };
+      
+      const calculatedScale = FaceDetector.calculateGlassesScale(faceMeasurements);
+      setGlassesScale([calculatedScale]);
+      
+      console.log('Escala automática calculada:', calculatedScale);
+    }
+    
+    stopCamera();
+    
+    if (onCapture) {
+      onCapture(imageData);
+    }
+    
+    toast({
+      title: "Foto Capturada!",
+      description: "Agora você pode experimentar diferentes óculos"
+    });
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const imageData = e.target?.result as string;
+      setCapturedImage(imageData);
+      stopCamera();
+      
+      // Processar detecção facial na imagem carregada
+      const faceDetection = await processImageForFaceDetection(imageData);
+      if (faceDetection) {
+        setCurrentFaceDetection(faceDetection);
+        
+        // Calcular escala automática
+        const faceMeasurements = {
+          eyeDistancePixels: faceDetection.eyeDistance,
+          faceWidthPixels: faceDetection.faceWidth,
+          faceHeightPixels: faceDetection.faceHeight,
+          eyeLevel: faceDetection.leftEye.y,
+          centerX: (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2,
+          centerY: faceDetection.leftEye.y
+        };
+        
+        const calculatedScale = FaceDetector.calculateGlassesScale(faceMeasurements);
+        setGlassesScale([calculatedScale]);
+      }
+      
+      if (onCapture) {
+        onCapture(imageData);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const renderGlassesOnCanvas = useCallback(async () => {
+    if (!canvasRef.current || !capturedImage || !selectedGlasses) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Carregar e desenhar imagem de fundo
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = async () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      // Renderizar óculos usando o GlassesRenderer
+      const renderOptions = {
+        position: glassesPosition,
+        scale: glassesScale[0],
+        rotation: glassesRotation[0],
+        opacity: glassesOpacity[0],
+        color: selectedColor
+      };
+
+      await GlassesRenderer.renderGlasses(
+        ctx,
+        selectedGlasses,
+        renderOptions,
+        canvas.width,
+        canvas.height,
+        currentFaceDetection || undefined
+      );
+    };
+    img.src = capturedImage;
+  }, [capturedImage, selectedGlasses, glassesScale, glassesRotation, glassesOpacity, glassesPosition, selectedColor, currentFaceDetection]);
+
+  // Re-renderizar quando os controles mudarem
+  useEffect(() => {
+    if (capturedImage) {
+      renderGlassesOnCanvas();
+    }
+  }, [renderGlassesOnCanvas, capturedImage]);
+
+  const downloadImage = () => {
+    if (!canvasRef.current) return;
+    
+    const link = document.createElement('a');
+    link.download = `oculos-virtual-${Date.now()}.jpg`;
+    link.href = canvasRef.current.toDataURL('image/jpeg', 0.9);
+    link.click();
+    
+    toast({
+      title: "Download Concluído!",
+      description: "Sua imagem foi salva com sucesso"
+    });
+  };
+
+  const resetControls = () => {
+    setGlassesScale([1.0]);
+    setGlassesRotation([0]);
+    setGlassesOpacity([0.9]);
+    setGlassesPosition({ x: 0, y: 0 });
+    setSelectedColor('#000000');
+  };
+
+  const getAvailableColors = () => {
+    if (!selectedGlasses?.cores_disponiveis) return [];
+    
+    try {
+      const colors = selectedGlasses.cores_disponiveis as any[];
+      return Array.isArray(colors) ? colors : [];
+    } catch {
       return [];
     }
   };
 
-  const fetchGlassesModels = useCallback(async () => {
-    try {
-      setLoadingModels(true);
-      
-      const categorias = suggestions.map(suggestion => {
-        const tipo = suggestion.tipo.toLowerCase();
-        if (tipo.includes('quadrada') || tipo.includes('angular')) return 'quadrada';
-        if (tipo.includes('redonda') || tipo.includes('oval')) return 'redonda';
-        if (tipo.includes('cat') || tipo.includes('felino')) return 'cat-eye';
-        if (tipo.includes('aviador')) return 'aviador';
-        if (tipo.includes('retangular')) return 'retangular';
-        return 'oval';
-      });
-
-      const formatoRosto = faceAnalysis.formatoRosto.toLowerCase();
-      const tomPele = faceAnalysis.tomPele.toLowerCase();
-      
-      const { data: models, error } = await supabase
-        .from('modelos_oculos')
-        .select('*')
-        .eq('ativo', true)
-        .or(
-          `categoria.in.(${categorias.join(',')}),formato_recomendado.eq.${formatoRosto},popular.eq.true`
-        )
-        .order('popular', { ascending: false });
-
-      if (error) {
-        console.error('Erro ao buscar modelos:', error);
-        toast({
-          title: "Erro",
-          description: "Erro ao carregar modelos de óculos",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const filteredModels = models?.filter(model => {
-        if (!model.tom_pele_recomendado) return true;
-        return model.tom_pele_recomendado.some(tom => 
-          tomPele.includes(tom) || tom === 'médio'
-        );
-      }) || [];
-
-      const finalModels = filteredModels.length > 0 ? filteredModels : (models || []);
-      
-      setAvailableModels(finalModels);
-      
-      if (finalModels.length > 0) {
-        const firstModel = finalModels[0];
-        setSelectedModel(firstModel.id);
-        
-        const cores = getCoresDisponiveis(firstModel);
-        if (cores.length > 0) {
-          setSelectedColor(cores[0].codigo);
-        }
-      }
-      
-    } catch (error) {
-      console.error('Erro ao buscar modelos:', error);
-      toast({
-        title: "Erro",
-        description: "Erro inesperado ao carregar modelos",
-        variant: "destructive"
-      });
-    } finally {
-      setLoadingModels(false);
-    }
-  }, [suggestions, faceAnalysis, toast]);
-
-  const detectFaceFeatures = useCallback(async () => {
-    if (!canvasRef.current || !imageRef.current) return;
-    
-    setIsDetecting(true);
-    
-    try {
-      // Usar nova detecção facial melhorada
-      const detection = await FaceDetector.detectFaceFeatures(imageRef.current);
-      setFaceDetection(detection);
-      
-      console.log('Detecção facial concluída:', detection);
-      
-    } catch (error) {
-      console.error('Erro na detecção facial:', error);
-      toast({
-        title: "Erro na detecção",
-        description: "Não foi possível detectar características faciais",
-        variant: "destructive"
-      });
-    } finally {
-      setIsDetecting(false);
-    }
-  }, [toast]);
-
-  const calculateAutoPosition = useCallback(() => {
-    if (!faceDetection || !canvasRef.current) return;
-    
-    const canvas = canvasRef.current;
-    
-    // Usar novo sistema de posicionamento
-    const position = FaceDetector.calculateGlassesPosition(faceDetection);
-    const faceMeasurements = {
-      eyeDistancePixels: faceDetection.eyeDistance,
-      faceWidthPixels: faceDetection.faceWidth,
-      faceHeightPixels: faceDetection.faceHeight,
-      eyeLevel: faceDetection.leftEye.y,
-      centerX: position.x,
-      centerY: position.y
-    };
-    
-    // Calcular escala baseada nas medições faciais
-    const calculatedScale = FaceDetector.calculateGlassesScale(faceMeasurements);
-    
-    console.log('Posicionamento automático:', {
-      position,
-      faceMeasurements,
-      calculatedScale
-    });
-    
-    setAdjustments(prev => ({
-      ...prev,
-      position: { 
-        x: ((position.x / canvas.width) - 0.5) * 100,
-        y: ((position.y / canvas.height) - 0.5) * 100
-      },
-      scale: calculatedScale
-    }));
-  }, [faceDetection]);
-
-  const renderSimulation = useCallback(async () => {
-    if (!canvasRef.current || !imageRef.current || !selectedModel || !selectedColor) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    const img = imageRef.current;
-    
-    canvas.width = img.naturalWidth || img.width;
-    canvas.height = img.naturalHeight || img.height;
-    
-    // Desenhar imagem de fundo
-    ctx.drawImage(img, 0, 0);
-    
-    // Renderizar óculos com novo sistema
-    const currentModel = availableModels.find(m => m.id === selectedModel);
-    if (currentModel) {
-      const renderOptions = {
-        position: adjustments.position,
-        scale: adjustments.scale,
-        rotation: adjustments.rotation,
-        opacity: adjustments.opacity,
-        color: selectedColor
-      };
-      
-      await GlassesRenderer.renderGlasses(
-        ctx,
-        currentModel,
-        renderOptions,
-        canvas.width,
-        canvas.height,
-        faceDetection || undefined
-      );
-    }
-    
-  }, [selectedModel, selectedColor, adjustments, availableModels, faceDetection]);
-
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => {
-      if (imageRef.current) {
-        imageRef.current.src = img.src;
-        detectFaceFeatures();
-      }
-    };
-    img.src = originalImage;
-  }, [originalImage, detectFaceFeatures]);
-
-  useEffect(() => {
-    fetchGlassesModels();
-  }, [fetchGlassesModels]);
-
-  useEffect(() => {
-    if (faceDetection) {
-      calculateAutoPosition();
-    }
-  }, [faceDetection, calculateAutoPosition]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      renderSimulation();
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [renderSimulation]);
-
-  const handleSave = () => {
-    if (!canvasRef.current || !onSave) return;
-    
-    const imageData = canvasRef.current.toDataURL('image/jpeg', 0.95);
-    onSave(imageData);
-  };
-
-  const handleDownload = () => {
-    if (!canvasRef.current) return;
-    
-    const link = document.createElement('a');
-    link.download = `provador-virtual-${Date.now()}.jpg`;
-    link.href = canvasRef.current.toDataURL('image/jpeg', 0.95);
-    link.click();
-  };
-
-  const resetAdjustments = () => {
-    setAdjustments({
-      position: { x: 0, y: -8 },
-      scale: 1.0,
-      rotation: 0,
-      opacity: 0.9
-    });
-    if (faceDetection) {
-      setTimeout(() => calculateAutoPosition(), 100);
-    }
-  };
-
-  const getCurrentModel = () => availableModels.find(m => m.id === selectedModel);
-  const currentModel = getCurrentModel();
-
-  if (loadingModels) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-3">
-          <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
-          <span>Carregando modelos de óculos...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="max-w-6xl mx-auto p-6">
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-600" />
-            Provador Virtual - Detecção Facial Aprimorada
-            {faceDetection && (
-              <Badge variant="secondary" className="ml-auto">
-                <Eye className="h-3 w-3 mr-1" />
-                Face Detectada ({Math.round(faceDetection.confidence * 100)}%)
-              </Badge>
-            )}
+            <Glasses className="h-6 w-6 text-blue-600" />
+            Prova Virtual de Óculos
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {imageLoadError && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-yellow-800 text-sm">
-                ⚠️ {imageLoadError}. Usando visualização alternativa.
-              </p>
-            </div>
-          )}
-          
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Canvas Principal */}
-            <div className="xl:col-span-2 space-y-4">
-              <div className="relative border-2 border-gray-200 rounded-xl overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 shadow-lg">
-                {isDetecting && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                    <div className="bg-white rounded-lg p-4 flex items-center gap-3">
-                      <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
-                      <span className="text-sm font-medium">Detectando características faciais...</span>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="relative">
-                  <img
-                    ref={imageRef}
-                    src={originalImage}
-                    alt="Cliente"
-                    className="w-full h-auto max-h-[500px] object-contain"
-                    style={{ display: 'none' }}
+          <div className="grid lg:grid-cols-2 gap-8">
+            {/* Área da Câmera/Imagem */}
+            <div className="space-y-4">
+              <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
+                {!capturedImage ? (
+                  <video
+                    ref={videoRef}
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    muted
+                    playsInline
                   />
+                ) : (
                   <canvas
                     ref={canvasRef}
-                    className="w-full h-auto max-h-[500px] object-contain"
+                    className="w-full h-full object-contain"
                   />
-                </div>
+                )}
+                
+                {currentFaceDetection && capturedImage && (
+                  <div className="absolute top-2 left-2">
+                    <Badge className="bg-green-100 text-green-800">
+                      <Zap className="w-3 h-3 mr-1" />
+                      Face Detectada ({Math.round(currentFaceDetection.confidence * 100)}%)
+                    </Badge>
+                  </div>
+                )}
               </div>
-              
-              <div className="flex gap-3">
-                <Button onClick={handleSave} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Salvar Provador
+
+              <div className="flex flex-wrap gap-2">
+                {!isStreaming && !capturedImage && (
+                  <Button onClick={startCamera} className="flex items-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    Iniciar Câmera
+                  </Button>
+                )}
+                
+                {isStreaming && (
+                  <Button onClick={capturePhoto} className="flex items-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    Capturar Foto
+                  </Button>
+                )}
+                
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Carregar Foto
                 </Button>
-                <Button onClick={handleDownload} variant="outline" className="flex-1">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download HD
-                </Button>
-                <Button onClick={resetAdjustments} variant="outline" size="icon">
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
+                
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                
+                {capturedImage && (
+                  <>
+                    <Button onClick={startCamera} variant="outline" className="flex items-center gap-2">
+                      <RotateCcw className="h-4 w-4" />
+                      Nova Foto
+                    </Button>
+                    <Button onClick={downloadImage} variant="outline" className="flex items-center gap-2">
+                      <Download className="h-4 w-4" />
+                      Download
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
-            
+
             {/* Controles */}
             <div className="space-y-6">
-              {suggestions.length > 0 && (
-                <div>
-                  <Label className="text-base font-semibold mb-3 block flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-purple-600" />
-                    Recomendações da IA
-                  </Label>
-                  <div className="space-y-2 mb-4">
-                    {suggestions.map((suggestion, index) => (
-                      <div key={index} className="p-2 bg-purple-50 rounded-lg border border-purple-200">
-                        <p className="text-sm font-medium text-purple-900">{suggestion.tipo}</p>
-                        <p className="text-xs text-purple-700">{suggestion.motivo}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
               {/* Seleção de Modelo */}
-              <div>
-                <Label className="text-base font-semibold mb-3 block flex items-center gap-2">
-                  <Glasses className="h-4 w-4" />
-                  Modelos Disponíveis ({availableModels.length})
-                </Label>
-                <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto">
-                  {availableModels.map((model) => (
-                    <div
-                      key={model.id}
-                      className={`relative p-3 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                        selectedModel === model.id
-                          ? 'border-purple-500 bg-purple-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => {
-                        setSelectedModel(model.id);
-                        const cores = getCoresDisponiveis(model);
-                        if (cores.length > 0) {
-                          setSelectedColor(cores[0].codigo);
-                        }
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm">{model.nome}</h4>
-                          <p className="text-xs text-gray-500 capitalize">{model.categoria}</p>
-                          <p className="text-xs text-gray-400">
-                            {model.largura_mm}mm x {model.altura_mm}mm
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          {model.popular && (
-                            <Badge className="bg-green-500 text-white text-xs">
-                              Popular
-                            </Badge>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Escolher Óculos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Select
+                    value={selectedGlasses?.id || ''}
+                    onValueChange={(value) => {
+                      const model = glassesModels.find(m => m.id === value);
+                      setSelectedGlasses(model || null);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um modelo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {glassesModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.nome} - {model.categoria}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {selectedGlasses && (
+                    <div className="mt-4 p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={selectedGlasses.imagem_url} 
+                          alt={selectedGlasses.nome}
+                          className="w-16 h-16 object-contain border rounded"
+                        />
+                        <div>
+                          <h3 className="font-medium">{selectedGlasses.nome}</h3>
+                          <p className="text-sm text-gray-600 capitalize">{selectedGlasses.categoria}</p>
+                          {selectedGlasses.popular && (
+                            <Badge variant="secondary" className="mt-1 text-xs">Popular</Badge>
                           )}
-                          <img 
-                            src={model.imagem_url} 
-                            alt={model.nome}
-                            className="w-12 h-8 object-contain opacity-80"
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Controles de Ajuste */}
+              {capturedImage && selectedGlasses && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      Ajustar Óculos
+                      <Button variant="outline" size="sm" onClick={resetControls}>
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Reset
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Tamanho */}
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Tamanho: {glassesScale[0].toFixed(2)}x
+                      </label>
+                      <Slider
+                        value={glassesScale}
+                        onValueChange={setGlassesScale}
+                        min={0.3}
+                        max={2.5}
+                        step={0.05}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Rotação */}
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Rotação: {glassesRotation[0]}°
+                      </label>
+                      <Slider
+                        value={glassesRotation}
+                        onValueChange={setGlassesRotation}
+                        min={-30}
+                        max={30}
+                        step={1}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Opacidade */}
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Opacidade: {Math.round(glassesOpacity[0] * 100)}%
+                      </label>
+                      <Slider
+                        value={glassesOpacity}
+                        onValueChange={setGlassesOpacity}
+                        min={0.1}
+                        max={1}
+                        step={0.1}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Posição */}
+                    <div>
+                      <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                        <Move className="h-4 w-4" />
+                        Posição
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-gray-600">Horizontal</label>
+                          <Slider
+                            value={[glassesPosition.x]}
+                            onValueChange={(value) => setGlassesPosition(prev => ({ ...prev, x: value[0] }))}
+                            min={-20}
+                            max={20}
+                            step={0.5}
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">Vertical</label>
+                          <Slider
+                            value={[glassesPosition.y]}
+                            onValueChange={(value) => setGlassesPosition(prev => ({ ...prev, y: value[0] }))}
+                            min={-20}
+                            max={20}
+                            step={0.5}
+                            className="w-full"
                           />
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Seleção de Cor */}
-              {currentModel && (
-                <div>
-                  <Label className="text-base font-semibold mb-3 block flex items-center gap-2">
-                    <Palette className="h-4 w-4" />
-                    Cores Disponíveis
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {getCoresDisponiveis(currentModel).map((cor) => (
-                      <button
-                        key={cor.codigo}
-                        className={`p-2 border-2 rounded-lg text-xs font-medium transition-all ${
-                          selectedColor === cor.codigo
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => setSelectedColor(cor.codigo)}
-                      >
-                        <div
-                          className="w-4 h-4 rounded-full mx-auto mb-1 border border-gray-300"
-                          style={{ backgroundColor: cor.codigo }}
-                        />
-                        {cor.nome}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
+                    {/* Cores */}
+                    {getAvailableColors().length > 0 && (
+                      <div>
+                        <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                          <Palette className="h-4 w-4" />
+                          Cor da Armação
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {getAvailableColors().map((color: any, index: number) => (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedColor(color.codigo)}
+                              className={`w-8 h-8 rounded-full border-2 ${
+                                selectedColor === color.codigo ? 'border-blue-500' : 'border-gray-300'
+                              }`}
+                              style={{ backgroundColor: color.codigo }}
+                              title={color.nome}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Informações da Detecção */}
+                    {currentFaceDetection && (
+                      <div className="p-3 bg-blue-50 rounded-lg text-sm">
+                        <h4 className="font-medium text-blue-900 mb-2">Análise Facial:</h4>
+                        <div className="grid grid-cols-2 gap-2 text-blue-800">
+                          <div>Distância dos olhos: {Math.round(currentFaceDetection.eyeDistance)}px</div>
+                          <div>Largura do rosto: {Math.round(currentFaceDetection.faceWidth)}px</div>
+                          <div>Altura do rosto: {Math.round(currentFaceDetection.faceHeight)}px</div>
+                          <div>Confiança: {Math.round(currentFaceDetection.confidence * 100)}%</div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
-              
-              {/* Ajustes Finos */}
-              <div>
-                <Label className="text-base font-semibold mb-3 block flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  Ajustes Precisos
-                  {faceDetection && (
-                    <Badge variant="outline" className="text-xs">
-                      Baseado na detecção facial
-                    </Badge>
-                  )}
-                </Label>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm mb-2 block">
-                      Posição Horizontal: {adjustments.position.x.toFixed(0)}%
-                    </Label>
-                    <Slider
-                      value={[adjustments.position.x]}
-                      onValueChange={(value) => 
-                        setAdjustments(prev => ({ 
-                          ...prev, 
-                          position: { ...prev.position, x: value[0] } 
-                        }))
-                      }
-                      min={-20}
-                      max={20}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm mb-2 block">
-                      Posição Vertical: {adjustments.position.y.toFixed(0)}%
-                    </Label>
-                    <Slider
-                      value={[adjustments.position.y]}
-                      onValueChange={(value) => 
-                        setAdjustments(prev => ({ 
-                          ...prev, 
-                          position: { ...prev.position, y: value[0] } 
-                        }))
-                      }
-                      min={-20}
-                      max={20}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm mb-2 block">
-                      Tamanho: {Math.round(adjustments.scale * 100)}%
-                      {faceDetection && (
-                        <span className="text-xs text-green-600 ml-2">
-                          (Auto-ajustado pela IA)
-                        </span>
-                      )}
-                    </Label>
-                    <Slider
-                      value={[adjustments.scale]}
-                      onValueChange={(value) => 
-                        setAdjustments(prev => ({ ...prev, scale: value[0] }))
-                      }
-                      min={0.5}
-                      max={2.0}
-                      step={0.05}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm mb-2 block">
-                      Rotação: {adjustments.rotation}°
-                    </Label>
-                    <Slider
-                      value={[adjustments.rotation]}
-                      onValueChange={(value) => 
-                        setAdjustments(prev => ({ ...prev, rotation: value[0] }))
-                      }
-                      min={-10}
-                      max={10}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm mb-2 block">
-                      Opacidade: {Math.round(adjustments.opacity * 100)}%
-                    </Label>
-                    <Slider
-                      value={[adjustments.opacity]}
-                      onValueChange={(value) => 
-                        setAdjustments(prev => ({ ...prev, opacity: value[0] }))
-                      }
-                      min={0.5}
-                      max={1.0}
-                      step={0.05}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </CardContent>
@@ -589,5 +560,3 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     </div>
   );
 };
-
-export default VirtualTryOn;
