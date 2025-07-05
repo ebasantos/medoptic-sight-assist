@@ -355,6 +355,7 @@ const FrameSuggestionPage = () => {
   };
 
   const handleSimulatedImageSave = (imageData: string) => {
+    console.log('Simulação salva:', imageData);
     setSimulatedImage(imageData);
     toast({
       title: "Simulação Salva",
@@ -585,10 +586,26 @@ const FrameSuggestionPage = () => {
 
         {step === 'simulation' && capturedImage && (
           <div className="space-y-6">
-            <VirtualTryOn
-              onCapture={handleSimulatedImageSave}
-              selectedModel={null}
-            />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Glasses className="h-6 w-6 text-blue-600" />
+                  Simulação Virtual de Óculos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-blue-800 text-sm">
+                    ✨ Use a foto capturada para experimentar diferentes modelos de óculos virtualmente!
+                  </p>
+                </div>
+                
+                <VirtualTryOn
+                  onCapture={handleSimulatedImageSave}
+                  selectedModel={null}
+                />
+              </CardContent>
+            </Card>
             
             <Card>
               <CardContent className="p-4">
