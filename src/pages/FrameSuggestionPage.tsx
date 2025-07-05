@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -587,16 +586,8 @@ const FrameSuggestionPage = () => {
         {step === 'simulation' && capturedImage && (
           <div className="space-y-6">
             <VirtualTryOn
-              originalImage={capturedImage}
-              faceAnalysis={faceAnalysis || {
-                formatoRosto: 'oval',
-                tomPele: 'médio',
-                distanciaOlhos: 'normal',
-                confiabilidade: 0.8,
-                observacoes: 'Análise genérica'
-              }}
-              suggestions={sugestoes}
-              onSave={handleSimulatedImageSave}
+              onCapture={handleSimulatedImageSave}
+              selectedModel={null}
             />
             
             <Card>
