@@ -59,8 +59,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   const [imageLoadError, setImageLoadError] = useState<string | null>(null);
   
   const [adjustments, setAdjustments] = useState({
-    position: { x: 0, y: -15 },
-    scale: 1.2,
+    position: { x: 0, y: -10 },
+    scale: 0.8, // Escala menor por padrão
     rotation: 0,
     opacity: 0.9
   });
@@ -152,19 +152,21 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     const img = imageRef.current;
-    const eyeDistance = Math.min(img.width, img.height) * 0.15;
+    
+    // Melhorar detecção baseada no tamanho real da imagem
+    const eyeDistance = Math.min(img.width, img.height) * 0.12; // Reduzir proporção
     
     const mockDetection: FaceDetection = {
       leftEye: { 
-        x: img.width * 0.35,
-        y: img.height * 0.4
+        x: img.width * 0.37,  // Ajustar posições dos olhos
+        y: img.height * 0.42
       },
       rightEye: { 
-        x: img.width * 0.65,
-        y: img.height * 0.4
+        x: img.width * 0.63,
+        y: img.height * 0.42
       },
       eyeDistance: eyeDistance,
-      faceWidth: img.width * 0.4,
+      faceWidth: img.width * 0.35, // Reduzir largura do rosto
       confidence: 0.88
     };
     
@@ -177,9 +179,20 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     
     const canvas = canvasRef.current;
     const centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
-    const centerY = faceDetection.leftEye.y - 15;
+    const centerY = faceDetection.leftEye.y - 8; // Posição um pouco acima dos olhos
     
-    const scale = Math.max(0.8, Math.min(1.5, faceDetection.eyeDistance / 80));
+    // Calcular escala baseada na distância entre os olhos e largura da face
+    const eyeDistancePixels = Math.abs(faceDetection.rightEye.x - faceDetection.leftEye.x);
+    const idealGlassesWidth = eyeDistancePixels * 1.4; // Óculos deve ser 1.4x a distância dos olhos
+    const baseGlassesWidth = 200; // Largura base dos óculos em pixels
+    const calculatedScale = Math.max(0.4, Math.min(1.2, idealGlassesWidth / baseGlassesWidth));
+    
+    console.log('Cálculos de escala:', {
+      eyeDistancePixels,
+      idealGlassesWidth,
+      calculatedScale,
+      faceWidth: faceDetection.faceWidth
+    });
     
     setAdjustments(prev => ({
       ...prev,
@@ -187,7 +200,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         x: (centerX / canvas.width) * 100 - 50,
         y: (centerY / canvas.height) * 100 - 50
       },
-      scale: scale
+      scale: calculatedScale
     }));
   }, [faceDetection]);
 
@@ -229,6 +242,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         const centerX = canvasWidth / 2 + (adjustments.position.x * canvasWidth / 100);
         const centerY = canvasHeight / 2 + (adjustments.position.y * canvasHeight / 100);
         
+        console.log('Posição calculada:', { centerX, centerY, canvasWidth, canvasHeight });
+        
         // Aplicar transformações
         ctx.translate(centerX, centerY);
         ctx.rotate((adjustments.rotation * Math.PI) / 180);
@@ -241,10 +256,24 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
           ctx.filter = `hue-rotate(${getHueRotation(selectedColor)}deg) saturate(150%)`;
         }
         
-        // Calcular tamanho proporcional ao rosto
-        const faceScale = Math.min(canvasWidth, canvasHeight) / 600;
-        const finalWidth = Math.max(200, glassesImg.width * faceScale);
-        const finalHeight = Math.max(80, glassesImg.height * faceScale);
+        // Calcular tamanho proporcional - mais conservador
+        const baseFaceScale = Math.min(canvasWidth, canvasHeight) / 800; // Aumentar divisor
+        const glassesAspectRatio = glassesImg.width / glassesImg.height;
+        
+        // Tamanho baseado na distância dos olhos se disponível
+        let finalWidth, finalHeight;
+        
+        if (faceDetection) {
+          const eyeDistance = Math.abs(faceDetection.rightEye.x - faceDetection.leftEye.x);
+          finalWidth = eyeDistance * 1.3; // Óculos 1.3x a distância dos olhos
+          finalHeight = finalWidth / glassesAspectRatio;
+        } else {
+          // Fallback para tamanho baseado no canvas
+          finalWidth = Math.max(150, Math.min(300, glassesImg.width * baseFaceScale));
+          finalHeight = Math.max(60, Math.min(120, glassesImg.height * baseFaceScale));
+        }
+        
+        console.log('Dimensões finais dos óculos:', { finalWidth, finalHeight, baseFaceScale });
         
         ctx.drawImage(
           glassesImg, 
@@ -294,33 +323,37 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     ctx.globalAlpha = adjustments.opacity;
     
     ctx.strokeStyle = selectedColor || '#000000';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3; // Linha mais fina
+    
+    // Lentes menores e mais proporcionais
+    const lensRadius = 28;
+    const lensDistance = 35;
     
     // Lente esquerda
     ctx.beginPath();
-    ctx.arc(-40, 0, 35, 0, 2 * Math.PI);
+    ctx.arc(-lensDistance, 0, lensRadius, 0, 2 * Math.PI);
     ctx.stroke();
     
     // Lente direita
     ctx.beginPath();
-    ctx.arc(40, 0, 35, 0, 2 * Math.PI);
+    ctx.arc(lensDistance, 0, lensRadius, 0, 2 * Math.PI);
     ctx.stroke();
     
     // Ponte
     ctx.beginPath();
-    ctx.moveTo(-5, 0);
-    ctx.lineTo(5, 0);
+    ctx.moveTo(-8, 0);
+    ctx.lineTo(8, 0);
     ctx.stroke();
     
-    // Hastes
+    // Hastes proporcionais
     ctx.beginPath();
-    ctx.moveTo(-75, 0);
-    ctx.lineTo(-100, -8);
+    ctx.moveTo(-(lensDistance + lensRadius), 0);
+    ctx.lineTo(-(lensDistance + lensRadius + 20), -6);
     ctx.stroke();
     
     ctx.beginPath();
-    ctx.moveTo(75, 0);
-    ctx.lineTo(100, -8);
+    ctx.moveTo((lensDistance + lensRadius), 0);
+    ctx.lineTo((lensDistance + lensRadius + 20), -6);
     ctx.stroke();
     
     ctx.restore();
@@ -373,8 +406,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
 
   const resetAdjustments = () => {
     setAdjustments({
-      position: { x: 0, y: -15 },
-      scale: 1.2,
+      position: { x: 0, y: -10 },
+      scale: 0.8, // Escala menor por padrão
       rotation: 0,
       opacity: 0.9
     });
