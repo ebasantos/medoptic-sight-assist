@@ -8,6 +8,8 @@ import { Glasses, RotateCcw, Download, Sparkles, Eye, Palette, Settings, Refresh
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
+import { FaceDetector, FaceDetection } from './VirtualTryOn/FaceDetector';
+import { GlassesRenderer } from './VirtualTryOn/GlassesRenderer';
 
 interface FaceDetection {
   leftEye: { x: number; y: number };
@@ -59,8 +61,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
   const [imageLoadError, setImageLoadError] = useState<string | null>(null);
   
   const [adjustments, setAdjustments] = useState({
-    position: { x: 0, y: -10 },
-    scale: 1.2, // Aumentar escala padrão
+    position: { x: 0, y: -8 },
+    scale: 1.0, // Escala inicial mais conservadora  
     rotation: 0,
     opacity: 0.9
   });
@@ -149,56 +151,55 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     
     setIsDetecting(true);
     
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const img = imageRef.current;
-    
-    // Aumentar proporção para óculos maiores
-    const eyeDistance = Math.min(img.width, img.height) * 0.18; // Aumentar de 0.12 para 0.18
-    
-    const mockDetection: FaceDetection = {
-      leftEye: { 
-        x: img.width * 0.37,
-        y: img.height * 0.42
-      },
-      rightEye: { 
-        x: img.width * 0.63,
-        y: img.height * 0.42
-      },
-      eyeDistance: eyeDistance,
-      faceWidth: img.width * 0.45, // Aumentar largura do rosto de 0.35 para 0.45
-      confidence: 0.88
-    };
-    
-    setFaceDetection(mockDetection);
-    setIsDetecting(false);
-  }, []);
+    try {
+      // Usar nova detecção facial melhorada
+      const detection = await FaceDetector.detectFaceFeatures(imageRef.current);
+      setFaceDetection(detection);
+      
+      console.log('Detecção facial concluída:', detection);
+      
+    } catch (error) {
+      console.error('Erro na detecção facial:', error);
+      toast({
+        title: "Erro na detecção",
+        description: "Não foi possível detectar características faciais",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDetecting(false);
+    }
+  }, [toast]);
 
   const calculateAutoPosition = useCallback(() => {
     if (!faceDetection || !canvasRef.current) return;
     
     const canvas = canvasRef.current;
-    const centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
-    const centerY = faceDetection.leftEye.y - 8;
     
-    // Calcular escala mais generosa
-    const eyeDistancePixels = Math.abs(faceDetection.rightEye.x - faceDetection.leftEye.x);
-    const idealGlassesWidth = eyeDistancePixels * 1.8; // Aumentar de 1.4 para 1.8
-    const baseGlassesWidth = 200;
-    const calculatedScale = Math.max(0.8, Math.min(2.0, idealGlassesWidth / baseGlassesWidth)); // Aumentar mínimo
+    // Usar novo sistema de posicionamento
+    const position = FaceDetector.calculateGlassesPosition(faceDetection);
+    const faceMeasurements = {
+      eyeDistancePixels: faceDetection.eyeDistance,
+      faceWidthPixels: faceDetection.faceWidth,
+      faceHeightPixels: faceDetection.faceHeight,
+      eyeLevel: faceDetection.leftEye.y,
+      centerX: position.x,
+      centerY: position.y
+    };
     
-    console.log('Cálculos de escala (aumentados):', {
-      eyeDistancePixels,
-      idealGlassesWidth,
-      calculatedScale,
-      faceWidth: faceDetection.faceWidth
+    // Calcular escala baseada nas medições faciais
+    const calculatedScale = FaceDetector.calculateGlassesScale(faceMeasurements);
+    
+    console.log('Posicionamento automático:', {
+      position,
+      faceMeasurements,
+      calculatedScale
     });
     
     setAdjustments(prev => ({
       ...prev,
       position: { 
-        x: (centerX / canvas.width) * 100 - 50,
-        y: (centerY / canvas.height) * 100 - 50
+        x: ((position.x / canvas.width) - 0.5) * 100,
+        y: ((position.y / canvas.height) - 0.5) * 100
       },
       scale: calculatedScale
     }));
@@ -216,144 +217,31 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
     canvas.width = img.naturalWidth || img.width;
     canvas.height = img.naturalHeight || img.height;
     
+    // Desenhar imagem de fundo
     ctx.drawImage(img, 0, 0);
     
+    // Renderizar óculos com novo sistema
     const currentModel = availableModels.find(m => m.id === selectedModel);
     if (currentModel) {
-      await renderGlassesImage(ctx, currentModel, canvas.width, canvas.height);
-    }
-    
-  }, [selectedModel, selectedColor, adjustments, availableModels]);
-
-  const renderGlassesImage = async (ctx: CanvasRenderingContext2D, model: GlassesModel, canvasWidth: number, canvasHeight: number) => {
-    try {
-      console.log('Carregando imagem da armação:', model.nome, model.imagem_url);
-      
-      const glassesImg = new Image();
-      glassesImg.crossOrigin = 'anonymous';
-      
-      glassesImg.onload = () => {
-        console.log('Imagem da armação carregada com sucesso:', model.nome);
-        setImageLoadError(null);
-        
-        ctx.save();
-        
-        const centerX = canvasWidth / 2 + (adjustments.position.x * canvasWidth / 100);
-        const centerY = canvasHeight / 2 + (adjustments.position.y * canvasHeight / 100);
-        
-        console.log('Posição calculada:', { centerX, centerY, canvasWidth, canvasHeight });
-        
-        ctx.translate(centerX, centerY);
-        ctx.rotate((adjustments.rotation * Math.PI) / 180);
-        ctx.scale(adjustments.scale, adjustments.scale);
-        ctx.globalAlpha = adjustments.opacity;
-        
-        if (selectedColor && selectedColor !== '#000000') {
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.filter = `hue-rotate(${getHueRotation(selectedColor)}deg) saturate(150%)`;
-        }
-        
-        // Tamanho mais generoso dos óculos
-        const baseFaceScale = Math.min(canvasWidth, canvasHeight) / 500; // Reduzir divisor de 800 para 500
-        const glassesAspectRatio = glassesImg.width / glassesImg.height;
-        
-        let finalWidth, finalHeight;
-        
-        if (faceDetection) {
-          const eyeDistance = Math.abs(faceDetection.rightEye.x - faceDetection.leftEye.x);
-          finalWidth = eyeDistance * 1.8; // Aumentar de 1.3 para 1.8
-          finalHeight = finalWidth / glassesAspectRatio;
-        } else {
-          // Fallback com tamanhos maiores
-          finalWidth = Math.max(200, Math.min(400, glassesImg.width * baseFaceScale)); // Aumentar mínimo e máximo
-          finalHeight = Math.max(80, Math.min(160, glassesImg.height * baseFaceScale)); // Aumentar mínimo e máximo
-        }
-        
-        console.log('Dimensões finais dos óculos (aumentadas):', { finalWidth, finalHeight, baseFaceScale });
-        
-        ctx.drawImage(
-          glassesImg, 
-          -finalWidth / 2, 
-          -finalHeight / 2, 
-          finalWidth, 
-          finalHeight
-        );
-        
-        ctx.restore();
+      const renderOptions = {
+        position: adjustments.position,
+        scale: adjustments.scale,
+        rotation: adjustments.rotation,
+        opacity: adjustments.opacity,
+        color: selectedColor
       };
       
-      glassesImg.onerror = (error) => {
-        console.error('Erro ao carregar imagem da armação:', error);
-        setImageLoadError(`Erro ao carregar imagem do modelo ${model.nome}`);
-        drawFallbackGlasses(ctx, canvasWidth, canvasHeight);
-      };
-      
-      glassesImg.src = model.imagem_url;
-      
-    } catch (error) {
-      console.error('Erro no processamento da imagem:', error);
-      setImageLoadError(`Erro ao processar imagem do modelo ${model.nome}`);
-      drawFallbackGlasses(ctx, canvasWidth, canvasHeight);
+      await GlassesRenderer.renderGlasses(
+        ctx,
+        currentModel,
+        renderOptions,
+        canvas.width,
+        canvas.height,
+        faceDetection || undefined
+      );
     }
-  };
-
-  const getHueRotation = (color: string): number => {
-    switch (color) {
-      case '#8B4513': return 30; // marrom
-      case '#FFD700': return 50; // dourado
-      case '#C0C0C0': return 0;  // prata
-      case '#000080': return 240; // azul
-      default: return 0;
-    }
-  };
-
-  const drawFallbackGlasses = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
-    ctx.save();
     
-    const centerX = canvasWidth / 2 + (adjustments.position.x * canvasWidth / 100);
-    const centerY = canvasWidth / 2 + (adjustments.position.y * canvasHeight / 100);
-    
-    ctx.translate(centerX, centerY);
-    ctx.rotate((adjustments.rotation * Math.PI) / 180);
-    ctx.scale(adjustments.scale, adjustments.scale);
-    ctx.globalAlpha = adjustments.opacity;
-    
-    ctx.strokeStyle = selectedColor || '#000000';
-    ctx.lineWidth = 3;
-    
-    // Lentes maiores para fallback
-    const lensRadius = 40; // Aumentar de 28 para 40
-    const lensDistance = 50; // Aumentar de 35 para 50
-    
-    // Lente esquerda
-    ctx.beginPath();
-    ctx.arc(-lensDistance, 0, lensRadius, 0, 2 * Math.PI);
-    ctx.stroke();
-    
-    // Lente direita
-    ctx.beginPath();
-    ctx.arc(lensDistance, 0, lensRadius, 0, 2 * Math.PI);
-    ctx.stroke();
-    
-    // Ponte
-    ctx.beginPath();
-    ctx.moveTo(-12, 0); // Aumentar ponte
-    ctx.lineTo(12, 0);
-    ctx.stroke();
-    
-    // Hastes proporcionais maiores
-    ctx.beginPath();
-    ctx.moveTo(-(lensDistance + lensRadius), 0);
-    ctx.lineTo(-(lensDistance + lensRadius + 30), -8); // Hastes maiores
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo((lensDistance + lensRadius), 0);
-    ctx.lineTo((lensDistance + lensRadius + 30), -8);
-    ctx.stroke();
-    
-    ctx.restore();
-  };
+  }, [selectedModel, selectedColor, adjustments, availableModels, faceDetection]);
 
   useEffect(() => {
     const img = new Image();
@@ -402,8 +290,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
 
   const resetAdjustments = () => {
     setAdjustments({
-      position: { x: 0, y: -10 },
-      scale: 1.2, // Escala padrão maior
+      position: { x: 0, y: -8 },
+      scale: 1.0,
       rotation: 0,
       opacity: 0.9
     });
@@ -432,11 +320,11 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-600" />
-            Provador Virtual - Modelos Recomendados pela IA
+            Provador Virtual - Detecção Facial Aprimorada
             {faceDetection && (
               <Badge variant="secondary" className="ml-auto">
                 <Eye className="h-3 w-3 mr-1" />
-                Rosto Detectado ({Math.round(faceDetection.confidence * 100)}%)
+                Face Detectada ({Math.round(faceDetection.confidence * 100)}%)
               </Badge>
             )}
           </CardTitle>
@@ -458,7 +346,7 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
                     <div className="bg-white rounded-lg p-4 flex items-center gap-3">
                       <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
-                      <span className="text-sm font-medium">Detectando posição dos olhos...</span>
+                      <span className="text-sm font-medium">Detectando características faciais...</span>
                     </div>
                   </div>
                 )}
@@ -495,7 +383,6 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
             
             {/* Controles */}
             <div className="space-y-6">
-              {/* Sugestões da IA */}
               {suggestions.length > 0 && (
                 <div>
                   <Label className="text-base font-semibold mb-3 block flex items-center gap-2">
@@ -596,6 +483,11 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                 <Label className="text-base font-semibold mb-3 block flex items-center gap-2">
                   <Settings className="h-4 w-4" />
                   Ajustes Precisos
+                  {faceDetection && (
+                    <Badge variant="outline" className="text-xs">
+                      Baseado na detecção facial
+                    </Badge>
+                  )}
                 </Label>
                 <div className="space-y-4">
                   <div>
@@ -610,8 +502,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                           position: { ...prev.position, x: value[0] } 
                         }))
                       }
-                      min={-30}
-                      max={30}
+                      min={-20}
+                      max={20}
                       step={1}
                       className="w-full"
                     />
@@ -629,8 +521,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                           position: { ...prev.position, y: value[0] } 
                         }))
                       }
-                      min={-30}
-                      max={30}
+                      min={-20}
+                      max={20}
                       step={1}
                       className="w-full"
                     />
@@ -639,13 +531,18 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                   <div>
                     <Label className="text-sm mb-2 block">
                       Tamanho: {Math.round(adjustments.scale * 100)}%
+                      {faceDetection && (
+                        <span className="text-xs text-green-600 ml-2">
+                          (Auto-ajustado pela IA)
+                        </span>
+                      )}
                     </Label>
                     <Slider
                       value={[adjustments.scale]}
                       onValueChange={(value) => 
                         setAdjustments(prev => ({ ...prev, scale: value[0] }))
                       }
-                      min={0.8}
+                      min={0.5}
                       max={2.0}
                       step={0.05}
                       className="w-full"
@@ -661,8 +558,8 @@ const VirtualTryOn: React.FC<VirtualTryOnProps> = ({
                       onValueChange={(value) => 
                         setAdjustments(prev => ({ ...prev, rotation: value[0] }))
                       }
-                      min={-15}
-                      max={15}
+                      min={-10}
+                      max={10}
                       step={1}
                       className="w-full"
                     />
