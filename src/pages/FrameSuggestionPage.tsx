@@ -603,6 +603,7 @@ const FrameSuggestionPage = () => {
                 <VirtualTryOn
                   onCapture={handleSimulatedImageSave}
                   selectedModel={null}
+                  initialImage={capturedImage}
                 />
               </CardContent>
             </Card>
