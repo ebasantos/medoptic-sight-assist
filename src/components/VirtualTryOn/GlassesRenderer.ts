@@ -54,8 +54,8 @@ export class GlassesRenderer {
         console.log('Usando posição fallback (sem detecção facial)');
       }
 
-      //escala padrao de 1.55
-      options.scale = 1.55;
+      // REMOVIDO: escala fixa de 1.55 - agora usa o valor do slider
+      console.log('Escala recebida do slider:', options.scale);
       
       // Aplicar apenas os ajustes manuais MUITO SUTIS do usuário
       centerX += (options.position.x * canvasWidth / 1000); // Sensibilidade reduzida pela metade
@@ -80,8 +80,8 @@ export class GlassesRenderer {
         const eyeDistance = faceDetection.eyeDistance;
         
         // Óculos devem ter largura proporcional à distância dos olhos
-        finalWidth = eyeDistance * 2.6; // Proporção mais conservadora
-        finalHeight = (finalWidth / (glassesImg.width / glassesImg.height)) * 2;
+        finalWidth = eyeDistance * 2.2; // Proporção reduzida para óculos menores
+        finalHeight = finalWidth / (glassesImg.width / glassesImg.height); // Manter proporção original da imagem
         
         console.log('Dimensões calculadas baseadas na detecção facial:', {
           eyeDistance,
@@ -100,11 +100,23 @@ export class GlassesRenderer {
       finalWidth *= options.scale;
       finalHeight *= options.scale;
       
-      // Renderizar óculos PERFEITAMENTE centralizados na posição dos olhos
+      // Calcular offset vertical para posicionamento correto da armação
+      const verticalOffset = finalHeight * 0.37; // 37% da altura para cima - posiciona armação sobre os olhos
+      
+      console.log('Posicionamento dos óculos (armação sobre os olhos):', {
+        finalWidth,
+        finalHeight,
+        verticalOffset,
+        percentualOffset: '37% da altura',
+        posicaoFinal: { x: -finalWidth / 2, y: -finalHeight / 2 - verticalOffset },
+        coordenadasOlhos: faceDetection ? { centerX, centerY } : 'Não detectado'
+      });
+      
+      // Renderizar óculos com offset vertical para posicionar armação exatamente sobre os olhos
       ctx.drawImage(
         glassesImg,
-        -finalWidth / 2,  // Centralizar horizontalmente
-        -(finalHeight / 2 + 65), // Centralizar verticalmente
+        -finalWidth / 2,   // Centralizar horizontalmente
+        -finalHeight / 2 - verticalOffset, // Offset para cima: posiciona armação sobre os olhos
         finalWidth,
         finalHeight
       );

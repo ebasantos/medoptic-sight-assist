@@ -1,16 +1,16 @@
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, RotateCcw, Download, Glasses, Zap, Palette, Move, Upload } from 'lucide-react';
+import { Camera, RotateCcw, Download, Glasses, Zap, Palette, Move, Upload, ZoomIn, ZoomOut } from 'lucide-react';
 import { FaceDetection, FaceDetector } from './VirtualTryOn/FaceDetector';
 import { GlassesRenderer } from './VirtualTryOn/GlassesRenderer';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
+import { useResponsiveGlassesScale } from '@/hooks/useResponsiveGlassesScale';
 
 type GlassesModel = Tables<'modelos_oculos'>;
 
@@ -25,20 +25,82 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Hook para escala responsiva
+  const { deviceInfo, responsiveScale, getOptimalScale } = useResponsiveGlassesScale();
+  
   const [isStreaming, setIsStreaming] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(initialImage || null);
   const [currentFaceDetection, setCurrentFaceDetection] = useState<FaceDetection | null>(null);
   const [glassesModels, setGlassesModels] = useState<GlassesModel[]>([]);
   const [selectedGlasses, setSelectedGlasses] = useState<GlassesModel | null>(selectedModel || null);
   
-  // Controles de ajuste
-  const [glassesScale, setGlassesScale] = useState([1.0]);
+  // Controles de ajuste - agora com valores responsivos
+  const [glassesScale, setGlassesScale] = useState([responsiveScale.initial]);
   const [glassesRotation, setGlassesRotation] = useState([0]);
   const [glassesOpacity, setGlassesOpacity] = useState([0.9]);
   const [glassesPosition, setGlassesPosition] = useState({ x: 0, y: 0 });
   const [selectedColor, setSelectedColor] = useState('#000000');
+  const [isScaleAdjustmentMode, setIsScaleAdjustmentMode] = useState(false);
   
+  // Função para lidar com mudanças de escala
+  const handleScaleChange = (newScale: number[]) => {
+    console.log('🎚️ Slider de escala mudou:', {
+      valorAnterior: glassesScale[0],
+      novoValor: newScale[0],
+      dispositivo: deviceInfo.isMobile ? 'Mobile' : deviceInfo.isTablet ? 'Tablet' : 'Desktop'
+    });
+    setGlassesScale(newScale);
+  };
+
   const { toast } = useToast();
+
+  // Função para processamento de detecção facial usando useCallback
+  const processImageForFaceDetection = useCallback(async (imageSrc: string): Promise<FaceDetection | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = async () => {
+        try {
+          const detection = await FaceDetector.detectFaceFeatures(img);
+          console.log('Detecção facial completa:', detection);
+          setCurrentFaceDetection(detection);
+          
+          // Calcular escala automática baseada na detecção facial e dispositivo
+          const faceMeasurements = {
+            eyeDistancePixels: detection.eyeDistance,
+            faceWidthPixels: detection.faceWidth,
+            faceHeightPixels: detection.faceHeight,
+            eyeLevel: detection.leftEye.y,
+            centerX: (detection.leftEye.x + detection.rightEye.x) / 2,
+            centerY: detection.leftEye.y
+          };
+          
+          const baseScale = FaceDetector.calculateGlassesScale(faceMeasurements);
+          const responsiveOptimalScale = getOptimalScale(baseScale);
+          setGlassesScale([responsiveOptimalScale]);
+          
+          console.log('Escala calculada:', {
+            dispositivo: deviceInfo.isMobile ? 'Mobile' : deviceInfo.isTablet ? 'Tablet' : 'Desktop',
+            baseScale,
+            responsiveOptimalScale,
+            tela: `${deviceInfo.screenWidth}x${deviceInfo.screenHeight}`
+          });
+          
+          resolve(detection);
+        } catch (error) {
+          console.error('Erro na detecção facial:', error);
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = imageSrc;
+    });
+  }, [getOptimalScale, deviceInfo.isMobile, deviceInfo.isTablet, deviceInfo.screenWidth, deviceInfo.screenHeight]);
+
+  // Atualizar escala inicial quando o dispositivo mudar
+  useEffect(() => {
+    setGlassesScale([responsiveScale.initial]);
+  }, [responsiveScale.initial]);
 
   // Usar imagem inicial se fornecida
   useEffect(() => {
@@ -46,7 +108,7 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
       setCapturedImage(initialImage);
       processImageForFaceDetection(initialImage);
     }
-  }, [initialImage]);
+  }, [initialImage, capturedImage, processImageForFaceDetection]);
 
   // Carregar modelos de óculos
   useEffect(() => {
@@ -63,19 +125,14 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
         
         if (!selectedGlasses && data && data.length > 0) {
           setSelectedGlasses(data[0]);
+        }        } catch (error) {
+          console.error('Erro ao carregar modelos:', error);
+          // toast será criado dentro do useEffect quando necessário
         }
-      } catch (error) {
-        console.error('Erro ao carregar modelos:', error);
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar os modelos de óculos",
-          variant: "destructive"
-        });
-      }
     };
 
     loadGlassesModels();
-  }, [selectedGlasses, toast]);
+  }, [selectedGlasses]);
 
   // Definir óculos selecionado quando prop muda
   useEffect(() => {
@@ -117,40 +174,6 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
       videoRef.current.srcObject = null;
     }
     setIsStreaming(false);
-  };
-
-  const processImageForFaceDetection = async (imageSrc: string): Promise<FaceDetection | null> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = async () => {
-        try {
-          const detection = await FaceDetector.detectFaceFeatures(img);
-          console.log('Detecção facial completa:', detection);
-          setCurrentFaceDetection(detection);
-          
-          // Calcular escala automática baseada na detecção facial
-          const faceMeasurements = {
-            eyeDistancePixels: detection.eyeDistance,
-            faceWidthPixels: detection.faceWidth,
-            faceHeightPixels: detection.faceHeight,
-            eyeLevel: detection.leftEye.y,
-            centerX: (detection.leftEye.x + detection.rightEye.x) / 2,
-            centerY: detection.leftEye.y
-          };
-          
-          const calculatedScale = FaceDetector.calculateGlassesScale(faceMeasurements);
-          setGlassesScale([calculatedScale]);
-          
-          resolve(detection);
-        } catch (error) {
-          console.error('Erro na detecção facial:', error);
-          resolve(null);
-        }
-      };
-      img.onerror = () => resolve(null);
-      img.src = imageSrc;
-    });
   };
 
   const capturePhoto = async () => {
@@ -229,6 +252,13 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
         color: selectedColor
       };
 
+      console.log('🔧 VirtualTryOn: Passando options para GlassesRenderer:', {
+        scale: renderOptions.scale,
+        position: renderOptions.position,
+        deviceInfo: deviceInfo.isMobile ? 'Mobile' : deviceInfo.isTablet ? 'Tablet' : 'Desktop',
+        canvasSize: `${canvas.width}x${canvas.height}`
+      });
+
       await GlassesRenderer.renderGlasses(
         ctx,
         selectedGlasses,
@@ -239,7 +269,7 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
       );
     };
     img.src = capturedImage;
-  }, [capturedImage, selectedGlasses, glassesScale, glassesRotation, glassesOpacity, glassesPosition, selectedColor, currentFaceDetection]);
+  }, [capturedImage, selectedGlasses, glassesScale, glassesRotation, glassesOpacity, glassesPosition, selectedColor, currentFaceDetection, deviceInfo.isMobile, deviceInfo.isTablet]);
 
   // Re-renderizar quando os controles mudarem
   useEffect(() => {
@@ -285,11 +315,16 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
     setSelectedColor('#000000');
   };
 
-  const getAvailableColors = () => {
+  interface ColorOption {
+    codigo: string;
+    nome: string;
+  }
+
+  const getAvailableColors = (): ColorOption[] => {
     if (!selectedGlasses?.cores_disponiveis) return [];
     
     try {
-      const colors = selectedGlasses.cores_disponiveis as any[];
+      const colors = selectedGlasses.cores_disponiveis as unknown as ColorOption[];
       return Array.isArray(colors) ? colors : [];
     } catch {
       return [];
@@ -443,19 +478,55 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Tamanho */}
+                {/* Tamanho - com controles responsivos */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Tamanho: {glassesScale[0].toFixed(2)}x
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Glasses className="h-4 w-4" />
+                      Tamanho: {glassesScale[0].toFixed(2)}x
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setGlassesScale([Math.max(responsiveScale.min, glassesScale[0] - 0.1)])}
+                        disabled={glassesScale[0] <= responsiveScale.min}
+                      >
+                        <ZoomOut className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setGlassesScale([responsiveScale.initial])}
+                      >
+                        Auto
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setGlassesScale([Math.min(responsiveScale.max, glassesScale[0] + 0.1)])}
+                        disabled={glassesScale[0] >= responsiveScale.max}
+                      >
+                        <ZoomIn className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
                   <Slider
                     value={glassesScale}
-                    onValueChange={setGlassesScale}
-                    min={0.3}
-                    max={2.5}
-                    step={0.05}
+                    onValueChange={handleScaleChange}
+                    min={responsiveScale.min}
+                    max={responsiveScale.max}
+                    step={responsiveScale.step}
                     className="w-full"
                   />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Min ({responsiveScale.min}x)</span>
+                    <span className="font-medium">
+                      {deviceInfo.isMobile ? 'Mobile' : deviceInfo.isTablet ? 'Tablet' : 'Desktop'} 
+                      - {deviceInfo.screenWidth}x{deviceInfo.screenHeight}
+                    </span>
+                    <span>Max ({responsiveScale.max}x)</span>
+                  </div>
                 </div>
 
                 {/* Rotação */}
@@ -490,7 +561,7 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
 
                 {/* Posição */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                  <label className="text-sm font-medium mb-2 flex items-center gap-2">
                     <Move className="h-4 w-4" />
                     Posição
                   </label>
@@ -523,12 +594,12 @@ export const VirtualTryOn: React.FC<VirtualTryOnProps> = ({ onCapture, selectedM
                 {/* Cores */}
                 {getAvailableColors().length > 0 && (
                   <div>
-                    <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                    <label className="text-sm font-medium mb-2 flex items-center gap-2">
                       <Palette className="h-4 w-4" />
                       Cor da Armação
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {getAvailableColors().map((color: any, index: number) => (
+                      {getAvailableColors().map((color: ColorOption, index: number) => (
                         <button
                           key={index}
                           onClick={() => setSelectedColor(color.codigo)}
