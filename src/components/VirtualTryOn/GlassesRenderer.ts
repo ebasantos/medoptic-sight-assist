@@ -6,7 +6,7 @@ type GlassesModel = Tables<'modelos_oculos'>;
 
 export interface RenderOptions {
   position: { x: number; y: number };
-  scale: number;
+  scale: number = 1.55;
   rotation: number;
   opacity: number;
   color: string;
