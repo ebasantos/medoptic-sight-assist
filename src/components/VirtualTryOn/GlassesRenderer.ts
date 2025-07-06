@@ -1,4 +1,3 @@
-
 import { FaceDetection } from './FaceDetector';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -37,14 +36,11 @@ export class GlassesRenderer {
       let centerX, centerY;
       
       if (faceDetection) {
-        // Usar posição exata dos olhos detectados
+        // Usar posição EXATA dos olhos detectados - sem ajustes
         centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
         centerY = (faceDetection.leftEye.y + faceDetection.rightEye.y) / 2;
         
-        // Ajustar a posição Y para ficar exatamente sobre os olhos (sem deslocamento para baixo)
-        centerY = centerY - 2; // Pequeno ajuste para cima para compensar a espessura da armação
-        
-        console.log('Renderizando óculos exatamente na posição dos olhos:', { centerX, centerY });
+        console.log('Renderizando óculos EXATAMENTE na posição dos olhos:', { centerX, centerY });
       } else {
         // Fallback para centro do canvas com ajustes do usuário
         centerX = canvasWidth / 2 + (options.position.x * canvasWidth / 100);
@@ -52,7 +48,7 @@ export class GlassesRenderer {
       }
       
       // Aplicar ajustes manuais do usuário sobre a posição detectada (com menor sensibilidade)
-      centerX += (options.position.x * canvasWidth / 300); // Reduzir ainda mais a sensibilidade
+      centerX += (options.position.x * canvasWidth / 300);
       centerY += (options.position.y * canvasHeight / 300);
       
       ctx.translate(centerX, centerY);
@@ -123,8 +119,7 @@ export class GlassesRenderer {
     if (faceDetection) {
       centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
       centerY = (faceDetection.leftEye.y + faceDetection.rightEye.y) / 2;
-      // Mesmo ajuste para o fallback
-      centerY = centerY - 2;
+      // SEM ajuste para o fallback também
     } else {
       centerX = canvasWidth / 2 + (options.position.x * canvasWidth / 100);
       centerY = canvasHeight / 2 + (options.position.y * canvasHeight / 100);

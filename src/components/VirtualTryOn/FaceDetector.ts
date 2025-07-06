@@ -59,7 +59,7 @@ export class FaceDetector {
     );
     
     const centerX = (eyePositions.leftEye.x + eyePositions.rightEye.x) / 2;
-    const noseBridgeY = eyePositions.leftEye.y + 8; // Ajustado para ficar mais próximo dos olhos
+    const noseBridgeY = eyePositions.leftEye.y + 12; // Ajustado para baixo da linha dos olhos
     
     return {
       leftEye: eyePositions.leftEye,
@@ -124,11 +124,11 @@ export class FaceDetector {
     faceRegion: any
   ) {
     // Região onde geralmente estão os olhos (terço superior da face)
-    const eyeRegionY = faceRegion.y + faceRegion.height * 0.25; // Ajustado para ser mais alto
-    const eyeRegionHeight = faceRegion.height * 0.25; // Região mais focada nos olhos
+    const eyeRegionY = faceRegion.y + faceRegion.height * 0.3; // Ajustado para encontrar exatamente os olhos
+    const eyeRegionHeight = faceRegion.height * 0.2; // Região mais focada
     
-    // Buscar regiões escuras (olhos) na região dos olhos com maior precisão
-    const leftEyeRegion = this.findEyeWithHighPrecision(
+    // Buscar regiões escuras (pupilas) na região dos olhos com máxima precisão
+    const leftEyeRegion = this.findPupilaWithMaxPrecision(
       data, width, height,
       faceRegion.x, 
       eyeRegionY,
@@ -137,7 +137,7 @@ export class FaceDetector {
       'left'
     );
     
-    const rightEyeRegion = this.findEyeWithHighPrecision(
+    const rightEyeRegion = this.findPupilaWithMaxPrecision(
       data, width, height,
       faceRegion.x + faceRegion.width * 0.55, // Metade direita
       eyeRegionY,
@@ -147,9 +147,9 @@ export class FaceDetector {
     );
     
     // Calcular confiança baseada na detecção
-    const confidence = Math.min(0.95, Math.max(0.75, (leftEyeRegion.darkness + rightEyeRegion.darkness) / 2));
+    const confidence = Math.min(0.95, Math.max(0.8, (leftEyeRegion.darkness + rightEyeRegion.darkness) / 2));
     
-    console.log('Olhos detectados com alta precisão:', {
+    console.log('Pupilas detectadas com máxima precisão:', {
       leftEye: leftEyeRegion,
       rightEye: rightEyeRegion,
       confidence
@@ -162,7 +162,7 @@ export class FaceDetector {
     };
   }
   
-  private static findEyeWithHighPrecision(
+  private static findPupilaWithMaxPrecision(
     data: Uint8ClampedArray,
     width: number,
     height: number,
@@ -181,8 +181,8 @@ export class FaceDetector {
     const endX = Math.min(width, startX + regionWidth);
     const endY = Math.min(height, startY + regionHeight);
     
-    // Procurar em uma grade mais fina para maior precisão
-    const step = 2;
+    // Procurar em uma grade muito fina para máxima precisão na detecção da pupila
+    const step = 1; // Análise pixel por pixel
     for (let y = Math.max(0, startY); y < endY; y += step) {
       for (let x = Math.max(0, startX); x < endX; x += step) {
         const i = (Math.floor(y) * width + Math.floor(x)) * 4;
@@ -193,14 +193,14 @@ export class FaceDetector {
         const brightness = (r + g + b) / 3;
         const darkness = (255 - brightness) / 255;
         
-        // Procurar padrões típicos de olhos (regiões escuras circulares)
-        const eyeScore = this.calculateEyeScore(data, width, height, x, y, step);
-        const combinedScore = darkness * 0.7 + eyeScore * 0.3;
+        // Procurar especificamente por pupilas (regiões muito escuras e circulares)
+        const pupilaScore = this.calculatePupilaScore(data, width, height, x, y, 6);
+        const combinedScore = darkness * 0.6 + pupilaScore * 0.4;
         
         totalDarkness += darkness;
         pixelCount++;
         
-        if (combinedScore > maxDarkness) {
+        if (combinedScore > maxDarkness && darkness > 0.6) { // Apenas regiões muito escuras
           maxDarkness = combinedScore;
           bestEyeX = x;
           bestEyeY = y;
@@ -218,18 +218,18 @@ export class FaceDetector {
     };
   }
   
-  private static calculateEyeScore(
+  private static calculatePupilaScore(
     data: Uint8ClampedArray,
     width: number,
     height: number,
     centerX: number,
     centerY: number,
-    radius: number = 8
+    radius: number = 6
   ): number {
-    let darkPixels = 0;
+    let veryDarkPixels = 0;
     let totalPixels = 0;
     
-    // Analisar uma pequena região circular ao redor do ponto
+    // Analisar uma pequena região circular ao redor do ponto procurando por pupilas
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -244,8 +244,8 @@ export class FaceDetector {
             const b = data[i + 2];
             const brightness = (r + g + b) / 3;
             
-            if (brightness < 100) { // Pixel escuro (típico de olho/pupila)
-              darkPixels++;
+            if (brightness < 80) { // Pixel muito escuro (pupila)
+              veryDarkPixels++;
             }
             totalPixels++;
           }
@@ -253,7 +253,7 @@ export class FaceDetector {
       }
     }
     
-    return totalPixels > 0 ? darkPixels / totalPixels : 0;
+    return totalPixels > 0 ? veryDarkPixels / totalPixels : 0;
   }
   
   private static isSkinColor(r: number, g: number, b: number): boolean {
