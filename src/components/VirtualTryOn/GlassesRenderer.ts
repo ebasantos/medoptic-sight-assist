@@ -53,6 +53,9 @@ export class GlassesRenderer {
         centerY = canvasHeight / 2;
         console.log('Usando posição fallback (sem detecção facial)');
       }
+
+      //escala padrao de 1.55
+      options.scale = 1.55;
       
       // Aplicar apenas os ajustes manuais MUITO SUTIS do usuário
       centerX += (options.position.x * canvasWidth / 1000); // Sensibilidade reduzida pela metade
