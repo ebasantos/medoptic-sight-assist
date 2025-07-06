@@ -34,7 +34,7 @@ export class FaceDetector {
     // Analisar a imagem para encontrar características faciais
     const detection = await this.analyzeImageForFaceFeatures(ctx, imgWidth, imgHeight);
     
-    console.log('Detecção facial otimizada para óculos:', detection);
+    console.log('Detecção facial PRECISÃO MÁXIMA:', detection);
     return detection;
   }
   
@@ -46,11 +46,13 @@ export class FaceDetector {
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
     
-    // Detectar região da face usando análise de cor de pele
-    const faceRegion = this.detectFaceRegion(data, width, height);
+    // Detectar região da face primeiro
+    const faceRegion = this.detectFaceRegionPrecise(data, width, height);
+    console.log('Região facial detectada:', faceRegion);
     
-    // Detectar olhos com foco na linha exata dos olhos
-    const eyePositions = this.detectExactEyePositions(data, width, height, faceRegion);
+    // Detectar olhos com MÁXIMA PRECISÃO na região facial
+    const eyePositions = this.detectEyesWithMaximumPrecision(data, width, height, faceRegion);
+    console.log('Posições dos olhos PRECISAS:', eyePositions);
     
     // Calcular métricas faciais
     const eyeDistance = Math.sqrt(
@@ -67,25 +69,24 @@ export class FaceDetector {
       eyeDistance: eyeDistance,
       faceWidth: faceRegion.width,
       faceHeight: faceRegion.height,
-      noseBridge: { x: centerX, y: eyeLineY }, // Usar exatamente a linha dos olhos
+      noseBridge: { x: centerX, y: eyeLineY },
       confidence: eyePositions.confidence
     };
   }
   
-  private static detectFaceRegion(data: Uint8ClampedArray, width: number, height: number) {
-    // Detectar região com cor de pele
+  private static detectFaceRegionPrecise(data: Uint8ClampedArray, width: number, height: number) {
+    // Detectar região com cor de pele usando múltiplos algoritmos
     let minX = width, maxX = 0, minY = height, maxY = 0;
     let skinPixels = 0;
     
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y += 2) { // Skip pixels para performance
+      for (let x = 0; x < width; x += 2) {
         const i = (y * width + x) * 4;
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
         
-        // Detectar cor de pele usando múltiplos algoritmos
-        if (this.isSkinColor(r, g, b)) {
+        if (this.isSkinColorAdvanced(r, g, b)) {
           skinPixels++;
           minX = Math.min(minX, x);
           maxX = Math.max(maxX, x);
@@ -95,17 +96,12 @@ export class FaceDetector {
       }
     }
     
-    // Se não detectou pele suficiente, usar região central
-    if (skinPixels < (width * height * 0.05)) {
-      return {
-        x: width * 0.25,
-        y: height * 0.25,
-        width: width * 0.5,
-        height: height * 0.5,
-        centerX: width * 0.5,
-        centerY: height * 0.5
-      };
-    }
+    // Expandir região para incluir olhos
+    const padding = Math.min(width, height) * 0.05;
+    minX = Math.max(0, minX - padding);
+    maxX = Math.min(width, maxX + padding);
+    minY = Math.max(0, minY - padding);
+    maxY = Math.min(height, maxY + padding);
     
     return {
       x: minX,
@@ -117,77 +113,78 @@ export class FaceDetector {
     };
   }
   
-  private static detectExactEyePositions(
+  private static detectEyesWithMaximumPrecision(
     data: Uint8ClampedArray, 
     width: number, 
     height: number, 
     faceRegion: any
   ) {
-    // Focar na região exata onde ficam os olhos (40% da altura da face)
-    const eyeRegionY = faceRegion.y + faceRegion.height * 0.35;
-    const eyeRegionHeight = faceRegion.height * 0.15; // Região muito específica
+    // Região dos olhos: aproximadamente 30-45% da altura facial do topo
+    const eyeRegionTop = faceRegion.y + faceRegion.height * 0.25;
+    const eyeRegionBottom = faceRegion.y + faceRegion.height * 0.55;
+    const eyeRegionHeight = eyeRegionBottom - eyeRegionTop;
     
-    console.log('Procurando olhos na região:', {
-      y: eyeRegionY,
+    console.log('Procurando olhos na região PRECISA:', {
+      top: eyeRegionTop,
+      bottom: eyeRegionBottom,
       height: eyeRegionHeight,
       faceWidth: faceRegion.width
     });
     
-    // Buscar centro das pupilas com máxima precisão
-    const leftEyeRegion = this.findEyeCenterPrecise(
-      data, width, height,
-      faceRegion.x, 
-      eyeRegionY,
-      faceRegion.width * 0.4, // Lado esquerdo
-      eyeRegionHeight
-    );
+    // Dividir em duas metades para olho esquerdo e direito
+    const leftEyeRegion = {
+      x: faceRegion.x + faceRegion.width * 0.1,
+      y: eyeRegionTop,
+      width: faceRegion.width * 0.35,
+      height: eyeRegionHeight
+    };
     
-    const rightEyeRegion = this.findEyeCenterPrecise(
-      data, width, height,
-      faceRegion.x + faceRegion.width * 0.6, // Lado direito
-      eyeRegionY,
-      faceRegion.width * 0.4,
-      eyeRegionHeight
-    );
+    const rightEyeRegion = {
+      x: faceRegion.x + faceRegion.width * 0.55,
+      y: eyeRegionTop,
+      width: faceRegion.width * 0.35,
+      height: eyeRegionHeight
+    };
     
-    // Garantir que os olhos estão na mesma linha horizontal
-    const avgY = (leftEyeRegion.y + rightEyeRegion.y) / 2;
+    // Encontrar centro EXATO de cada olho
+    const leftEyeCenter = this.findEyeCenterUltraPrecise(data, width, height, leftEyeRegion);
+    const rightEyeCenter = this.findEyeCenterUltraPrecise(data, width, height, rightEyeRegion);
     
-    const confidence = Math.min(0.95, Math.max(0.8, (leftEyeRegion.score + rightEyeRegion.score) / 2));
+    // Garantir que estão na mesma linha horizontal (média das alturas)
+    const avgY = (leftEyeCenter.y + rightEyeCenter.y) / 2;
     
-    console.log('Centros dos olhos detectados:', {
-      leftEye: { x: leftEyeRegion.x, y: avgY },
-      rightEye: { x: rightEyeRegion.x, y: avgY },
-      confidence
+    console.log('CENTROS DOS OLHOS ULTRA PRECISOS:', {
+      leftEye: { x: leftEyeCenter.x, y: avgY },
+      rightEye: { x: rightEyeCenter.x, y: avgY },
+      leftScore: leftEyeCenter.score,
+      rightScore: rightEyeCenter.score
     });
     
     return {
-      leftEye: { x: leftEyeRegion.x, y: avgY },
-      rightEye: { x: rightEyeRegion.x, y: avgY },
-      confidence: confidence
+      leftEye: { x: leftEyeCenter.x, y: avgY },
+      rightEye: { x: rightEyeCenter.x, y: avgY },
+      confidence: Math.min(0.95, (leftEyeCenter.score + rightEyeCenter.score) / 2)
     };
   }
   
-  private static findEyeCenterPrecise(
+  private static findEyeCenterUltraPrecise(
     data: Uint8ClampedArray,
     width: number,
     height: number,
-    startX: number,
-    startY: number,
-    regionWidth: number,
-    regionHeight: number
+    region: { x: number; y: number; width: number; height: number }
   ) {
-    let bestX = startX + regionWidth / 2;
-    let bestY = startY + regionHeight / 2;
+    let bestX = region.x + region.width / 2;
+    let bestY = region.y + region.height / 2;
     let maxScore = 0;
     
-    const endX = Math.min(width, startX + regionWidth);
-    const endY = Math.min(height, startY + regionHeight);
+    const endX = Math.min(width, region.x + region.width);
+    const endY = Math.min(height, region.y + region.height);
     
-    // Procurar pelo centro do olho (iris/pupila)
-    for (let y = Math.max(0, startY); y < endY; y += 2) {
-      for (let x = Math.max(0, startX); x < endX; x += 2) {
-        const eyeScore = this.calculateEyeCenterScore(data, width, height, x, y);
+    // Busca pixel por pixel com scoring avançado
+    for (let y = Math.max(0, region.y); y < endY; y++) {
+      for (let x = Math.max(0, region.x); x < endX; x++) {
+        // Calcular score do olho baseado em padrões circulares
+        const eyeScore = this.calculateAdvancedEyeScore(data, width, height, x, y);
         
         if (eyeScore > maxScore) {
           maxScore = eyeScore;
@@ -204,66 +201,131 @@ export class FaceDetector {
     };
   }
   
-  private static calculateEyeCenterScore(
+  private static calculateAdvancedEyeScore(
     data: Uint8ClampedArray,
     width: number,
     height: number,
     centerX: number,
     centerY: number
   ): number {
-    let darkCenter = 0;
-    let lightSurround = 0;
-    let totalPixels = 0;
+    let centerDarkness = 0;
+    let innerRingBrightness = 0;
+    let outerRingBrightness = 0;
+    let edgeContrast = 0;
     
-    // Analisar padrão circular: centro escuro (pupila) com borda mais clara (iris/esclera)
-    for (let dy = -8; dy <= 8; dy++) {
-      for (let dx = -8; dx <= 8; dx++) {
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const x = centerX + dx;
-        const y = centerY + dy;
+    // Analisar múltiplos anéis concêntricos
+    for (let radius = 1; radius <= 12; radius++) {
+      const circumference = Math.max(8, Math.floor(2 * Math.PI * radius));
+      let ringBrightness = 0;
+      let validPixels = 0;
+      
+      for (let i = 0; i < circumference; i++) {
+        const angle = (2 * Math.PI * i) / circumference;
+        const x = Math.round(centerX + radius * Math.cos(angle));
+        const y = Math.round(centerY + radius * Math.sin(angle));
         
         if (x >= 0 && x < width && y >= 0 && y < height) {
-          const i = (Math.floor(y) * width + Math.floor(x)) * 4;
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
+          const pixelIndex = (y * width + x) * 4;
+          const r = data[pixelIndex];
+          const g = data[pixelIndex + 1];
+          const b = data[pixelIndex + 2];
           const brightness = (r + g + b) / 3;
           
-          if (distance <= 3) {
-            // Centro deve ser escuro (pupila)
-            if (brightness < 100) darkCenter++;
-          } else if (distance <= 8) {
-            // Ao redor deve ser mais claro (iris/esclera)
-            if (brightness > 120) lightSurround++;
-          }
-          totalPixels++;
+          ringBrightness += brightness;
+          validPixels++;
+        }
+      }
+      
+      if (validPixels > 0) {
+        const avgBrightness = ringBrightness / validPixels;
+        
+        if (radius <= 3) {
+          // Centro deve ser escuro (pupila)
+          centerDarkness += (255 - avgBrightness) / 255;
+        } else if (radius <= 6) {
+          // Anel interno (iris) - moderadamente brilhante
+          innerRingBrightness += avgBrightness / 255;
+        } else if (radius <= 9) {
+          // Anel externo (esclera) - mais brilhante
+          outerRingBrightness += avgBrightness / 255;
         }
       }
     }
     
-    // Score baseado no contraste centro escuro vs borda clara
-    const centerScore = darkCenter / 28; // ~28 pixels no centro
-    const surroundScore = lightSurround / 100; // ~100 pixels na borda
+    // Calcular contraste entre centro e bordas
+    const centerPixelBrightness = this.getPixelBrightness(data, width, height, centerX, centerY);
+    const surroundingBrightness = this.getAverageBrightness(data, width, height, centerX, centerY, 8);
+    edgeContrast = Math.abs(centerPixelBrightness - surroundingBrightness) / 255;
     
-    return (centerScore * 0.7) + (surroundScore * 0.3);
+    // Score composto privilegiando centro escuro e bordas claras
+    const finalScore = (
+      centerDarkness * 0.4 +        // Centro escuro é crítico
+      innerRingBrightness * 0.2 +   // Iris moderada
+      outerRingBrightness * 0.2 +   // Esclera clara
+      edgeContrast * 0.2            // Contraste geral
+    );
+    
+    return finalScore;
   }
   
-  private static isSkinColor(r: number, g: number, b: number): boolean {
-    // Múltiplos algoritmos de detecção de cor de pele
+  private static getPixelBrightness(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number,
+    x: number,
+    y: number
+  ): number {
+    if (x < 0 || x >= width || y < 0 || y >= height) return 128;
     
-    // Algoritmo 1: RGB
+    const i = (Math.floor(y) * width + Math.floor(x)) * 4;
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    return (r + g + b) / 3;
+  }
+  
+  private static getAverageBrightness(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number,
+    centerX: number,
+    centerY: number,
+    radius: number
+  ): number {
+    let totalBrightness = 0;
+    let pixelCount = 0;
+    
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance <= radius) {
+          const x = centerX + dx;
+          const y = centerY + dy;
+          
+          if (x >= 0 && x < width && y >= 0 && y < height) {
+            totalBrightness += this.getPixelBrightness(data, width, height, x, y);
+            pixelCount++;
+          }
+        }
+      }
+    }
+    
+    return pixelCount > 0 ? totalBrightness / pixelCount : 128;
+  }
+  
+  private static isSkinColorAdvanced(r: number, g: number, b: number): boolean {
+    // Algoritmo RGB aprimorado
     const rgbCheck = r > 95 && g > 40 && b > 20 && 
                    Math.max(r, g, b) - Math.min(r, g, b) > 15 &&
                    Math.abs(r - g) > 15 && r > g && r > b;
     
-    // Algoritmo 2: YCbCr (aproximado)
+    // Algoritmo YCbCr mais rigoroso
     const y = 0.299 * r + 0.587 * g + 0.114 * b;
     const cb = -0.169 * r - 0.331 * g + 0.5 * b + 128;
     const cr = 0.5 * r - 0.419 * g - 0.081 * b + 128;
+    const ycbcrCheck = y > 70 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173;
     
-    const ycbcrCheck = y > 80 && cb >= 85 && cb <= 135 && cr >= 135 && cr <= 180;
-    
-    // Algoritmo 3: HSV
+    // Algoritmo HSV refinado
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     const delta = max - min;
@@ -280,7 +342,7 @@ export class FaceDetector {
     const s = max === 0 ? 0 : delta / max;
     const v = max / 255;
     
-    const hsvCheck = (h >= 0 && h <= 50) || (h >= 340 && h <= 360);
+    const hsvCheck = ((h >= 0 && h <= 60) || (h >= 320 && h <= 360)) && s >= 0.1 && v >= 0.2;
     
     return rgbCheck || ycbcrCheck || hsvCheck;
   }

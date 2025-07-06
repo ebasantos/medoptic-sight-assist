@@ -33,15 +33,15 @@ export class GlassesRenderer {
       
       ctx.save();
       
-      // Posicionamento EXATO sobre os olhos
+      // Usar EXATAMENTE as coordenadas dos olhos detectados
       let centerX, centerY;
       
       if (faceDetection) {
-        // Usar EXATAMENTE a posição dos olhos detectados
+        // Usar coordenadas EXATAS dos olhos sem qualquer ajuste
         centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
         centerY = (faceDetection.leftEye.y + faceDetection.rightEye.y) / 2;
         
-        console.log('Renderizando óculos EXATAMENTE sobre os olhos:', { 
+        console.log('Renderizando óculos EXATAMENTE nas coordenadas dos olhos:', { 
           centerX, 
           centerY,
           leftEye: faceDetection.leftEye,
@@ -51,11 +51,14 @@ export class GlassesRenderer {
         // Fallback para centro do canvas
         centerX = canvasWidth / 2;
         centerY = canvasHeight / 2;
+        console.log('Usando posição fallback (sem detecção facial)');
       }
       
-      // Aplicar APENAS ajustes manuais muito sutis do usuário
-      centerX += (options.position.x * canvasWidth / 500); // Menor sensibilidade
-      centerY += (options.position.y * canvasHeight / 500); // Menor sensibilidade
+      // Aplicar apenas os ajustes manuais MUITO SUTIS do usuário
+      centerX += (options.position.x * canvasWidth / 1000); // Sensibilidade reduzida pela metade
+      centerY += (options.position.y * canvasHeight / 1000); // Sensibilidade reduzida pela metade
+      
+      console.log('Posição final dos óculos após ajustes manuais:', { centerX, centerY });
       
       ctx.translate(centerX, centerY);
       ctx.rotate((options.rotation * Math.PI) / 180);
@@ -70,14 +73,14 @@ export class GlassesRenderer {
       let finalWidth, finalHeight;
       
       if (faceDetection) {
-        // Usar distância exata dos olhos para dimensionamento
+        // Usar distância exata dos olhos para dimensionamento PRECISO
         const eyeDistance = faceDetection.eyeDistance;
         
         // Óculos devem ter largura proporcional à distância dos olhos
-        finalWidth = eyeDistance * 1.8; // Proporção otimizada
+        finalWidth = eyeDistance * 1.6; // Proporção mais conservadora
         finalHeight = finalWidth / (glassesImg.width / glassesImg.height);
         
-        console.log('Dimensões calculadas para encaixe perfeito:', {
+        console.log('Dimensões calculadas baseadas na detecção facial:', {
           eyeDistance,
           finalWidth,
           finalHeight,
@@ -94,7 +97,7 @@ export class GlassesRenderer {
       finalWidth *= options.scale;
       finalHeight *= options.scale;
       
-      // Renderizar óculos centralizados na posição dos olhos
+      // Renderizar óculos PERFEITAMENTE centralizados na posição dos olhos
       ctx.drawImage(
         glassesImg,
         -finalWidth / 2,  // Centralizar horizontalmente
@@ -102,6 +105,8 @@ export class GlassesRenderer {
         finalWidth,
         finalHeight
       );
+      
+      console.log('Óculos renderizados com dimensões:', { finalWidth, finalHeight });
       
       ctx.restore();
       
@@ -132,8 +137,8 @@ export class GlassesRenderer {
     }
     
     // Aplicar ajustes sutis do usuário
-    centerX += (options.position.x * canvasWidth / 500);
-    centerY += (options.position.y * canvasHeight / 500);
+    centerX += (options.position.x * canvasWidth / 1000);
+    centerY += (options.position.y * canvasHeight / 1000);
     
     ctx.translate(centerX, centerY);
     ctx.rotate((options.rotation * Math.PI) / 180);
@@ -148,8 +153,8 @@ export class GlassesRenderer {
     
     if (faceDetection) {
       const eyeDistance = faceDetection.eyeDistance;
-      lensRadius = eyeDistance * 0.2;
-      lensDistance = eyeDistance * 0.3;
+      lensRadius = eyeDistance * 0.18; // Ajuste mais conservador
+      lensDistance = eyeDistance * 0.28; // Ajuste mais conservador
     }
     
     // Aplicar escala
