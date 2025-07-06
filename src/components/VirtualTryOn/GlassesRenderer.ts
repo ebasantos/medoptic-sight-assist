@@ -55,7 +55,7 @@ export class GlassesRenderer {
       }
 
       //escala padrao de 1.55
-      options.scale = 2.55;
+      options.scale = 1.55;
       
       // Aplicar apenas os ajustes manuais MUITO SUTIS do usuário
       centerX += (options.position.x * canvasWidth / 1000); // Sensibilidade reduzida pela metade
