@@ -77,8 +77,8 @@ export class GlassesRenderer {
         const eyeDistance = faceDetection.eyeDistance;
         
         // Óculos devem ter largura proporcional à distância dos olhos
-        finalWidth = eyeDistance * 1.6; // Proporção mais conservadora
-        finalHeight = finalWidth / (glassesImg.width / glassesImg.height);
+        finalWidth = eyeDistance * 2.6; // Proporção mais conservadora
+        finalHeight = (finalWidth / (glassesImg.width / glassesImg.height)) * 2;
         
         console.log('Dimensões calculadas baseadas na detecção facial:', {
           eyeDistance,
