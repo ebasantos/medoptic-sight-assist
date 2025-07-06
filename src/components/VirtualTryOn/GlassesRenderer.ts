@@ -101,7 +101,7 @@ export class GlassesRenderer {
       ctx.drawImage(
         glassesImg,
         -finalWidth / 2,  // Centralizar horizontalmente
-        -finalHeight / 2, // Centralizar verticalmente
+        -(finalHeight / 2 - 10), // Centralizar verticalmente
         finalWidth,
         finalHeight
       );
