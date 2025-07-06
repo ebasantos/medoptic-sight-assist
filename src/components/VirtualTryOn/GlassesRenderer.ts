@@ -1,3 +1,4 @@
+
 import { FaceDetection } from './FaceDetector';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -40,16 +41,19 @@ export class GlassesRenderer {
         centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
         centerY = (faceDetection.leftEye.y + faceDetection.rightEye.y) / 2;
         
-        console.log('Renderizando óculos na posição dos olhos detectados:', { centerX, centerY });
+        // Ajustar a posição Y para ficar exatamente sobre os olhos (sem deslocamento para baixo)
+        centerY = centerY - 2; // Pequeno ajuste para cima para compensar a espessura da armação
+        
+        console.log('Renderizando óculos exatamente na posição dos olhos:', { centerX, centerY });
       } else {
         // Fallback para centro do canvas com ajustes do usuário
         centerX = canvasWidth / 2 + (options.position.x * canvasWidth / 100);
         centerY = canvasHeight / 2 + (options.position.y * canvasHeight / 100);
       }
       
-      // Aplicar ajustes manuais do usuário sobre a posição detectada
-      centerX += (options.position.x * canvasWidth / 200); // Reduzir sensibilidade
-      centerY += (options.position.y * canvasHeight / 200);
+      // Aplicar ajustes manuais do usuário sobre a posição detectada (com menor sensibilidade)
+      centerX += (options.position.x * canvasWidth / 300); // Reduzir ainda mais a sensibilidade
+      centerY += (options.position.y * canvasHeight / 300);
       
       ctx.translate(centerX, centerY);
       ctx.rotate((options.rotation * Math.PI) / 180);
@@ -68,7 +72,7 @@ export class GlassesRenderer {
         const eyeDistance = faceDetection.eyeDistance;
         
         // Óculos devem ter largura proporcional à distância real dos olhos
-        finalWidth = eyeDistance * 1.8; // Ajustado para melhor proporção
+        finalWidth = eyeDistance * 1.8; // Proporção ideal para armação
         finalHeight = finalWidth / (glassesImg.width / glassesImg.height);
         
         console.log('Dimensões baseadas na detecção precisa:', {
@@ -119,14 +123,16 @@ export class GlassesRenderer {
     if (faceDetection) {
       centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
       centerY = (faceDetection.leftEye.y + faceDetection.rightEye.y) / 2;
+      // Mesmo ajuste para o fallback
+      centerY = centerY - 2;
     } else {
       centerX = canvasWidth / 2 + (options.position.x * canvasWidth / 100);
       centerY = canvasHeight / 2 + (options.position.y * canvasHeight / 100);
     }
     
-    // Aplicar ajustes do usuário
-    centerX += (options.position.x * canvasWidth / 200);
-    centerY += (options.position.y * canvasHeight / 200);
+    // Aplicar ajustes do usuário com menor sensibilidade
+    centerX += (options.position.x * canvasWidth / 300);
+    centerY += (options.position.y * canvasHeight / 300);
     
     ctx.translate(centerX, centerY);
     ctx.rotate((options.rotation * Math.PI) / 180);

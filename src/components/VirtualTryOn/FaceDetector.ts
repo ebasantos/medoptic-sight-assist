@@ -1,4 +1,3 @@
-
 export interface FaceDetection {
   leftEye: { x: number; y: number };
   rightEye: { x: number; y: number };
@@ -50,8 +49,8 @@ export class FaceDetector {
     // Detectar região da face usando análise de cor de pele
     const faceRegion = this.detectFaceRegion(data, width, height);
     
-    // Detectar olhos dentro da região facial
-    const eyePositions = this.detectEyePositions(data, width, height, faceRegion);
+    // Detectar olhos dentro da região facial com maior precisão
+    const eyePositions = this.detectEyePositionsWithPrecision(data, width, height, faceRegion);
     
     // Calcular métricas faciais
     const eyeDistance = Math.sqrt(
@@ -60,7 +59,7 @@ export class FaceDetector {
     );
     
     const centerX = (eyePositions.leftEye.x + eyePositions.rightEye.x) / 2;
-    const noseBridgeY = eyePositions.leftEye.y + 10; // Ligeiramente abaixo dos olhos
+    const noseBridgeY = eyePositions.leftEye.y + 8; // Ajustado para ficar mais próximo dos olhos
     
     return {
       leftEye: eyePositions.leftEye,
@@ -118,35 +117,43 @@ export class FaceDetector {
     };
   }
   
-  private static detectEyePositions(
+  private static detectEyePositionsWithPrecision(
     data: Uint8ClampedArray, 
     width: number, 
     height: number, 
     faceRegion: any
   ) {
     // Região onde geralmente estão os olhos (terço superior da face)
-    const eyeRegionY = faceRegion.y + faceRegion.height * 0.3;
-    const eyeRegionHeight = faceRegion.height * 0.3;
+    const eyeRegionY = faceRegion.y + faceRegion.height * 0.25; // Ajustado para ser mais alto
+    const eyeRegionHeight = faceRegion.height * 0.25; // Região mais focada nos olhos
     
-    // Buscar regiões escuras (olhos) na região dos olhos
-    const leftEyeRegion = this.findDarkestRegion(
+    // Buscar regiões escuras (olhos) na região dos olhos com maior precisão
+    const leftEyeRegion = this.findEyeWithHighPrecision(
       data, width, height,
       faceRegion.x, 
       eyeRegionY,
       faceRegion.width * 0.45, // Metade esquerda
-      eyeRegionHeight
+      eyeRegionHeight,
+      'left'
     );
     
-    const rightEyeRegion = this.findDarkestRegion(
+    const rightEyeRegion = this.findEyeWithHighPrecision(
       data, width, height,
       faceRegion.x + faceRegion.width * 0.55, // Metade direita
       eyeRegionY,
       faceRegion.width * 0.45,
-      eyeRegionHeight
+      eyeRegionHeight,
+      'right'
     );
     
     // Calcular confiança baseada na detecção
-    const confidence = Math.min(0.95, Math.max(0.7, (leftEyeRegion.darkness + rightEyeRegion.darkness) / 2));
+    const confidence = Math.min(0.95, Math.max(0.75, (leftEyeRegion.darkness + rightEyeRegion.darkness) / 2));
+    
+    console.log('Olhos detectados com alta precisão:', {
+      leftEye: leftEyeRegion,
+      rightEye: rightEyeRegion,
+      confidence
+    });
     
     return {
       leftEye: { x: leftEyeRegion.x, y: leftEyeRegion.y },
@@ -155,26 +162,27 @@ export class FaceDetector {
     };
   }
   
-  private static findDarkestRegion(
+  private static findEyeWithHighPrecision(
     data: Uint8ClampedArray,
     width: number,
     height: number,
     startX: number,
     startY: number,
     regionWidth: number,
-    regionHeight: number
+    regionHeight: number,
+    side: 'left' | 'right'
   ) {
-    let darkestX = startX + regionWidth / 2;
-    let darkestY = startY + regionHeight / 2;
-    let minBrightness = 255;
+    let bestEyeX = startX + regionWidth / 2;
+    let bestEyeY = startY + regionHeight / 2;
+    let maxDarkness = 0;
     let totalDarkness = 0;
     let pixelCount = 0;
     
     const endX = Math.min(width, startX + regionWidth);
     const endY = Math.min(height, startY + regionHeight);
     
-    // Procurar em uma grade para otimizar
-    const step = 3;
+    // Procurar em uma grade mais fina para maior precisão
+    const step = 2;
     for (let y = Math.max(0, startY); y < endY; y += step) {
       for (let x = Math.max(0, startX); x < endX; x += step) {
         const i = (Math.floor(y) * width + Math.floor(x)) * 4;
@@ -183,24 +191,69 @@ export class FaceDetector {
         const b = data[i + 2];
         
         const brightness = (r + g + b) / 3;
-        totalDarkness += (255 - brightness);
+        const darkness = (255 - brightness) / 255;
+        
+        // Procurar padrões típicos de olhos (regiões escuras circulares)
+        const eyeScore = this.calculateEyeScore(data, width, height, x, y, step);
+        const combinedScore = darkness * 0.7 + eyeScore * 0.3;
+        
+        totalDarkness += darkness;
         pixelCount++;
         
-        if (brightness < minBrightness) {
-          minBrightness = brightness;
-          darkestX = x;
-          darkestY = y;
+        if (combinedScore > maxDarkness) {
+          maxDarkness = combinedScore;
+          bestEyeX = x;
+          bestEyeY = y;
         }
       }
     }
     
-    const avgDarkness = pixelCount > 0 ? totalDarkness / pixelCount / 255 : 0;
+    const avgDarkness = pixelCount > 0 ? totalDarkness / pixelCount : 0;
     
     return {
-      x: darkestX,
-      y: darkestY,
-      darkness: avgDarkness
+      x: bestEyeX,
+      y: bestEyeY,
+      darkness: avgDarkness,
+      eyeScore: maxDarkness
     };
+  }
+  
+  private static calculateEyeScore(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number,
+    centerX: number,
+    centerY: number,
+    radius: number = 8
+  ): number {
+    let darkPixels = 0;
+    let totalPixels = 0;
+    
+    // Analisar uma pequena região circular ao redor do ponto
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance <= radius) {
+          const x = centerX + dx;
+          const y = centerY + dy;
+          
+          if (x >= 0 && x < width && y >= 0 && y < height) {
+            const i = (Math.floor(y) * width + Math.floor(x)) * 4;
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const brightness = (r + g + b) / 3;
+            
+            if (brightness < 100) { // Pixel escuro (típico de olho/pupila)
+              darkPixels++;
+            }
+            totalPixels++;
+          }
+        }
+      }
+    }
+    
+    return totalPixels > 0 ? darkPixels / totalPixels : 0;
   }
   
   private static isSkinColor(r: number, g: number, b: number): boolean {
