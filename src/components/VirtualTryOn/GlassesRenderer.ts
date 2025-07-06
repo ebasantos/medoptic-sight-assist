@@ -1,4 +1,3 @@
-
 import { FaceDetection } from './FaceDetector';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -33,9 +32,24 @@ export class GlassesRenderer {
       
       ctx.save();
       
-      // Posicionamento mais preciso
-      const centerX = canvasWidth / 2 + (options.position.x * canvasWidth / 100);
-      const centerY = canvasHeight / 2 + (options.position.y * canvasHeight / 100);
+      // Posicionamento preciso baseado na detecção facial
+      let centerX, centerY;
+      
+      if (faceDetection) {
+        // Usar posição exata dos olhos detectados
+        centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
+        centerY = (faceDetection.leftEye.y + faceDetection.rightEye.y) / 2;
+        
+        console.log('Renderizando óculos na posição dos olhos detectados:', { centerX, centerY });
+      } else {
+        // Fallback para centro do canvas com ajustes do usuário
+        centerX = canvasWidth / 2 + (options.position.x * canvasWidth / 100);
+        centerY = canvasHeight / 2 + (options.position.y * canvasHeight / 100);
+      }
+      
+      // Aplicar ajustes manuais do usuário sobre a posição detectada
+      centerX += (options.position.x * canvasWidth / 200); // Reduzir sensibilidade
+      centerY += (options.position.y * canvasHeight / 200);
       
       ctx.translate(centerX, centerY);
       ctx.rotate((options.rotation * Math.PI) / 180);
@@ -46,25 +60,25 @@ export class GlassesRenderer {
         ctx.filter = `hue-rotate(${this.getHueRotation(options.color)}deg) saturate(120%)`;
       }
       
-      // Calcular dimensões baseadas na detecção facial
+      // Calcular dimensões baseadas na detecção facial precisa
       let finalWidth, finalHeight;
       
       if (faceDetection) {
-        // Usar detecção facial para dimensionamento preciso
+        // Usar distância exata dos olhos para dimensionamento
         const eyeDistance = faceDetection.eyeDistance;
         
-        // Óculos devem ter largura proporcional à distância dos olhos
-        finalWidth = eyeDistance * 2.0; // Multiplicador ajustado
+        // Óculos devem ter largura proporcional à distância real dos olhos
+        finalWidth = eyeDistance * 1.8; // Ajustado para melhor proporção
         finalHeight = finalWidth / (glassesImg.width / glassesImg.height);
         
-        console.log('Dimensões baseadas na face:', {
+        console.log('Dimensões baseadas na detecção precisa:', {
           eyeDistance,
           finalWidth,
           finalHeight,
-          glassesAspectRatio: glassesImg.width / glassesImg.height
+          confidence: faceDetection.confidence
         });
       } else {
-        // Fallback para dimensões baseadas no canvas
+        // Fallback para dimensionamento genérico
         const baseFaceScale = Math.min(canvasWidth, canvasHeight) / 400;
         finalWidth = Math.max(120, Math.min(280, glassesImg.width * baseFaceScale));
         finalHeight = Math.max(60, Math.min(140, glassesImg.height * baseFaceScale));
@@ -99,8 +113,20 @@ export class GlassesRenderer {
   ): void {
     ctx.save();
     
-    const centerX = canvasWidth / 2 + (options.position.x * canvasWidth / 100);
-    const centerY = canvasHeight / 2 + (options.position.y * canvasHeight / 100);
+    // Usar posição dos olhos detectados se disponível
+    let centerX, centerY;
+    
+    if (faceDetection) {
+      centerX = (faceDetection.leftEye.x + faceDetection.rightEye.x) / 2;
+      centerY = (faceDetection.leftEye.y + faceDetection.rightEye.y) / 2;
+    } else {
+      centerX = canvasWidth / 2 + (options.position.x * canvasWidth / 100);
+      centerY = canvasHeight / 2 + (options.position.y * canvasHeight / 100);
+    }
+    
+    // Aplicar ajustes do usuário
+    centerX += (options.position.x * canvasWidth / 200);
+    centerY += (options.position.y * canvasHeight / 200);
     
     ctx.translate(centerX, centerY);
     ctx.rotate((options.rotation * Math.PI) / 180);
@@ -109,14 +135,14 @@ export class GlassesRenderer {
     ctx.strokeStyle = options.color || '#000000';
     ctx.lineWidth = 3;
     
-    // Dimensões proporcionais à face detectada
+    // Dimensões baseadas na detecção facial
     let lensRadius = 35;
     let lensDistance = 45;
     
     if (faceDetection) {
       const eyeDistance = faceDetection.eyeDistance;
-      lensRadius = eyeDistance * 0.25;
-      lensDistance = eyeDistance * 0.35;
+      lensRadius = eyeDistance * 0.2;
+      lensDistance = eyeDistance * 0.3;
     }
     
     // Aplicar escala
