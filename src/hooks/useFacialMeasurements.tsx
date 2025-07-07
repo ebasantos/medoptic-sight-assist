@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -14,8 +13,8 @@ interface MeasurementResult {
   dpBinocular: number;
   dnpEsquerda: number;
   dnpDireita: number;
-  alturaEsquerda: number;
-  alturaDireita: number;
+  alturaEsquerda: number | null;
+  alturaDireita: number | null;
   larguraLente: number;
   confiabilidade: number;
   temOculos: boolean;
@@ -33,7 +32,7 @@ export const useFacialMeasurements = () => {
     setError(null);
     
     try {
-      console.log('🚀 Iniciando análise facial...');
+      console.log('🚀 Iniciando análise facial ultra-precisa...');
       console.log('📊 Tamanho da imagem:', imageData.length);
       console.log('📏 Largura da armação:', frameWidth);
       
@@ -44,19 +43,16 @@ export const useFacialMeasurements = () => {
         }
       });
 
-      console.log('📥 Resposta da edge function:', data);
+      console.log('📥 Resposta da edge function ultra-precisa:', data);
       console.log('❌ Erro da edge function:', supabaseError);
 
       if (supabaseError) {
         console.error('💥 Erro detalhado do Supabase:', supabaseError);
         
-        // Melhorar tratamento de erros específicos
-        let errorMessage = 'Erro ao processar a análise';
+        let errorMessage = 'Erro ao processar a análise ultra-precisa';
         
         if (supabaseError.message?.includes('Failed to send a request')) {
           errorMessage = 'Erro de conexão com o serviço de análise. Verifique sua conexão e tente novamente.';
-        } else if (supabaseError.message?.includes('Failed to fetch')) {
-          errorMessage = 'Erro de conectividade. Verifique sua conexão com a internet e tente novamente.';
         } else if (supabaseError.message?.includes('timeout')) {
           errorMessage = 'Timeout na análise. A imagem pode estar muito grande. Tente novamente.';
         } else if (supabaseError.message?.includes('unauthorized')) {
@@ -68,22 +64,28 @@ export const useFacialMeasurements = () => {
 
       if (data?.error) {
         console.error('🚨 Erro da função:', data.error);
-        console.error('📋 Detalhes do erro:', data.details);
         throw new Error(data.error);
       }
 
       if (!data?.measurements) {
         console.error('❌ Resposta inesperada:', data);
-        throw new Error('Nenhuma medição foi retornada');
+        throw new Error('Nenhuma medição ultra-precisa foi retornada');
       }
 
-      console.log('✅ Análise concluída com sucesso:', data.measurements);
+      console.log('✅ Análise ultra-precisa concluída com sucesso:', data.measurements);
+      
+      // Validar se as medições têm precisão adequada
+      const precisionValidation = validateMeasurementPrecision(data.measurements);
+      if (!precisionValidation.isValid) {
+        console.warn('⚠️ Aviso de precisão:', precisionValidation.warnings);
+      }
+      
       setMeasurements(data.measurements);
       return data.measurements;
 
     } catch (err) {
-      console.error('💥 Erro na análise facial:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido na análise';
+      console.error('💥 Erro na análise facial ultra-precisa:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido na análise ultra-precisa';
       setError(errorMessage);
       throw err;
     } finally {
@@ -148,3 +150,28 @@ export const useFacialMeasurements = () => {
     clearAnalysis
   };
 };
+
+function validateMeasurementPrecision(measurements: MeasurementResult) {
+  const warnings = [];
+  
+  // Verificar se DP está em faixa realista
+  if (measurements.dpBinocular < 50 || measurements.dpBinocular > 75) {
+    warnings.push(`DP Binocular fora da faixa normal: ${measurements.dpBinocular}mm`);
+  }
+  
+  // Verificar se DNPs são equilibradas
+  const dnpDifference = Math.abs(measurements.dnpEsquerda - measurements.dnpDireita);
+  if (dnpDifference > 5) {
+    warnings.push(`Diferença significativa entre DNPs: ${dnpDifference}mm`);
+  }
+  
+  // Verificar confiabilidade
+  if (measurements.confiabilidade < 0.8) {
+    warnings.push(`Confiabilidade baixa: ${Math.round(measurements.confiabilidade * 100)}%`);
+  }
+  
+  return {
+    isValid: warnings.length === 0,
+    warnings
+  };
+}
