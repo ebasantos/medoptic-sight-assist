@@ -25,6 +25,48 @@ serve(async (req) => {
     }
 
     console.log('🔍 Analisando presença de óculos com DeepSeek...');
+    
+    // Verificar se a imagem está no formato correto
+    let processedImageData = imageData;
+    if (!imageData.startsWith('data:image/')) {
+      processedImageData = `data:image/jpeg;base64,${imageData}`;
+    }
+    
+    // Limitar tamanho da imagem para evitar erro 422
+    console.log('📏 Tamanho original da imagem:', processedImageData.length);
+    
+    const requestPayload = {
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um especialista em detecção de óculos. Analise a imagem e responda APENAS com JSON no formato: {"temOculos": true/false, "confiabilidade": 0.0-1.0, "detalhes": "descrição"}'
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Esta pessoa está usando óculos? Responda apenas com JSON.'
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: processedImageData,
+                detail: 'low' // Usar baixa resolução para evitar erro de tamanho
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 200,
+      temperature: 0.0,
+      stream: false
+    };
+
+    console.log('📤 Enviando requisição para DeepSeek...');
+    console.log('🔧 Modelo:', requestPayload.model);
+    console.log('📊 Max tokens:', requestPayload.max_tokens);
 
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
@@ -32,53 +74,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${deepseekApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [
-          {
-            role: 'system',
-            content: `Você é um especialista em detecção visual de óculos. Sua ÚNICA tarefa é determinar se a pessoa na imagem está usando óculos ou não.
-
-CRITÉRIOS PARA DETECTAR ÓCULOS:
-- Armações visíveis ao redor dos olhos (qualquer material: metal, plástico, acetato)
-- Lentes com reflexos ou brilhos típicos
-- Pontes nasais visíveis entre os olhos
-- Hastes dos óculos visíveis nas laterais
-- Qualquer tipo: óculos de grau, de sol, de leitura, etc.
-
-IMPORTANTE:
-- Analise CUIDADOSAMENTE a região dos olhos
-- Não confunda sombras, maquiagem ou cabelo com óculos
-- Se houver QUALQUER dúvida, seja conservador e marque como SEM óculos
-- Seja extremamente preciso na análise
-
-Responda APENAS com este JSON:
-{
-  "temOculos": true/false,
-  "confiabilidade": 0.0-1.0,
-  "detalhes": "descrição_detalhada_do_que_viu"
-}`
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Analise esta imagem e determine se a pessoa está usando óculos. Seja muito preciso na detecção.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageData
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 300,
-        temperature: 0.1,
-        stream: false
-      }),
+      body: JSON.stringify(requestPayload),
     });
 
     if (!response.ok) {
