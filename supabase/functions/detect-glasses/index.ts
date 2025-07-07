@@ -39,29 +39,23 @@ serve(async (req) => {
       model: 'deepseek-chat',
       messages: [
         {
-          role: 'system',
-          content: 'Você é um especialista em detecção de óculos. Analise a imagem e responda APENAS com JSON no formato: {"temOculos": true/false, "confiabilidade": 0.0-1.0, "detalhes": "descrição"}'
-        },
-        {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: 'Esta pessoa está usando óculos? Responda apenas com JSON.'
+              text: 'Analise esta imagem e determine se a pessoa está usando óculos. Responda APENAS com JSON no formato: {"temOculos": true/false, "confiabilidade": 0.9, "detalhes": "descrição do que viu"}. Seja preciso na detecção de armações, lentes, hastes ou qualquer indício de óculos.'
             },
             {
               type: 'image_url',
               image_url: {
-                url: processedImageData,
-                detail: 'low' // Usar baixa resolução para evitar erro de tamanho
+                url: processedImageData
               }
             }
           ]
         }
       ],
-      max_tokens: 200,
-      temperature: 0.0,
-      stream: false
+      max_tokens: 150,
+      temperature: 0.0
     };
 
     console.log('📤 Enviando requisição para DeepSeek...');
