@@ -70,143 +70,172 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   }, [isActive]);
 
   const drawPupilLine = (imageData: string) => {
-    console.log('🎯 Iniciando desenho da linha nas pupilas - Mobile:', isMobile);
+    console.log('🎯 [MOBILE] Iniciando desenho da linha nas pupilas - Mobile:', isMobile);
+    console.log('📱 [MOBILE] Dados da imagem recebida, tamanho:', imageData.length);
     
-    // Aguardar um pouco mais no mobile para garantir que a imagem está pronta
-    const delay = isMobile ? 500 : 100;
+    // Aguardar mais tempo no mobile para garantir que tudo está pronto
+    const delay = isMobile ? 1000 : 200;
     
     setTimeout(() => {
+      console.log('⏰ [MOBILE] Timeout executado, criando canvas...');
+      
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { alpha: false });
+      const ctx = canvas.getContext('2d', { 
+        alpha: false,
+        willReadFrequently: false 
+      });
       
       if (!ctx) {
-        console.error('❌ Contexto do canvas não disponível');
+        console.error('❌ [MOBILE] Contexto do canvas não disponível');
         return;
       }
       
+      console.log('✅ [MOBILE] Canvas criado com sucesso');
+      
       const img = new Image();
-      img.crossOrigin = 'anonymous'; // Para evitar problemas de CORS
+      img.crossOrigin = 'anonymous';
       
       img.onload = () => {
-        console.log('🖼️ Imagem carregada - dimensões:', img.width, 'x', img.height);
+        console.log('🖼️ [MOBILE] Imagem carregada - dimensões:', img.width, 'x', img.height);
         
         // Definir dimensões do canvas
         canvas.width = img.width;
         canvas.height = img.height;
         
-        console.log('📐 Canvas dimensões:', canvas.width, 'x', canvas.height);
+        console.log('📐 [MOBILE] Canvas redimensionado para:', canvas.width, 'x', canvas.height);
         
-        // Limpar canvas e desenhar a imagem
+        // Limpar e desenhar a imagem
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        console.log('✅ Imagem desenhada no canvas');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        console.log('✅ [MOBILE] Imagem original desenhada no canvas');
         
-        // Posições mais precisas das pupilas (30% da altura, 40% e 60% da largura)
-        const leftPupilX = img.width * 0.40;   
-        const rightPupilX = img.width * 0.60;  
-        const pupilY = img.height * 0.30;      
+        // Calcular posições das pupilas - mais precisas para mobile
+        const faceWidth = img.width * 0.6; // Largura estimada do rosto
+        const centerX = img.width / 2;
+        const eyeDistance = faceWidth * 0.3; // Distância entre os olhos
         
-        console.log('📍 Posições calculadas - Esquerda:', leftPupilX, 'Direita:', rightPupilX, 'Y:', pupilY);
+        const leftPupilX = centerX - eyeDistance / 2;   
+        const rightPupilX = centerX + eyeDistance / 2;  
+        const pupilY = img.height * 0.35; // Ligeiramente mais baixo      
         
-        // Desenhar contorno da linha para melhor visibilidade
-        ctx.save(); // Salvar estado
+        console.log('📍 [MOBILE] Posições calculadas:');
+        console.log('   - Centro X:', centerX);
+        console.log('   - Pupila esquerda X:', leftPupilX);
+        console.log('   - Pupila direita X:', rightPupilX);
+        console.log('   - Y das pupilas:', pupilY);
+        
+        // Configurar estilo para mobile
+        ctx.save();
+        
+        // Linha de contorno (preta) mais espessa
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = isMobile ? 4 : 6; // Linha mais fina no mobile
-        ctx.setLineDash([8, 6]);
+        ctx.lineWidth = isMobile ? 6 : 4;
+        ctx.lineCap = 'round';
+        ctx.setLineDash([]);
         ctx.beginPath();
         ctx.moveTo(leftPupilX, pupilY);
         ctx.lineTo(rightPupilX, pupilY);
         ctx.stroke();
+        console.log('✅ [MOBILE] Contorno da linha desenhado');
         
-        // Configurar linha tracejada principal
+        // Linha principal (verde) tracejada
         ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = isMobile ? 2 : 3;
-        ctx.setLineDash([8, 4]);
-        
-        // Desenhar linha entre pupilas
+        ctx.lineWidth = isMobile ? 3 : 2;
+        ctx.setLineDash([10, 5]);
         ctx.beginPath();
         ctx.moveTo(leftPupilX, pupilY);
         ctx.lineTo(rightPupilX, pupilY);
         ctx.stroke();
-        console.log('✅ Linha tracejada desenhada');
+        console.log('✅ [MOBILE] Linha principal desenhada');
         
-        // Desenhar pontos nas pupilas
+        // Pontos nas pupilas
         ctx.setLineDash([]);
         
-        // Contorno dos pontos
+        // Contorno dos pontos (preto)
         ctx.fillStyle = '#000000';
-        const pointSize = isMobile ? 4 : 6;
+        const outerPointSize = isMobile ? 8 : 6;
         ctx.beginPath();
-        ctx.arc(leftPupilX, pupilY, pointSize, 0, 2 * Math.PI);
+        ctx.arc(leftPupilX, pupilY, outerPointSize, 0, 2 * Math.PI);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(rightPupilX, pupilY, pointSize, 0, 2 * Math.PI);
+        ctx.arc(rightPupilX, pupilY, outerPointSize, 0, 2 * Math.PI);
         ctx.fill();
         
-        // Pontos principais
+        // Pontos internos (verde)
         ctx.fillStyle = '#00ff00';
-        const innerPointSize = isMobile ? 2 : 4;
+        const innerPointSize = isMobile ? 5 : 4;
         ctx.beginPath();
         ctx.arc(leftPupilX, pupilY, innerPointSize, 0, 2 * Math.PI);
         ctx.fill();
         ctx.beginPath();
         ctx.arc(rightPupilX, pupilY, innerPointSize, 0, 2 * Math.PI);
         ctx.fill();
-        console.log('✅ Pontos das pupilas desenhados');
+        console.log('✅ [MOBILE] Pontos das pupilas desenhados');
         
-        // Adicionar texto indicativo (menor no mobile)
-        const fontSize = isMobile ? 12 : 16;
-        ctx.font = `bold ${fontSize}px Arial`;
-        ctx.fillStyle = '#00ff00';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        const text = 'Linha Base';
-        const textMetrics = ctx.measureText(text);
-        const textX = (leftPupilX + rightPupilX) / 2 - textMetrics.width / 2;
-        const textY = pupilY + (isMobile ? 25 : 30);
-        
-        // Contorno do texto
-        ctx.strokeText(text, textX, textY);
-        // Texto principal
-        ctx.fillText(text, textX, textY);
-        console.log('✅ Texto adicionado');
-        
-        ctx.restore(); // Restaurar estado
-        
-        // Forçar renderização no mobile
-        if (isMobile) {
-          ctx.globalCompositeOperation = 'source-over';
+        // Texto indicativo
+        if (!isMobile || img.width > 400) { // Só adicionar texto se a imagem for grande o suficiente
+          const fontSize = isMobile ? 16 : 18;
+          ctx.font = `bold ${fontSize}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#000000';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 3;
+          
+          const text = 'Linha Base';
+          const textX = (leftPupilX + rightPupilX) / 2;
+          const textY = pupilY + (isMobile ? 35 : 40);
+          
+          // Contorno branco
+          ctx.strokeText(text, textX, textY);
+          // Texto verde
+          ctx.fillStyle = '#00ff00';
+          ctx.fillText(text, textX, textY);
+          console.log('✅ [MOBILE] Texto adicionado');
         }
         
-        // Atualizar a imagem capturada com a linha
-        const newImageData = canvas.toDataURL('image/jpeg', 0.95);
-        console.log('🔄 Nova imagem gerada, tamanho:', newImageData.length);
+        ctx.restore();
         
-        setCapturedImage(newImageData);
+        // Forçar uma nova renderização
+        ctx.globalCompositeOperation = 'source-over';
         
-        // Chamar callback se fornecido
-        if (onCapture) {
-          console.log('📞 Chamando callback onCapture');
-          onCapture(newImageData);
+        // Converter para nova imagem
+        try {
+          const newImageData = canvas.toDataURL('image/jpeg', 0.9);
+          console.log('🔄 [MOBILE] Nova imagem gerada, tamanho:', newImageData.length);
+          console.log('📏 [MOBILE] Canvas final:', canvas.width, 'x', canvas.height);
+          
+          // Aguardar um frame antes de atualizar
+          requestAnimationFrame(() => {
+            setCapturedImage(newImageData);
+            
+            if (onCapture) {
+              console.log('📞 [MOBILE] Chamando callback onCapture');
+              onCapture(newImageData);
+            }
+            
+            console.log('✅ [MOBILE] Processo de desenho concluído com sucesso!');
+          });
+          
+        } catch (error) {
+          console.error('❌ [MOBILE] Erro ao gerar nova imagem:', error);
         }
-        
-        console.log('✅ Processo de desenho concluído');
       };
       
       img.onerror = (error) => {
-        console.error('❌ Erro ao carregar imagem:', error);
+        console.error('❌ [MOBILE] Erro ao carregar imagem:', error);
       };
       
-      // No mobile, aguardar um frame antes de definir a src
+      console.log('🚀 [MOBILE] Iniciando carregamento da imagem...');
+      
+      // No mobile, usar timeout adicional
       if (isMobile) {
-        requestAnimationFrame(() => {
+        setTimeout(() => {
           img.src = imageData;
-        });
+        }, 100);
       } else {
         img.src = imageData;
       }
       
-      console.log('🚀 Iniciando carregamento da imagem');
     }, delay);
   };
 
