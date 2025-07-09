@@ -70,32 +70,49 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   }, [isActive]);
 
   const drawPupilLine = (imageData: string) => {
-    console.log('🎯 Iniciando desenho da linha nas pupilas');
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
+    console.log('🎯 Iniciando desenho da linha nas pupilas - Mobile:', isMobile);
     
-    img.onload = () => {
-      console.log('🖼️ Imagem carregada - dimensões:', img.width, 'x', img.height);
-      canvas.width = img.width;
-      canvas.height = img.height;
+    // Aguardar um pouco mais no mobile para garantir que a imagem está pronta
+    const delay = isMobile ? 500 : 100;
+    
+    setTimeout(() => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { alpha: false });
       
-      // Desenhar a imagem
-      ctx?.drawImage(img, 0, 0);
-      console.log('✅ Imagem desenhada no canvas');
+      if (!ctx) {
+        console.error('❌ Contexto do canvas não disponível');
+        return;
+      }
       
-      // Posições mais precisas das pupilas (30% da altura, 40% e 60% da largura)
-      const leftPupilX = img.width * 0.40;   // Pupila esquerda mais ao centro
-      const rightPupilX = img.width * 0.60;  // Pupila direita mais ao centro
-      const pupilY = img.height * 0.30;      // Mantém a altura
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // Para evitar problemas de CORS
       
-      console.log('📍 Posições calculadas - Esquerda:', leftPupilX, 'Direita:', rightPupilX, 'Y:', pupilY);
-      
-      if (ctx) {
+      img.onload = () => {
+        console.log('🖼️ Imagem carregada - dimensões:', img.width, 'x', img.height);
+        
+        // Definir dimensões do canvas
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        console.log('📐 Canvas dimensões:', canvas.width, 'x', canvas.height);
+        
+        // Limpar canvas e desenhar a imagem
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        console.log('✅ Imagem desenhada no canvas');
+        
+        // Posições mais precisas das pupilas (30% da altura, 40% e 60% da largura)
+        const leftPupilX = img.width * 0.40;   
+        const rightPupilX = img.width * 0.60;  
+        const pupilY = img.height * 0.30;      
+        
+        console.log('📍 Posições calculadas - Esquerda:', leftPupilX, 'Direita:', rightPupilX, 'Y:', pupilY);
+        
         // Desenhar contorno da linha para melhor visibilidade
+        ctx.save(); // Salvar estado
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 6;
-        ctx.setLineDash([12, 8]);
+        ctx.lineWidth = isMobile ? 4 : 6; // Linha mais fina no mobile
+        ctx.setLineDash([8, 6]);
         ctx.beginPath();
         ctx.moveTo(leftPupilX, pupilY);
         ctx.lineTo(rightPupilX, pupilY);
@@ -103,8 +120,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         
         // Configurar linha tracejada principal
         ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10, 5]);
+        ctx.lineWidth = isMobile ? 2 : 3;
+        ctx.setLineDash([8, 4]);
         
         // Desenhar linha entre pupilas
         ctx.beginPath();
@@ -113,34 +130,40 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         ctx.stroke();
         console.log('✅ Linha tracejada desenhada');
         
-        // Desenhar contorno dos pontos para melhor visibilidade
+        // Desenhar pontos nas pupilas
         ctx.setLineDash([]);
+        
+        // Contorno dos pontos
         ctx.fillStyle = '#000000';
+        const pointSize = isMobile ? 4 : 6;
         ctx.beginPath();
-        ctx.arc(leftPupilX, pupilY, 6, 0, 2 * Math.PI);
+        ctx.arc(leftPupilX, pupilY, pointSize, 0, 2 * Math.PI);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(rightPupilX, pupilY, 6, 0, 2 * Math.PI);
+        ctx.arc(rightPupilX, pupilY, pointSize, 0, 2 * Math.PI);
         ctx.fill();
         
-        // Desenhar pontos nas pupilas
+        // Pontos principais
         ctx.fillStyle = '#00ff00';
+        const innerPointSize = isMobile ? 2 : 4;
         ctx.beginPath();
-        ctx.arc(leftPupilX, pupilY, 4, 0, 2 * Math.PI);
+        ctx.arc(leftPupilX, pupilY, innerPointSize, 0, 2 * Math.PI);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(rightPupilX, pupilY, 4, 0, 2 * Math.PI);
+        ctx.arc(rightPupilX, pupilY, innerPointSize, 0, 2 * Math.PI);
         ctx.fill();
         console.log('✅ Pontos das pupilas desenhados');
         
-        // Adicionar texto indicativo
-        ctx.font = 'bold 16px Arial';
+        // Adicionar texto indicativo (menor no mobile)
+        const fontSize = isMobile ? 12 : 16;
+        ctx.font = `bold ${fontSize}px Arial`;
         ctx.fillStyle = '#00ff00';
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
-        const text = 'Linha Base Medição';
-        const textX = (leftPupilX + rightPupilX) / 2 - ctx.measureText(text).width / 2;
-        const textY = pupilY + 30;
+        ctx.lineWidth = 1;
+        const text = 'Linha Base';
+        const textMetrics = ctx.measureText(text);
+        const textX = (leftPupilX + rightPupilX) / 2 - textMetrics.width / 2;
+        const textY = pupilY + (isMobile ? 25 : 30);
         
         // Contorno do texto
         ctx.strokeText(text, textX, textY);
@@ -148,9 +171,17 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         ctx.fillText(text, textX, textY);
         console.log('✅ Texto adicionado');
         
+        ctx.restore(); // Restaurar estado
+        
+        // Forçar renderização no mobile
+        if (isMobile) {
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        
         // Atualizar a imagem capturada com a linha
-        const newImageData = canvas.toDataURL('image/jpeg', 0.9);
+        const newImageData = canvas.toDataURL('image/jpeg', 0.95);
         console.log('🔄 Nova imagem gerada, tamanho:', newImageData.length);
+        
         setCapturedImage(newImageData);
         
         // Chamar callback se fornecido
@@ -160,15 +191,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         }
         
         console.log('✅ Processo de desenho concluído');
+      };
+      
+      img.onerror = (error) => {
+        console.error('❌ Erro ao carregar imagem:', error);
+      };
+      
+      // No mobile, aguardar um frame antes de definir a src
+      if (isMobile) {
+        requestAnimationFrame(() => {
+          img.src = imageData;
+        });
+      } else {
+        img.src = imageData;
       }
-    };
-    
-    img.onerror = (error) => {
-      console.error('❌ Erro ao carregar imagem:', error);
-    };
-    
-    img.src = imageData;
-    console.log('🚀 Iniciando carregamento da imagem');
+      
+      console.log('🚀 Iniciando carregamento da imagem');
+    }, delay);
   };
 
   const handleCapture = () => {
