@@ -188,16 +188,17 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       <div className={`space-y-4 ${className}`}>
         <Card className="overflow-hidden bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-200">
           <CardContent className="p-4">
-            <div className="aspect-video rounded-lg overflow-hidden bg-white shadow-lg">
+            <div className="rounded-lg overflow-hidden bg-white shadow-lg">
               <img 
                 src={capturedImage} 
-                alt="Foto capturada" 
-                className="w-full h-full object-cover"
+                alt="Foto capturada com linha de medição" 
+                className="w-full h-auto object-contain max-h-[70vh]"
+                style={{ display: 'block' }}
               />
             </div>
             <div className="mt-4 flex items-center justify-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
-              <span className="text-green-700 font-medium">Foto capturada com sucesso!</span>
+              <span className="text-green-700 font-medium">Foto capturada com linha de medição!</span>
             </div>
           </CardContent>
         </Card>
