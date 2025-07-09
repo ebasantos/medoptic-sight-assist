@@ -38,7 +38,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     startCamera,
     stopCamera,
     switchCamera,
-    capturePhoto
+    capturePhoto,
+    setCapturedImage
   } = useCamera({ onCapture });
 
   // Simular detecção de posição em tempo real
@@ -68,9 +69,63 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     return () => clearInterval(interval);
   }, [isActive]);
 
+  const drawPupilLine = (imageData: string) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Desenhar a imagem
+      ctx?.drawImage(img, 0, 0);
+      
+      // Simular posições das pupilas (30% da altura, 25% e 75% da largura)
+      const leftPupilX = img.width * 0.25;
+      const rightPupilX = img.width * 0.75;
+      const pupilY = img.height * 0.30;
+      
+      if (ctx) {
+        // Configurar linha tracejada
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 5]);
+        
+        // Desenhar linha entre pupilas
+        ctx.beginPath();
+        ctx.moveTo(leftPupilX, pupilY);
+        ctx.lineTo(rightPupilX, pupilY);
+        ctx.stroke();
+        
+        // Desenhar pontos nas pupilas
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#00ff00';
+        ctx.beginPath();
+        ctx.arc(leftPupilX, pupilY, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(rightPupilX, pupilY, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Atualizar a imagem capturada com a linha
+        const newImageData = canvas.toDataURL('image/jpeg', 0.8);
+        setCapturedImage(newImageData);
+        
+        // Chamar callback se fornecido
+        if (onCapture) {
+          onCapture(newImageData);
+        }
+      }
+    };
+    
+    img.src = imageData;
+  };
+
   const handleCapture = () => {
     const result = capturePhoto();
     if (result) {
+      drawPupilLine(result);
       stopCamera();
     }
   };
