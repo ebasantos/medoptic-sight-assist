@@ -70,21 +70,26 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   }, [isActive]);
 
   const drawPupilLine = (imageData: string) => {
+    console.log('🎯 Iniciando desenho da linha nas pupilas');
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
     
     img.onload = () => {
+      console.log('🖼️ Imagem carregada - dimensões:', img.width, 'x', img.height);
       canvas.width = img.width;
       canvas.height = img.height;
       
       // Desenhar a imagem
       ctx?.drawImage(img, 0, 0);
+      console.log('✅ Imagem desenhada no canvas');
       
       // Simular posições das pupilas (30% da altura, 25% e 75% da largura)
       const leftPupilX = img.width * 0.25;
       const rightPupilX = img.width * 0.75;
       const pupilY = img.height * 0.30;
+      
+      console.log('📍 Posições calculadas - Esquerda:', leftPupilX, 'Direita:', rightPupilX, 'Y:', pupilY);
       
       if (ctx) {
         // Desenhar contorno da linha para melhor visibilidade
@@ -106,6 +111,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         ctx.moveTo(leftPupilX, pupilY);
         ctx.lineTo(rightPupilX, pupilY);
         ctx.stroke();
+        console.log('✅ Linha tracejada desenhada');
         
         // Desenhar contorno dos pontos para melhor visibilidade
         ctx.setLineDash([]);
@@ -125,6 +131,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         ctx.beginPath();
         ctx.arc(rightPupilX, pupilY, 4, 0, 2 * Math.PI);
         ctx.fill();
+        console.log('✅ Pontos das pupilas desenhados');
         
         // Adicionar texto indicativo
         ctx.font = 'bold 16px Arial';
@@ -139,26 +146,40 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         ctx.strokeText(text, textX, textY);
         // Texto principal
         ctx.fillText(text, textX, textY);
+        console.log('✅ Texto adicionado');
         
         // Atualizar a imagem capturada com a linha
         const newImageData = canvas.toDataURL('image/jpeg', 0.9);
+        console.log('🔄 Nova imagem gerada, tamanho:', newImageData.length);
         setCapturedImage(newImageData);
         
         // Chamar callback se fornecido
         if (onCapture) {
+          console.log('📞 Chamando callback onCapture');
           onCapture(newImageData);
         }
+        
+        console.log('✅ Processo de desenho concluído');
       }
     };
     
+    img.onerror = (error) => {
+      console.error('❌ Erro ao carregar imagem:', error);
+    };
+    
     img.src = imageData;
+    console.log('🚀 Iniciando carregamento da imagem');
   };
 
   const handleCapture = () => {
+    console.log('📸 Iniciando captura...');
     const result = capturePhoto();
     if (result) {
+      console.log('✅ Foto capturada, iniciando desenho da linha');
       drawPupilLine(result);
       stopCamera();
+    } else {
+      console.error('❌ Falha na captura da foto');
     }
   };
 
