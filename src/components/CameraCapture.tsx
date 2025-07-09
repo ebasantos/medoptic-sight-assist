@@ -87,7 +87,16 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       const pupilY = img.height * 0.30;
       
       if (ctx) {
-        // Configurar linha tracejada
+        // Desenhar contorno da linha para melhor visibilidade
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 6;
+        ctx.setLineDash([12, 8]);
+        ctx.beginPath();
+        ctx.moveTo(leftPupilX, pupilY);
+        ctx.lineTo(rightPupilX, pupilY);
+        ctx.stroke();
+        
+        // Configurar linha tracejada principal
         ctx.strokeStyle = '#00ff00';
         ctx.lineWidth = 3;
         ctx.setLineDash([10, 5]);
@@ -98,8 +107,17 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         ctx.lineTo(rightPupilX, pupilY);
         ctx.stroke();
         
-        // Desenhar pontos nas pupilas
+        // Desenhar contorno dos pontos para melhor visibilidade
         ctx.setLineDash([]);
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(leftPupilX, pupilY, 6, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(rightPupilX, pupilY, 6, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Desenhar pontos nas pupilas
         ctx.fillStyle = '#00ff00';
         ctx.beginPath();
         ctx.arc(leftPupilX, pupilY, 4, 0, 2 * Math.PI);
@@ -108,8 +126,22 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         ctx.arc(rightPupilX, pupilY, 4, 0, 2 * Math.PI);
         ctx.fill();
         
+        // Adicionar texto indicativo
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#00ff00';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        const text = 'Linha Base Medição';
+        const textX = (leftPupilX + rightPupilX) / 2 - ctx.measureText(text).width / 2;
+        const textY = pupilY + 30;
+        
+        // Contorno do texto
+        ctx.strokeText(text, textX, textY);
+        // Texto principal
+        ctx.fillText(text, textX, textY);
+        
         // Atualizar a imagem capturada com a linha
-        const newImageData = canvas.toDataURL('image/jpeg', 0.8);
+        const newImageData = canvas.toDataURL('image/jpeg', 0.9);
         setCapturedImage(newImageData);
         
         // Chamar callback se fornecido
