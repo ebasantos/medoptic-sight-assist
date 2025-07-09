@@ -260,6 +260,24 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
                 </Badge>
               </div>
             )}
+            
+            {/* Botão de captura sobreposto ao vídeo */}
+            {isActive && (
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+                <Button 
+                  onClick={handleCapture} 
+                  disabled={!isOptimalPosition}
+                  size="lg"
+                  className={`h-16 w-16 rounded-full shadow-2xl transition-all duration-300 ${
+                    isOptimalPosition 
+                      ? 'bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 scale-100' 
+                      : 'bg-gray-400 cursor-not-allowed scale-90'
+                  }`}
+                >
+                  <Camera className="h-6 w-6" />
+                </Button>
+              </div>
+            )}
           </div>
           
           {/* Feedback em tempo real */}
