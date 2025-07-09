@@ -84,10 +84,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       ctx?.drawImage(img, 0, 0);
       console.log('✅ Imagem desenhada no canvas');
       
-      // Simular posições das pupilas (30% da altura, 25% e 75% da largura)
-      const leftPupilX = img.width * 0.25;
-      const rightPupilX = img.width * 0.75;
-      const pupilY = img.height * 0.30;
+      // Posições mais precisas das pupilas (30% da altura, 40% e 60% da largura)
+      const leftPupilX = img.width * 0.40;   // Pupila esquerda mais ao centro
+      const rightPupilX = img.width * 0.60;  // Pupila direita mais ao centro
+      const pupilY = img.height * 0.30;      // Mantém a altura
       
       console.log('📍 Posições calculadas - Esquerda:', leftPupilX, 'Direita:', rightPupilX, 'Y:', pupilY);
       
