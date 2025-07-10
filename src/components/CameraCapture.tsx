@@ -70,8 +70,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       const distance = calculateEstimatedDistance(mockScore);
       setEstimatedDistance(distance);
       
-      // Verificar se está na distância ideal (45-55cm) E com boa detecção facial
-      const isIdealDistance = distance >= 45 && distance <= 55;
+      // Verificar se está na distância ideal (20-30cm) E com boa detecção facial
+      const isIdealDistance = distance >= 20 && distance <= 30;
       const hasGoodDetection = mockScore > 85;
       
       if (hasGoodDetection && isIdealDistance) {
@@ -80,10 +80,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         setIsOptimalPosition(true);
       } else if (hasGoodDetection && !isIdealDistance) {
         setPositionFeedback('Rosto bem posicionado');
-        if (distance > 55) {
-          setDistanceFeedback(`${distance}cm - Aproxime-se mais (ideal: 45-55cm)`);
-        } else if (distance < 45) {
-          setDistanceFeedback(`${distance}cm - Afaste-se um pouco (ideal: 45-55cm)`);
+        if (distance > 30) {
+          setDistanceFeedback(`${distance}cm - Aproxime-se mais (ideal: 20-30cm)`);
+        } else if (distance < 20) {
+          setDistanceFeedback(`${distance}cm - Afaste-se um pouco (ideal: 20-30cm)`);
         }
         setIsOptimalPosition(false);
       } else if (isIdealDistance && !hasGoodDetection) {
@@ -92,10 +92,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         setIsOptimalPosition(false);
       } else {
         setPositionFeedback('Ajuste posição e distância');
-        if (distance > 55) {
-          setDistanceFeedback(`${distance}cm - Aproxime-se (ideal: 45-55cm)`);
-        } else if (distance < 45) {
-          setDistanceFeedback(`${distance}cm - Afaste-se (ideal: 45-55cm)`);
+        if (distance > 30) {
+          setDistanceFeedback(`${distance}cm - Aproxime-se (ideal: 20-30cm)`);
+        } else if (distance < 20) {
+          setDistanceFeedback(`${distance}cm - Afaste-se (ideal: 20-30cm)`);
         } else {
           setDistanceFeedback(`${distance}cm - Centralize o rosto`);
         }
@@ -425,7 +425,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
             <ul className="text-sm text-blue-800 space-y-1">
               <li>• Posicione seu rosto dentro do oval amarelo/verde</li>
               <li>• Alinhe seus olhos com a linha horizontal</li>
-              <li>• Mantenha uma distância de aproximadamente 60cm da tela</li>
+              <li>• Mantenha uma distância de aproximadamente 25cm da tela</li>
               <li>• Aguarde o indicador ficar verde antes de capturar</li>
             </ul>
           </CardContent>
