@@ -112,33 +112,21 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Apply zoom and pan ONLY to the image
+    // Apply transformations and draw image
     ctx.save();
     ctx.scale(zoom, zoom);
     ctx.translate(panX, panY);
     ctx.drawImage(img, 0, 0);
-    ctx.restore();
     
-    // Draw measurements (lines and points) WITHOUT zoom
-    ctx.save();
-    
-    // Adjust line coordinates based on zoom and pan
-    const leftPupilAdjusted = {
-      x: (leftPupil.x * zoom) + (panX * zoom),
-      y: (leftPupil.y * zoom) + (panY * zoom)
-    };
-    const rightPupilAdjusted = {
-      x: (rightPupil.x * zoom) + (panX * zoom),
-      y: (rightPupil.y * zoom) + (panY * zoom)
-    };
+    // Draw measurements ON TOP of the zoomed image (same transformation)
     
     // Draw pupil line
     ctx.strokeStyle = '#00ff00';
     ctx.lineWidth = 3;
     ctx.setLineDash([8, 4]);
     ctx.beginPath();
-    ctx.moveTo(leftPupilAdjusted.x, leftPupilAdjusted.y);
-    ctx.lineTo(rightPupilAdjusted.x, rightPupilAdjusted.y);
+    ctx.moveTo(leftPupil.x, leftPupil.y);
+    ctx.lineTo(rightPupil.x, rightPupil.y);
     ctx.stroke();
     
     // Draw pupil points
@@ -147,7 +135,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     // Left pupil point
     ctx.fillStyle = '#ff0000';
     ctx.beginPath();
-    ctx.arc(leftPupilAdjusted.x, leftPupilAdjusted.y, 8, 0, 2 * Math.PI);
+    ctx.arc(leftPupil.x, leftPupil.y, 8, 0, 2 * Math.PI);
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
@@ -156,7 +144,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     // Right pupil point
     ctx.fillStyle = '#ff0000';
     ctx.beginPath();
-    ctx.arc(rightPupilAdjusted.x, rightPupilAdjusted.y, 8, 0, 2 * Math.PI);
+    ctx.arc(rightPupil.x, rightPupil.y, 8, 0, 2 * Math.PI);
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
@@ -164,29 +152,20 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     
     // Draw vertical lines and glasses points if glasses detected
     if (hasGlassesDetected) {
-      const leftGlassesAdjusted = {
-        x: (leftGlassesBottom.x * zoom) + (panX * zoom),
-        y: (leftGlassesBottom.y * zoom) + (panY * zoom)
-      };
-      const rightGlassesAdjusted = {
-        x: (rightGlassesBottom.x * zoom) + (panX * zoom),
-        y: (rightGlassesBottom.y * zoom) + (panY * zoom)
-      };
-      
       ctx.strokeStyle = '#0066ff';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 3]);
       
       // Left vertical line
       ctx.beginPath();
-      ctx.moveTo(leftPupilAdjusted.x, leftPupilAdjusted.y);
-      ctx.lineTo(leftGlassesAdjusted.x, leftGlassesAdjusted.y);
+      ctx.moveTo(leftPupil.x, leftPupil.y);
+      ctx.lineTo(leftGlassesBottom.x, leftGlassesBottom.y);
       ctx.stroke();
       
       // Right vertical line
       ctx.beginPath();
-      ctx.moveTo(rightPupilAdjusted.x, rightPupilAdjusted.y);
-      ctx.lineTo(rightGlassesAdjusted.x, rightGlassesAdjusted.y);
+      ctx.moveTo(rightPupil.x, rightPupil.y);
+      ctx.lineTo(rightGlassesBottom.x, rightGlassesBottom.y);
       ctx.stroke();
       
       // Glasses bottom points
@@ -195,7 +174,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
       
       // Left glasses bottom point
       ctx.beginPath();
-      ctx.arc(leftGlassesAdjusted.x, leftGlassesAdjusted.y, 6, 0, 2 * Math.PI);
+      ctx.arc(leftGlassesBottom.x, leftGlassesBottom.y, 6, 0, 2 * Math.PI);
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
@@ -203,7 +182,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
       
       // Right glasses bottom point
       ctx.beginPath();
-      ctx.arc(rightGlassesAdjusted.x, rightGlassesAdjusted.y, 6, 0, 2 * Math.PI);
+      ctx.arc(rightGlassesBottom.x, rightGlassesBottom.y, 6, 0, 2 * Math.PI);
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
@@ -218,30 +197,21 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     ctx.lineWidth = 3;
     
     // Pupil line label
-    const midX = (leftPupilAdjusted.x + rightPupilAdjusted.x) / 2;
-    const midY = leftPupilAdjusted.y - 20;
+    const midX = (leftPupil.x + rightPupil.x) / 2;
+    const midY = leftPupil.y - 20;
     ctx.strokeText('Linha Pupilar', midX, midY);
     ctx.fillText('Linha Pupilar', midX, midY);
     
     if (hasGlassesDetected) {
-      const leftGlassesAdjusted = {
-        x: (leftGlassesBottom.x * zoom) + (panX * zoom),
-        y: (leftGlassesBottom.y * zoom) + (panY * zoom)
-      };
-      const rightGlassesAdjusted = {
-        x: (rightGlassesBottom.x * zoom) + (panX * zoom),
-        y: (rightGlassesBottom.y * zoom) + (panY * zoom)
-      };
-      
       // Left height label
-      const leftMidY = (leftPupilAdjusted.y + leftGlassesAdjusted.y) / 2;
-      ctx.strokeText('Alt. E', leftPupilAdjusted.x - 25, leftMidY);
-      ctx.fillText('Alt. E', leftPupilAdjusted.x - 25, leftMidY);
+      const leftMidY = (leftPupil.y + leftGlassesBottom.y) / 2;
+      ctx.strokeText('Alt. E', leftPupil.x - 25, leftMidY);
+      ctx.fillText('Alt. E', leftPupil.x - 25, leftMidY);
       
       // Right height label
-      const rightMidY = (rightPupilAdjusted.y + rightGlassesAdjusted.y) / 2;
-      ctx.strokeText('Alt. D', rightPupilAdjusted.x + 25, rightMidY);
-      ctx.fillText('Alt. D', rightPupilAdjusted.x + 25, rightMidY);
+      const rightMidY = (rightPupil.y + rightGlassesBottom.y) / 2;
+      ctx.strokeText('Alt. D', rightPupil.x + 25, rightMidY);
+      ctx.fillText('Alt. D', rightPupil.x + 25, rightMidY);
     }
     
     ctx.restore();
@@ -271,13 +241,13 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
       return { x: 0, y: 0 };
     }
     
-    // Calcular coordenadas reais considerando zoom e pan
+    // Converter coordenadas da tela para coordenadas do canvas
     const canvasX = (clientX - rect.left) * (canvas.width / rect.width);
     const canvasY = (clientY - rect.top) * (canvas.height / rect.height);
     
-    // Converter de coordenadas da tela para coordenadas da imagem original
-    const x = (canvasX - (panX * zoom)) / zoom;
-    const y = (canvasY - (panY * zoom)) / zoom;
+    // Ajustar para zoom e pan
+    const x = (canvasX / zoom) - panX;
+    const y = (canvasY / zoom) - panY;
     
     return { x, y };
   };
@@ -288,21 +258,26 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
 
   const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoordinates(event);
-    const threshold = 20 / zoom; // Ajustar threshold baseado no zoom
+    const threshold = 15; // Threshold fixo, mais fácil de clicar
     
     // Check which point is being clicked
     if (getPointDistance(coords, leftPupil) < threshold) {
       setIsDragging('leftPupil');
+      event.preventDefault();
     } else if (getPointDistance(coords, rightPupil) < threshold) {
       setIsDragging('rightPupil');
+      event.preventDefault();
     } else if (hasGlassesDetected && getPointDistance(coords, leftGlassesBottom) < threshold) {
       setIsDragging('leftGlasses');
+      event.preventDefault();
     } else if (hasGlassesDetected && getPointDistance(coords, rightGlassesBottom) < threshold) {
       setIsDragging('rightGlasses');
+      event.preventDefault();
     } else {
-      // Start panning if not clicking on a point
+      // Start panning
       setIsPanning(true);
       setLastPanPoint({ x: event.clientX, y: event.clientY });
+      event.preventDefault();
     }
   };
 
@@ -324,16 +299,15 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
           setRightGlassesBottom(coords);
           break;
       }
+      event.preventDefault();
     } else if (isPanning) {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      const deltaX = event.clientX - lastPanPoint.x;
+      const deltaY = event.clientY - lastPanPoint.y;
       
-      const deltaX = (event.clientX - lastPanPoint.x) / zoom;
-      const deltaY = (event.clientY - lastPanPoint.y) / zoom;
-      
-      setPanX(prev => prev + deltaX);
-      setPanY(prev => prev + deltaY);
+      setPanX(prev => prev + deltaX / zoom);
+      setPanY(prev => prev + deltaY / zoom);
       setLastPanPoint({ x: event.clientX, y: event.clientY });
+      event.preventDefault();
     }
   };
 
@@ -371,19 +345,19 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
 
   // Calculate measurements
   const calculateMeasurements = (): MeasurementResults => {
-    // Assumir que frameWidth representa largura real da armação em mm
-    // Calcular quantos pixels representam 1mm baseado na distância entre pupilas
+    // Calcular distância real entre pupilas em pixels
     const pupilDistancePixels = Math.abs(rightPupil.x - leftPupil.x);
     
-    // Usar uma distância pupilar média de 63mm como referência para calibração
-    const averagePupilDistanceMM = 63;
-    const pixelsPerMM = pupilDistancePixels / averagePupilDistanceMM;
+    // Usar frameWidth como referência real em mm para calibração
+    // Assumir que frameWidth é a largura real da armação que o usuário informou
+    const frameWidthPixels = imageRef.current?.width || 1;
+    const pixelsPerMM = frameWidthPixels / frameWidth;
     
-    // Calcular medidas reais
+    // Calcular medidas baseadas na posição REAL das linhas ajustadas pelo usuário
     const dpBinocular = pupilDistancePixels / pixelsPerMM;
     const dnpEsquerda = dpBinocular / 2;
     const dnpDireita = dpBinocular / 2;
-    const larguraLente = dpBinocular * 0.75; // Largura da lente baseada na DP
+    const larguraLente = dpBinocular * 0.75;
     
     let alturaEsquerda, alturaDireita;
     
