@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import CameraCapture from '@/components/CameraCapture';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
-import { PrecisionMeasurementSystem } from '@/components/PrecisionMeasurementSystem';
+import { IVisionMeasurementSystem } from '@/components/IVisionMeasurementSystem';
 
 const MeasurementPage = () => {
   const navigate = useNavigate();
@@ -333,7 +333,7 @@ const MeasurementPage = () => {
 
         {step === 'interactive' && capturedImage && (
           <div className="max-w-6xl mx-auto">
-            <PrecisionMeasurementSystem
+            <IVisionMeasurementSystem
               imageData={capturedImage}
               hasGlasses={false}
               onMeasurementsChange={handleInteractiveMeasurements}
