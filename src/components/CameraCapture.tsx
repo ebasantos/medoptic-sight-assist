@@ -32,6 +32,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   const [stableScore, setStableScore] = useState(0);
   const [stableDistance, setStableDistance] = useState(0);
   const [stableHeight, setStableHeight] = useState(0.5);
+  const [stableFrames, setStableFrames] = useState(0);
+  const [autoCapturing, setAutoCapturing] = useState(false);
   
   const {
     videoRef,
@@ -89,58 +91,67 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       setEstimatedDistance(Math.round(newStableDistance));
       setFaceHeightPosition(newStableHeight);
       
-      // Verificar condições ideais com tolerâncias mais amplas
-      const isIdealDistance = newStableDistance >= 20 && newStableDistance <= 30;
-      const hasGoodDetection = newStableScore > 85;
-      const isCorrectHeight = newStableHeight >= 0.45 && newStableHeight <= 0.55;
+      // Verificar condições ideais com tolerâncias mais rigorosas
+      const isIdealDistance = newStableDistance >= 23 && newStableDistance <= 27;
+      const hasGoodDetection = newStableScore > 90;
+      const isCorrectHeight = newStableHeight >= 0.48 && newStableHeight <= 0.52;
       
-      if (hasGoodDetection && isIdealDistance && isCorrectHeight) {
+      // Só marca como posição ótima se TODAS as condições estão perfeitas
+      const isPerfect = hasGoodDetection && isIdealDistance && isCorrectHeight;
+      
+      if (isPerfect) {
         setPositionFeedback('Posição perfeita! ✓');
-        setDistanceFeedback(`${Math.round(newStableDistance)}cm - Posição ideal ✓`);
+        setDistanceFeedback(`${Math.round(newStableDistance)}cm - Ideal ✓`);
         setIsOptimalPosition(true);
-      } else if (hasGoodDetection && isIdealDistance && !isCorrectHeight) {
-        if (newStableHeight < 0.45) {
-          setPositionFeedback('Abaixe um pouco a câmera');
-          setDistanceFeedback(`${Math.round(newStableDistance)}cm - Rosto muito alto`);
-        } else {
-          setPositionFeedback('Levante um pouco a câmera');
-          setDistanceFeedback(`${Math.round(newStableDistance)}cm - Rosto muito baixo`);
-        }
-        setIsOptimalPosition(false);
-      } else if (hasGoodDetection && !isIdealDistance && isCorrectHeight) {
-        setPositionFeedback('Altura boa, ajuste distância');
-        if (newStableDistance > 30) {
-          setDistanceFeedback(`${Math.round(newStableDistance)}cm - Aproxime-se`);
-        } else if (newStableDistance < 20) {
-          setDistanceFeedback(`${Math.round(newStableDistance)}cm - Afaste-se`);
-        }
-        setIsOptimalPosition(false);
-      } else if (!hasGoodDetection && isIdealDistance && isCorrectHeight) {
-        setPositionFeedback('Centralize melhor o rosto');
-        setDistanceFeedback(`${Math.round(newStableDistance)}cm - Distância e altura OK`);
-        setIsOptimalPosition(false);
+        
+        // Contador para captura automática
+        setStableFrames(prev => {
+          const newCount = prev + 1;
+          if (newCount >= 4 && !autoCapturing) { // 4 frames estáveis = ~3.2s
+            setAutoCapturing(true);
+            setTimeout(() => {
+              if (!autoCapturing) {
+                handleCapture();
+              }
+            }, 500);
+          }
+          return newCount;
+        });
       } else {
-        // Feedback mais simples e estável
-        const distance = Math.round(newStableDistance);
-        if (!isIdealDistance && !isCorrectHeight) {
-          if (distance > 30 && newStableHeight < 0.45) {
+        setIsOptimalPosition(false);
+        setStableFrames(0);
+        setAutoCapturing(false);
+        
+        if (!hasGoodDetection) {
+          setPositionFeedback('Centralize melhor o rosto na câmera');
+          setDistanceFeedback(`${Math.round(newStableDistance)}cm - Melhore o enquadramento`);
+        } else if (!isIdealDistance && !isCorrectHeight) {
+          const distance = Math.round(newStableDistance);
+          if (distance > 27 && newStableHeight < 0.48) {
             setPositionFeedback('Aproxime-se e abaixe a câmera');
-          } else if (distance > 30 && newStableHeight > 0.55) {
+          } else if (distance > 27 && newStableHeight > 0.52) {
             setPositionFeedback('Aproxime-se e levante a câmera');
-          } else if (distance < 20 && newStableHeight < 0.45) {
+          } else if (distance < 23 && newStableHeight < 0.48) {
             setPositionFeedback('Afaste-se e abaixe a câmera');
-          } else if (distance < 20 && newStableHeight > 0.55) {
+          } else if (distance < 23 && newStableHeight > 0.52) {
             setPositionFeedback('Afaste-se e levante a câmera');
           } else {
-            setPositionFeedback('Ajuste posição e centralize');
+            setPositionFeedback('Ajuste distância e altura simultaneamente');
           }
+          setDistanceFeedback(`${distance}cm - Precisa estar entre 23-27cm`);
         } else if (!isIdealDistance) {
-          setPositionFeedback(distance > 30 ? 'Aproxime-se mais' : 'Afaste-se um pouco');
-        } else {
-          setPositionFeedback(newStableHeight < 0.45 ? 'Abaixe a câmera' : 'Levante a câmera');
+          const distance = Math.round(newStableDistance);
+          setPositionFeedback(distance > 27 ? 'Aproxime-se mais da câmera' : 'Afaste-se um pouco da câmera');
+          setDistanceFeedback(`${distance}cm - Ideal: 25cm`);
+        } else if (!isCorrectHeight) {
+          if (newStableHeight < 0.48) {
+            setPositionFeedback('Abaixe a câmera - rosto muito alto');
+            setDistanceFeedback(`${Math.round(newStableDistance)}cm - Centralize na altura`);
+          } else {
+            setPositionFeedback('Levante a câmera - rosto muito baixo');
+            setDistanceFeedback(`${Math.round(newStableDistance)}cm - Centralize na altura`);
+          }
         }
-        setDistanceFeedback(`${distance}cm - Ideal: 25cm centralizado`);
-        setIsOptimalPosition(false);
       }
     }, 800); // Intervalo maior para reduzir oscilações
 
@@ -343,7 +354,16 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               <div className="absolute top-4 left-4">
                 <Badge className="bg-black/70 text-white border-0 backdrop-blur-sm">
                   <div className={`w-2 h-2 rounded-full mr-2 ${isOptimalPosition ? 'bg-green-400 animate-pulse' : 'bg-yellow-400 animate-pulse'}`} />
-                  Câmera {facingMode === 'user' ? 'Frontal' : 'Traseira'}
+                  {autoCapturing ? 'Capturando...' : isOptimalPosition ? 'Perfeito!' : `Câmera ${facingMode === 'user' ? 'Frontal' : 'Traseira'}`}
+                </Badge>
+              </div>
+            )}
+            
+            {/* Contador de estabilidade */}
+            {isActive && isOptimalPosition && (
+              <div className="absolute top-14 left-4">
+                <Badge className="bg-green-500/90 text-white border-0 backdrop-blur-sm">
+                  Estável: {stableFrames}/4
                 </Badge>
               </div>
             )}
