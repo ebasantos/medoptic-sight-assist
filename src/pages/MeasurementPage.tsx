@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import CameraCapture from '@/components/CameraCapture';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
+import { InteractivePupilMeasurement } from '@/components/InteractivePupilMeasurement';
 
 const MeasurementPage = () => {
   const navigate = useNavigate();
@@ -19,12 +20,17 @@ const MeasurementPage = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  const [step, setStep] = useState<'camera' | 'measurements'>('camera');
+  const [step, setStep] = useState<'camera' | 'measurements' | 'interactive'>('camera');
   const [loading, setSaving] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [measurementCalculated, setMeasurementCalculated] = useState(false);
+  const [useInteractiveMode, setUseInteractiveMode] = useState(true);
+  const [interactiveMeasurements, setInteractiveMeasurements] = useState<any>(null);
   
-  const { isAnalyzing, measurements, error: analysisError, analyzeFacialMeasurements } = useFacialMeasurements();
+  const { isAnalyzing, measurements: aiMeasurements, error: analysisError, analyzeFacialMeasurements } = useFacialMeasurements();
+  
+  // Use interactive measurements if available, otherwise use AI measurements
+  const measurements = interactiveMeasurements || aiMeasurements;
   
   const [formData, setFormData] = useState({
     nomeCliente: '',
@@ -34,8 +40,15 @@ const MeasurementPage = () => {
   const handleImageCapture = (imageData: string) => {
     console.log('Imagem capturada na página de medição');
     setCapturedImage(imageData);
-    setStep('measurements');
+    setStep(useInteractiveMode ? 'interactive' : 'measurements');
     setMeasurementCalculated(false);
+  };
+
+  const handleInteractiveMeasurements = (measurementData: any) => {
+    console.log('Medições interativas recebidas:', measurementData);
+    setInteractiveMeasurements(measurementData);
+    setMeasurementCalculated(true);
+    setStep('measurements');
   };
 
   const handleAutoAnalysis = async () => {
@@ -56,7 +69,7 @@ const MeasurementPage = () => {
       
       toast({
         title: "Medições calculadas automaticamente",
-        description: `Análise concluída com ${Math.round((measurements?.confiabilidade || 0) * 100)}% de confiança`,
+        description: `Análise concluída com ${Math.round((aiMeasurements?.confiabilidade || 0) * 100)}% de confiança`,
       });
     } catch (error) {
       toast({
@@ -259,7 +272,11 @@ const MeasurementPage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => step === 'measurements' ? setStep('camera') : navigate('/optica')}
+                onClick={() => {
+                  if (step === 'measurements') setStep('interactive');
+                  else if (step === 'interactive') setStep('camera');
+                  else navigate('/optica');
+                }}
                 className="border-blue-200 hover:bg-blue-50"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -267,11 +284,13 @@ const MeasurementPage = () => {
               </Button>
               <div>
                 <h1 className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-gray-900`}>
-                  {step === 'camera' ? 'Captura de Foto' : 'Dados da Aferição'}
+                  {step === 'camera' ? 'Captura de Foto' : 
+                   step === 'interactive' ? 'Medição Interativa' : 'Dados da Aferição'}
                 </h1>
                 {!isMobile && (
                   <p className="text-sm text-gray-600">
-                    {step === 'camera' ? 'Posicione o cliente para uma foto padronizada' : 'Análise automática com IA'}
+                    {step === 'camera' ? 'Posicione o cliente para uma foto padronizada' : 
+                     step === 'interactive' ? 'Ajuste manualmente as posições das pupilas' : 'Análise automática com IA'}
                   </p>
                 )}
               </div>
@@ -285,12 +304,16 @@ const MeasurementPage = () => {
           <div className="mt-4">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
               <span className={step === 'camera' ? 'text-blue-600 font-medium' : ''}>Captura</span>
+              <span className={step === 'interactive' ? 'text-blue-600 font-medium' : ''}>Ajuste</span>
               <span className={step === 'measurements' ? 'text-blue-600 font-medium' : ''}>Medições</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
                 className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: step === 'camera' ? '50%' : '100%' }}
+                style={{ 
+                  width: step === 'camera' ? '33%' : 
+                         step === 'interactive' ? '66%' : '100%' 
+                }}
               />
             </div>
           </div>
@@ -304,6 +327,17 @@ const MeasurementPage = () => {
               onCapture={handleImageCapture}
               showGuides={true}
               guideType="measurement"
+            />
+          </div>
+        )}
+
+        {step === 'interactive' && capturedImage && (
+          <div className="max-w-4xl mx-auto">
+            <InteractivePupilMeasurement
+              imageData={capturedImage}
+              frameWidth={formData.larguraArmacao ? parseFloat(formData.larguraArmacao) : 50}
+              hasGlasses={false} // Will be detected automatically in the component
+              onMeasurementsChange={handleInteractiveMeasurements}
             />
           </div>
         )}
@@ -369,36 +403,62 @@ const MeasurementPage = () => {
               </Card>
 
               {!measurementCalculated && (
-                <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-                        <Brain className="h-6 w-6 text-white" />
+                <div className="space-y-4">
+                  <Card className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
+                          <Eye className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-purple-900 mb-2">Medição Interativa (Recomendado)</h4>
+                          <p className="text-purple-700 mb-4">
+                            Ajuste manualmente as posições das pupilas para máxima precisão nas medidas.
+                          </p>
+                          <Button 
+                            onClick={() => setStep('interactive')}
+                            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Usar Medição Interativa
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-blue-900 mb-2">Análise Automática com IA</h4>
-                        <p className="text-blue-700 mb-4">
-                          Nossa IA analisará automaticamente a foto para calcular as medidas faciais com precisão.
-                        </p>
-                        <Button 
-                          onClick={handleAutoAnalysis}
-                          disabled={isAnalyzing || !capturedImage}
-                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                        >
-                          <Brain className="h-4 w-4 mr-2" />
-                          {isAnalyzing ? 'Analisando...' : 'Calcular Medidas com IA'}
-                        </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+                          <Brain className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-blue-900 mb-2">Análise Automática com IA</h4>
+                          <p className="text-blue-700 mb-4">
+                            Nossa IA analisará automaticamente a foto para calcular as medidas faciais.
+                          </p>
+                          <Button 
+                            onClick={handleAutoAnalysis}
+                            disabled={isAnalyzing || !capturedImage}
+                            variant="outline"
+                            className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
+                          >
+                            <Brain className="h-4 w-4 mr-2" />
+                            {isAnalyzing ? 'Analisando...' : 'Calcular Medidas com IA'}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    
-                    {analysisError && (
-                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
-                        <AlertTriangle className="h-4 w-4 mt-0.5" />
-                        <span>{analysisError}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      
+                      {analysisError && (
+                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5" />
+                          <span>{analysisError}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               )}
 
               {measurementCalculated && measurements && (
