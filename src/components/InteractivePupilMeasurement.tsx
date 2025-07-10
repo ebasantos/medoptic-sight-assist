@@ -113,13 +113,15 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
     
-    // Draw pupil line
+    // Apply zoom and pan transformations
     ctx.save();
+    ctx.scale(zoom, zoom);
+    ctx.translate(panX, panY);
     
-    // Horizontal line between pupils
+    // Draw pupil line
     ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([8, 4]);
+    ctx.lineWidth = 3 / zoom; // Ajustar espessura baseada no zoom
+    ctx.setLineDash([8 / zoom, 4 / zoom]);
     ctx.beginPath();
     ctx.moveTo(leftPupil.x, leftPupil.y);
     ctx.lineTo(rightPupil.x, rightPupil.y);
@@ -131,26 +133,26 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     // Left pupil point
     ctx.fillStyle = '#ff0000';
     ctx.beginPath();
-    ctx.arc(leftPupil.x, leftPupil.y, 8, 0, 2 * Math.PI);
+    ctx.arc(leftPupil.x, leftPupil.y, 8 / zoom, 0, 2 * Math.PI);
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 / zoom;
     ctx.stroke();
     
     // Right pupil point
     ctx.fillStyle = '#ff0000';
     ctx.beginPath();
-    ctx.arc(rightPupil.x, rightPupil.y, 8, 0, 2 * Math.PI);
+    ctx.arc(rightPupil.x, rightPupil.y, 8 / zoom, 0, 2 * Math.PI);
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 / zoom;
     ctx.stroke();
     
     // Draw vertical lines and glasses points if glasses detected
     if (hasGlassesDetected) {
       ctx.strokeStyle = '#0066ff';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 3]);
+      ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash([6 / zoom, 3 / zoom]);
       
       // Left vertical line
       ctx.beginPath();
@@ -170,48 +172,48 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
       
       // Left glasses bottom point
       ctx.beginPath();
-      ctx.arc(leftGlassesBottom.x, leftGlassesBottom.y, 6, 0, 2 * Math.PI);
+      ctx.arc(leftGlassesBottom.x, leftGlassesBottom.y, 6 / zoom, 0, 2 * Math.PI);
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 / zoom;
       ctx.stroke();
       
       // Right glasses bottom point
       ctx.beginPath();
-      ctx.arc(rightGlassesBottom.x, rightGlassesBottom.y, 6, 0, 2 * Math.PI);
+      ctx.arc(rightGlassesBottom.x, rightGlassesBottom.y, 6 / zoom, 0, 2 * Math.PI);
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 / zoom;
       ctx.stroke();
     }
     
     // Add labels
-    ctx.font = 'bold 14px Arial';
+    ctx.font = `bold ${14 / zoom}px Arial`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 / zoom;
     
     // Pupil line label
     const midX = (leftPupil.x + rightPupil.x) / 2;
-    const midY = leftPupil.y - 20;
+    const midY = leftPupil.y - 20 / zoom;
     ctx.strokeText('Linha Pupilar', midX, midY);
     ctx.fillText('Linha Pupilar', midX, midY);
     
     if (hasGlassesDetected) {
       // Left height label
       const leftMidY = (leftPupil.y + leftGlassesBottom.y) / 2;
-      ctx.strokeText('Alt. E', leftPupil.x - 25, leftMidY);
-      ctx.fillText('Alt. E', leftPupil.x - 25, leftMidY);
+      ctx.strokeText('Alt. E', leftPupil.x - 25 / zoom, leftMidY);
+      ctx.fillText('Alt. E', leftPupil.x - 25 / zoom, leftMidY);
       
       // Right height label
       const rightMidY = (rightPupil.y + rightGlassesBottom.y) / 2;
-      ctx.strokeText('Alt. D', rightPupil.x + 25, rightMidY);
-      ctx.fillText('Alt. D', rightPupil.x + 25, rightMidY);
+      ctx.strokeText('Alt. D', rightPupil.x + 25 / zoom, rightMidY);
+      ctx.fillText('Alt. D', rightPupil.x + 25 / zoom, rightMidY);
     }
     
     ctx.restore();
-  }, [leftPupil, rightPupil, leftGlassesBottom, rightGlassesBottom, hasGlassesDetected, isLoaded]);
+  }, [leftPupil, rightPupil, leftGlassesBottom, rightGlassesBottom, hasGlassesDetected, isLoaded, zoom, panX, panY]);
 
   // Redraw when positions change
   useEffect(() => {
@@ -224,8 +226,6 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     if (!canvas) return { x: 0, y: 0 };
     
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / (rect.width * zoom);
-    const scaleY = canvas.height / (rect.height * zoom);
     
     let clientX, clientY;
     
@@ -239,10 +239,11 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
       return { x: 0, y: 0 };
     }
     
-    return {
-      x: ((clientX - rect.left) * scaleX) - panX,
-      y: ((clientY - rect.top) * scaleY) - panY
-    };
+    // Calcular coordenadas considerando zoom e pan
+    const x = ((clientX - rect.left) / zoom - panX) * (canvas.width / rect.width);
+    const y = ((clientY - rect.top) / zoom - panY) * (canvas.height / rect.height);
+    
+    return { x, y };
   };
 
   const getPointDistance = (point1: { x: number; y: number }, point2: { x: number; y: number }) => {
@@ -288,8 +289,11 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
           break;
       }
     } else if (isPanning) {
-      const deltaX = event.clientX - lastPanPoint.x;
-      const deltaY = event.clientY - lastPanPoint.y;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      const deltaX = (event.clientX - lastPanPoint.x) / zoom;
+      const deltaY = (event.clientY - lastPanPoint.y) / zoom;
       
       setPanX(prev => prev + deltaX);
       setPanY(prev => prev + deltaY);
@@ -455,24 +459,18 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
             </Button>
           </div>
           
-          <div className="overflow-hidden">
-            <canvas
-              ref={canvasRef}
-              className="cursor-crosshair"
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              style={{ 
-                touchAction: 'none',
-                transform: `scale(${zoom}) translate(${panX / zoom}px, ${panY / zoom}px)`,
-                transformOrigin: '0 0'
-              }}
-            />
-          </div>
+          <canvas
+            ref={canvasRef}
+            className="max-w-full h-auto cursor-crosshair"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{ touchAction: 'none' }}
+          />
         </div>
 
         {/* Controls */}
