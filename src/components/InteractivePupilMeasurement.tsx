@@ -345,18 +345,66 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
 
   // Calculate measurements
   const calculateMeasurements = (): MeasurementResults => {
+    if (!imageRef.current) {
+      return {
+        dpBinocular: 0,
+        dnpEsquerda: 0,
+        dnpDireita: 0,
+        larguraLente: 0,
+        confiabilidade: 0,
+        temOculos: hasGlassesDetected
+      };
+    }
+
     // Calcular distância real entre pupilas em pixels
     const pupilDistancePixels = Math.abs(rightPupil.x - leftPupil.x);
     
-    // Usar frameWidth como referência real em mm para calibração
-    // Assumir que frameWidth é a largura real da armação que o usuário informou
-    const frameWidthPixels = imageRef.current?.width || 1;
-    const pixelsPerMM = frameWidthPixels / frameWidth;
+    console.log('=== CÁLCULO DAS MEDIDAS ===');
+    console.log('Posição pupila esquerda (pixels):', leftPupil);
+    console.log('Posição pupila direita (pixels):', rightPupil);
+    console.log('Distância entre pupilas (pixels):', pupilDistancePixels);
+    console.log('Frame width fornecido (mm):', frameWidth);
+    console.log('Largura da imagem (pixels):', imageRef.current.width);
     
-    // Calcular medidas baseadas na posição REAL das linhas ajustadas pelo usuário
+    // CORREÇÃO: Usar uma escala mais realista baseada na largura facial típica
+    // A largura facial média entre têmporas é cerca de 140mm
+    // Assumindo que a face ocupa cerca de 70% da largura da imagem
+    const faceWidthInImage = imageRef.current.width * 0.7; // 70% da largura da imagem
+    const realFaceWidthMM = 140; // largura facial média em mm
+    const pixelsPerMM = faceWidthInImage / realFaceWidthMM;
+    
+    console.log('Largura facial estimada na imagem (pixels):', faceWidthInImage);
+    console.log('Largura facial real estimada (mm):', realFaceWidthMM);
+    console.log('Pixels por mm calculado:', pixelsPerMM);
+    
+    // Calcular DP Binocular (distância entre centros das pupilas)
     const dpBinocular = pupilDistancePixels / pixelsPerMM;
-    const dnpEsquerda = dpBinocular / 2;
-    const dnpDireita = dpBinocular / 2;
+    
+    console.log('DP Binocular calculada (mm):', dpBinocular);
+    
+    // CORREÇÃO: Calcular DNP corretamente
+    // DNP = distância do centro do nariz até cada pupila
+    // O centro do nariz está no meio da linha que conecta as pupilas
+    const centerNoseX = (leftPupil.x + rightPupil.x) / 2;
+    
+    // DNP Esquerda: distância do centro do nariz até a pupila esquerda
+    const dnpEsquerdaPixels = Math.abs(centerNoseX - leftPupil.x);
+    const dnpEsquerda = dnpEsquerdaPixels / pixelsPerMM;
+    
+    // DNP Direita: distância do centro do nariz até a pupila direita  
+    const dnpDireitaPixels = Math.abs(rightPupil.x - centerNoseX);
+    const dnpDireita = dnpDireitaPixels / pixelsPerMM;
+    
+    console.log('Centro do nariz (x):', centerNoseX);
+    console.log('DNP Esquerda (pixels):', dnpEsquerdaPixels);
+    console.log('DNP Direita (pixels):', dnpDireitaPixels);
+    console.log('DNP Esquerda (mm):', dnpEsquerda);
+    console.log('DNP Direita (mm):', dnpDireita);
+    
+    // Validação: DP deve estar entre 50-80mm para adultos
+    const isValidDP = dpBinocular >= 50 && dpBinocular <= 80;
+    console.log('DP é válida (50-80mm)?', isValidDP);
+    
     const larguraLente = dpBinocular * 0.75;
     
     let alturaEsquerda, alturaDireita;
@@ -367,18 +415,25 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
       
       alturaEsquerda = leftHeightPixels / pixelsPerMM;
       alturaDireita = rightHeightPixels / pixelsPerMM;
+      
+      console.log('Altura esquerda (mm):', alturaEsquerda);
+      console.log('Altura direita (mm):', alturaDireita);
     }
     
-    return {
+    const result = {
       dpBinocular,
       dnpEsquerda,
       dnpDireita,
       alturaEsquerda,
       alturaDireita,
       larguraLente,
-      confiabilidade: 0.95,
+      confiabilidade: isValidDP ? 0.95 : 0.70,
       temOculos: hasGlassesDetected
     };
+    
+    console.log('=== RESULTADO FINAL ===', result);
+    
+    return result;
   };
 
   const handleProcess = () => {
@@ -523,11 +578,19 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-gray-600">DP Binocular:</span>
-                <span className="ml-2 font-medium">{calculateMeasurements().dpBinocular.toFixed(1)} mm</span>
+                <span className="ml-2 font-medium text-blue-600">{calculateMeasurements().dpBinocular.toFixed(1)} mm</span>
               </div>
               <div>
                 <span className="text-gray-600">Largura Lente:</span>
                 <span className="ml-2 font-medium">{calculateMeasurements().larguraLente.toFixed(1)} mm</span>
+              </div>
+              <div>
+                <span className="text-gray-600">DNP Esquerda:</span>
+                <span className="ml-2 font-medium text-green-600">{calculateMeasurements().dnpEsquerda.toFixed(1)} mm</span>
+              </div>
+              <div>
+                <span className="text-gray-600">DNP Direita:</span>
+                <span className="ml-2 font-medium text-green-600">{calculateMeasurements().dnpDireita.toFixed(1)} mm</span>
               </div>
               {hasGlassesDetected && (
                 <>
