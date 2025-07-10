@@ -227,6 +227,8 @@ export const SimpleMeasurementSystem: React.FC<SimpleMeasurementSystemProps> = (
     const canvasX = clientX - rect.left;
     const canvasY = clientY - rect.top;
     
+    console.log('Click nas coordenadas do canvas:', canvasX, canvasY);
+    
     // Calculate image bounds
     const containerAspect = canvas.width / canvas.height;
     const imageAspect = img.width / img.height;
@@ -245,8 +247,10 @@ export const SimpleMeasurementSystem: React.FC<SimpleMeasurementSystemProps> = (
     const imgY = (canvas.height - displayHeight) / 2 + offset.y;
     
     // Convert to image coordinates
-    const x = ((canvasX - imgX) / displayWidth) * img.width;
-    const y = ((canvasY - imgY) / displayHeight) * img.height;
+    const x = Math.max(0, Math.min(img.width, ((canvasX - imgX) / displayWidth) * img.width));
+    const y = Math.max(0, Math.min(img.height, ((canvasY - imgY) / displayHeight) * img.height));
+    
+    console.log('Coordenadas da imagem calculadas:', x, y);
     
     return { x, y };
   };
@@ -259,15 +263,34 @@ export const SimpleMeasurementSystem: React.FC<SimpleMeasurementSystemProps> = (
     const coords = getImageCoordinates(event.clientX, event.clientY);
     const threshold = 25 / zoom;
     
-    if (getPointDistance(coords, leftPupil) < threshold) {
+    console.log('Mouse down - coords:', coords, 'threshold:', threshold);
+    console.log('Posições atuais - leftPupil:', leftPupil, 'rightPupil:', rightPupil);
+    
+    const leftDistance = getPointDistance(coords, leftPupil);
+    const rightDistance = getPointDistance(coords, rightPupil);
+    const leftGlassesDistance = hasGlassesDetected ? getPointDistance(coords, leftGlassesBottom) : Infinity;
+    const rightGlassesDistance = hasGlassesDetected ? getPointDistance(coords, rightGlassesBottom) : Infinity;
+    
+    console.log('Distâncias:', { leftDistance, rightDistance, leftGlassesDistance, rightGlassesDistance });
+    
+    if (leftDistance < threshold) {
+      console.log('Arrastando pupila esquerda');
       setIsDragging('leftPupil');
-    } else if (getPointDistance(coords, rightPupil) < threshold) {
+      event.preventDefault();
+    } else if (rightDistance < threshold) {
+      console.log('Arrastando pupila direita');
       setIsDragging('rightPupil');
-    } else if (hasGlassesDetected && getPointDistance(coords, leftGlassesBottom) < threshold) {
+      event.preventDefault();
+    } else if (hasGlassesDetected && leftGlassesDistance < threshold) {
+      console.log('Arrastando óculos esquerdo');
       setIsDragging('leftGlasses');
-    } else if (hasGlassesDetected && getPointDistance(coords, rightGlassesBottom) < threshold) {
+      event.preventDefault();
+    } else if (hasGlassesDetected && rightGlassesDistance < threshold) {
+      console.log('Arrastando óculos direito');
       setIsDragging('rightGlasses');
+      event.preventDefault();
     } else {
+      console.log('Iniciando pan');
       setIsPanning(true);
       setLastPanPoint({ x: event.clientX, y: event.clientY });
     }
@@ -276,13 +299,16 @@ export const SimpleMeasurementSystem: React.FC<SimpleMeasurementSystemProps> = (
   const handleMouseMove = (event: React.MouseEvent) => {
     if (isDragging) {
       const coords = getImageCoordinates(event.clientX, event.clientY);
+      console.log('Movendo para:', coords, 'Tipo:', isDragging);
       
       switch (isDragging) {
         case 'leftPupil':
           setLeftPupil(coords);
+          console.log('Nova posição pupila esquerda:', coords);
           break;
         case 'rightPupil':
           setRightPupil(coords);
+          console.log('Nova posição pupila direita:', coords);
           break;
         case 'leftGlasses':
           setLeftGlassesBottom(coords);
@@ -309,27 +335,62 @@ export const SimpleMeasurementSystem: React.FC<SimpleMeasurementSystemProps> = (
   };
 
   const calculateLiveMeasurements = (): MeasurementResults => {
+    // Calcular distância real entre pupilas em pixels
     const pixelDistance = Math.abs(rightPupil.x - leftPupil.x);
+    console.log('Distância em pixels entre pupilas:', pixelDistance);
+    console.log('Posições das pupilas - Esquerda:', leftPupil, 'Direita:', rightPupil);
     
-    // Use average PD for calibration (63mm)
-    const averagePD = 63;
-    const estimatedPixelsPerMM = pixelDistance / averagePD;
-    const realDistance = pixelDistance / estimatedPixelsPerMM;
+    // Para calibração, usar uma largura de referência (frame width) se disponível
+    // Caso contrário, usar uma estimativa baseada na proporção da imagem
+    const imageRef_current = imageRef.current;
+    if (!imageRef_current) {
+      return {
+        dpBinocular: 0,
+        dnpEsquerda: 0,
+        dnpDireita: 0,
+        larguraLente: 0,
+        confiabilidade: 0,
+        temOculos: hasGlassesDetected,
+        autoCalibrated: false,
+        anthropometricScale: 1
+      };
+    }
+    
+    // Usar proporção da largura da imagem para estimar escala
+    // Assumindo que a largura facial típica é cerca de 140mm
+    const estimatedFaceWidthMM = 140;
+    const estimatedFaceWidthPixels = imageRef_current.width * 0.6; // 60% da largura da imagem
+    const pixelsPerMM = estimatedFaceWidthPixels / estimatedFaceWidthMM;
+    
+    console.log('Pixels por MM estimado:', pixelsPerMM);
+    
+    // Calcular DP Binocular baseado na distância real dos pontos
+    const dpBinocular = pixelDistance / pixelsPerMM;
+    
+    // Calcular DNP (distância centro-nasal à pupila) - metade da DP para cada lado
+    const centerX = (leftPupil.x + rightPupil.x) / 2;
+    const dnpEsquerda = Math.abs(centerX - leftPupil.x) / pixelsPerMM;
+    const dnpDireita = Math.abs(rightPupil.x - centerX) / pixelsPerMM;
+    
+    console.log('Medições calculadas:', { dpBinocular, dnpEsquerda, dnpDireita });
     
     const measurements: MeasurementResults = {
-      dpBinocular: realDistance,
-      dnpEsquerda: realDistance / 2,
-      dnpDireita: realDistance / 2,
-      larguraLente: realDistance * 0.75,
+      dpBinocular: dpBinocular,
+      dnpEsquerda: dnpEsquerda,
+      dnpDireita: dnpDireita,
+      larguraLente: dpBinocular * 0.75,
       confiabilidade: 0.85,
       temOculos: hasGlassesDetected,
       autoCalibrated: true,
-      anthropometricScale: estimatedPixelsPerMM
+      anthropometricScale: pixelsPerMM
     };
     
+    
     if (hasGlassesDetected) {
-      measurements.alturaEsquerda = Math.abs(leftGlassesBottom.y - leftPupil.y) / estimatedPixelsPerMM;
-      measurements.alturaDireita = Math.abs(rightGlassesBottom.y - rightPupil.y) / estimatedPixelsPerMM;
+      const leftHeightPixels = Math.abs(leftGlassesBottom.y - leftPupil.y);
+      const rightHeightPixels = Math.abs(rightGlassesBottom.y - rightPupil.y);
+      measurements.alturaEsquerda = leftHeightPixels / pixelsPerMM;
+      measurements.alturaDireita = rightHeightPixels / pixelsPerMM;
     }
     
     return measurements;
@@ -483,6 +544,14 @@ export const SimpleMeasurementSystem: React.FC<SimpleMeasurementSystemProps> = (
               <div className="flex justify-between">
                 <span className="text-gray-600">Largura Lente:</span>
                 <span className="font-medium">{liveMeasurements.larguraLente.toFixed(1)} mm</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">DNP Esquerda:</span>
+                <span className="font-medium text-blue-600">{liveMeasurements.dnpEsquerda.toFixed(1)} mm</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">DNP Direita:</span>
+                <span className="font-medium text-blue-600">{liveMeasurements.dnpDireita.toFixed(1)} mm</span>
               </div>
               {hasGlassesDetected && (
                 <>
