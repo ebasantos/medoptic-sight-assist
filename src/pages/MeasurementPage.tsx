@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import CameraCapture from '@/components/CameraCapture';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
-import { SimpleMeasurementSystem } from '@/components/SimpleMeasurementSystem';
+import { InteractivePupilMeasurement } from '@/components/InteractivePupilMeasurement';
 
 const MeasurementPage = () => {
   const navigate = useNavigate();
@@ -355,8 +355,9 @@ const MeasurementPage = () => {
 
         {step === 'interactive' && capturedImage && (
           <div className="max-w-6xl mx-auto">
-          <SimpleMeasurementSystem
+          <InteractivePupilMeasurement
             imageData={capturedImage}
+            frameWidth={130}
             hasGlasses={glassesDetected}
             onMeasurementsChange={handleMeasurementsChange}
           />
