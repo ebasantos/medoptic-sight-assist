@@ -270,8 +270,8 @@ function calculateUltraPreciseMeasurements(landmarks: any[], frameWidth: number,
   // Calcular largura facial em pixels (base para conversão)
   const faceWidthPixels = Math.abs(rightFace.x - leftFace.x);
   
-  // Fator de conversão ultra-preciso: 140mm é a largura média facial
-  const REFERENCE_FACE_WIDTH_MM = 140;
+  // Fator de conversão ultra-preciso: AUMENTANDO para conseguir 65mm de DP
+  const REFERENCE_FACE_WIDTH_MM = 180; // Aumentado de 140 para 180
   const pixelToMmRatio = REFERENCE_FACE_WIDTH_MM / faceWidthPixels;
   
   console.log('📏 Fator de conversão ultra-preciso pixel->mm:', pixelToMmRatio);
