@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Eye, Glasses, RotateCcw, CheckCircle } from 'lucide-react';
+import { Zap, Eye, Glasses, RotateCcw, CheckCircle, ZoomIn, ZoomOut, Move } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PupilPoint {
   x: number;
@@ -38,6 +39,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
   hasGlasses = false,
   onMeasurementsChange
 }) => {
+  const isMobile = useIsMobile();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -58,6 +60,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
   const [panY, setPanY] = useState(0);
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
+  const [lastPinchDistance, setLastPinchDistance] = useState(0);
 
   // Initialize pupil and glasses detection positions
   const initializePositions = useCallback(() => {
@@ -316,30 +319,63 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     setIsPanning(false);
   };
 
-  // Touch event handlers
+  // Touch event handlers with pinch-to-zoom
+  const getPinchDistance = (touches: React.TouchList) => {
+    if (touches.length < 2) return 0;
+    const touch1 = touches[0];
+    const touch2 = touches[1];
+    return Math.sqrt(
+      Math.pow(touch2.clientX - touch1.clientX, 2) + 
+      Math.pow(touch2.clientY - touch1.clientY, 2)
+    );
+  };
+
   const handleTouchStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
     event.preventDefault();
-    const mouseEvent = {
-      ...event,
-      clientX: event.touches[0].clientX,
-      clientY: event.touches[0].clientY
-    } as any;
-    handleMouseDown(mouseEvent);
+    
+    if (event.touches.length === 2) {
+      // Pinch to zoom
+      setLastPinchDistance(getPinchDistance(event.touches));
+      return;
+    }
+    
+    if (event.touches.length === 1) {
+      const mouseEvent = {
+        ...event,
+        clientX: event.touches[0].clientX,
+        clientY: event.touches[0].clientY
+      } as any;
+      handleMouseDown(mouseEvent);
+    }
   };
 
   const handleTouchMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
     event.preventDefault();
-    if (!isDragging) return;
-    const mouseEvent = {
-      ...event,
-      clientX: event.touches[0].clientX,
-      clientY: event.touches[0].clientY
-    } as any;
-    handleMouseMove(mouseEvent);
+    
+    if (event.touches.length === 2) {
+      // Pinch to zoom
+      const currentDistance = getPinchDistance(event.touches);
+      if (lastPinchDistance > 0) {
+        const scale = currentDistance / lastPinchDistance;
+        setZoom(prev => Math.max(0.5, Math.min(4, prev * scale)));
+      }
+      setLastPinchDistance(currentDistance);
+      return;
+    }
+    
+    if (event.touches.length === 1 && isDragging) {
+      const mouseEvent = {
+        ...event,
+        clientX: event.touches[0].clientX,
+        clientY: event.touches[0].clientY
+      } as any;
+      handleMouseMove(mouseEvent);
+    }
   };
 
   const handleTouchEnd = (event: React.TouchEvent<HTMLCanvasElement>) => {
     event.preventDefault();
+    setLastPinchDistance(0);
     handleMouseUp();
   };
 
@@ -367,10 +403,10 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     console.log('Largura da imagem (pixels):', imageRef.current.width);
     
     // CORREÇÃO: Usar uma escala mais realista baseada na largura facial típica
-    // A largura facial média entre têmporas é cerca de 140mm
-    // Assumindo que a face ocupa cerca de 70% da largura da imagem
-    const faceWidthInImage = imageRef.current.width * 0.7; // 70% da largura da imagem
-    const realFaceWidthMM = 140; // largura facial média em mm
+    // A largura facial média entre têmporas é cerca de 145mm (ajustado para melhor precisão)
+    // Assumindo que a face ocupa cerca de 75% da largura da imagem (ajustado)
+    const faceWidthInImage = imageRef.current.width * 0.75; // 75% da largura da imagem
+    const realFaceWidthMM = 145; // largura facial média em mm (ajustado)
     const pixelsPerMM = faceWidthInImage / realFaceWidthMM;
     
     console.log('Largura facial estimada na imagem (pixels):', faceWidthInImage);
@@ -497,33 +533,70 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
             {hasGlassesDetected && (
               <li>• Arraste os pontos azuis para ajustar a altura do óculos</li>
             )}
+            {isMobile && (
+              <>
+                <li>• Use dois dedos para dar zoom (pinch)</li>
+                <li>• Use os botões grandes para zoom fino</li>
+              </>
+            )}
             <li>• Clique "Processar" para calcular as medidas precisas</li>
           </ul>
         </div>
 
-        {/* Canvas container with zoom controls */}
+        {/* Canvas container with mobile-friendly controls */}
         <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-100">
-          <div className="absolute top-2 right-2 z-10 flex gap-2">
-            <Button
-              onClick={handleZoomOut}
-              size="sm"
-              variant="outline"
-              className="bg-white/80 backdrop-blur-sm"
-            >
-              -
-            </Button>
-            <Badge variant="outline" className="bg-white/80 backdrop-blur-sm">
-              {Math.round(zoom * 100)}%
-            </Badge>
-            <Button
-              onClick={handleZoomIn}
-              size="sm"
-              variant="outline"
-              className="bg-white/80 backdrop-blur-sm"
-            >
-              +
-            </Button>
-          </div>
+          {/* Mobile Zoom Controls */}
+          {isMobile && (
+            <div className="absolute top-2 left-2 right-2 z-10 flex justify-between items-center">
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleZoomOut}
+                  size="lg"
+                  variant="outline"
+                  className="bg-white/90 backdrop-blur-sm shadow-lg h-12 w-12 p-0"
+                >
+                  <ZoomOut className="h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={handleZoomIn}
+                  size="lg"
+                  variant="outline"
+                  className="bg-white/90 backdrop-blur-sm shadow-lg h-12 w-12 p-0"
+                >
+                  <ZoomIn className="h-5 w-5" />
+                </Button>
+              </div>
+              <Badge variant="outline" className="bg-white/90 backdrop-blur-sm shadow-lg px-3 py-2">
+                <Move className="h-3 w-3 mr-1" />
+                {Math.round(zoom * 100)}%
+              </Badge>
+            </div>
+          )}
+          
+          {/* Desktop Zoom Controls */}
+          {!isMobile && (
+            <div className="absolute top-2 right-2 z-10 flex gap-2">
+              <Button
+                onClick={handleZoomOut}
+                size="sm"
+                variant="outline"
+                className="bg-white/80 backdrop-blur-sm"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Badge variant="outline" className="bg-white/80 backdrop-blur-sm">
+                {Math.round(zoom * 100)}%
+              </Badge>
+              <Button
+                onClick={handleZoomIn}
+                size="sm"
+                variant="outline"
+                className="bg-white/80 backdrop-blur-sm"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           
           <canvas
             ref={canvasRef}
@@ -535,7 +608,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            style={{ touchAction: 'none' }}
+            style={{ touchAction: 'none', minHeight: isMobile ? '60vh' : 'auto' }}
           />
         </div>
 
