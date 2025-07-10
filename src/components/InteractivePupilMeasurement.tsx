@@ -63,10 +63,10 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     const centerX = img.width / 2;
     const eyeDistance = faceWidth * 0.3;
     
-    // Initialize pupil positions
+    // Initialize pupil positions - corrigido para posição dos olhos
     const leftPupilX = centerX - eyeDistance / 2;
     const rightPupilX = centerX + eyeDistance / 2;
-    const pupilY = img.height * 0.35;
+    const pupilY = img.height * 0.45; // Posição dos olhos (não da testa)
     
     setLeftPupil({ x: leftPupilX, y: pupilY });
     setRightPupil({ x: rightPupilX, y: pupilY });
