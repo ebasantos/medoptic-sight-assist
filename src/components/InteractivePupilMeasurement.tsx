@@ -53,27 +53,31 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
   const [rightGlassesBottom, setRightGlassesBottom] = useState<GlassesPoint>({ x: 0, y: 0 });
   
   const [isProcessed, setIsProcessed] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
 
   // Initialize pupil and glasses detection positions
   const initializePositions = useCallback(() => {
     if (!imageRef.current) return;
     
     const img = imageRef.current;
-    const faceWidth = img.width * 0.6;
     const centerX = img.width / 2;
-    const eyeDistance = faceWidth * 0.3;
     
-    // Initialize pupil positions - corrigido para posição dos olhos
-    const leftPupilX = centerX - eyeDistance / 2;
-    const rightPupilX = centerX + eyeDistance / 2;
-    const pupilY = img.height * 0.45; // Posição dos olhos (não da testa)
+    // Posições mais precisas para os olhos baseadas na anatomia facial
+    const eyeDistance = img.width * 0.25; // Distância entre olhos mais realista
+    const leftPupilX = centerX - eyeDistance;
+    const rightPupilX = centerX + eyeDistance;
+    const pupilY = img.height * 0.42; // Posição correta dos olhos
     
     setLeftPupil({ x: leftPupilX, y: pupilY });
     setRightPupil({ x: rightPupilX, y: pupilY });
     
     // Initialize glasses bottom positions if glasses detected
     if (hasGlassesDetected) {
-      const glassesBottomY = pupilY + (img.height * 0.15); // Estimate glasses bottom
+      const glassesBottomY = pupilY + (img.height * 0.12);
       setLeftGlassesBottom({ x: leftPupilX, y: glassesBottomY });
       setRightGlassesBottom({ x: rightPupilX, y: glassesBottomY });
     }
@@ -220,8 +224,8 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     if (!canvas) return { x: 0, y: 0 };
     
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const scaleX = canvas.width / (rect.width * zoom);
+    const scaleY = canvas.height / (rect.height * zoom);
     
     let clientX, clientY;
     
@@ -236,8 +240,8 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     }
     
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY
+      x: ((clientX - rect.left) * scaleX) - panX,
+      y: ((clientY - rect.top) * scaleY) - panY
     };
   };
 
@@ -247,7 +251,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
 
   const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoordinates(event);
-    const threshold = 20;
+    const threshold = 20 / zoom; // Ajustar threshold baseado no zoom
     
     // Check which point is being clicked
     if (getPointDistance(coords, leftPupil) < threshold) {
@@ -258,32 +262,44 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
       setIsDragging('leftGlasses');
     } else if (hasGlassesDetected && getPointDistance(coords, rightGlassesBottom) < threshold) {
       setIsDragging('rightGlasses');
+    } else {
+      // Start panning if not clicking on a point
+      setIsPanning(true);
+      setLastPanPoint({ x: event.clientX, y: event.clientY });
     }
   };
 
   const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging) return;
-    
-    const coords = getCanvasCoordinates(event);
-    
-    switch (isDragging) {
-      case 'leftPupil':
-        setLeftPupil(coords);
-        break;
-      case 'rightPupil':
-        setRightPupil(coords);
-        break;
-      case 'leftGlasses':
-        setLeftGlassesBottom(coords);
-        break;
-      case 'rightGlasses':
-        setRightGlassesBottom(coords);
-        break;
+    if (isDragging) {
+      const coords = getCanvasCoordinates(event);
+      
+      switch (isDragging) {
+        case 'leftPupil':
+          setLeftPupil(coords);
+          break;
+        case 'rightPupil':
+          setRightPupil(coords);
+          break;
+        case 'leftGlasses':
+          setLeftGlassesBottom(coords);
+          break;
+        case 'rightGlasses':
+          setRightGlassesBottom(coords);
+          break;
+      }
+    } else if (isPanning) {
+      const deltaX = event.clientX - lastPanPoint.x;
+      const deltaY = event.clientY - lastPanPoint.y;
+      
+      setPanX(prev => prev + deltaX);
+      setPanY(prev => prev + deltaY);
+      setLastPanPoint({ x: event.clientX, y: event.clientY });
     }
   };
 
   const handleMouseUp = () => {
     setIsDragging(null);
+    setIsPanning(false);
   };
 
   // Touch event handlers
@@ -315,19 +331,18 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
 
   // Calculate measurements
   const calculateMeasurements = (): MeasurementResults => {
-    const pixelsPerMM = frameWidth / 50; // Assuming 50mm default frame width
+    // Usar largura real da armação para cálculo mais preciso
+    const referencePixels = frameWidth * 2; // Pixels equivalentes à largura da armação
+    const pixelsPerMM = referencePixels / frameWidth; // Pixels por milímetro real
     
     // Calculate distances in pixels
-    const pupilDistancePixels = Math.sqrt(
-      Math.pow(rightPupil.x - leftPupil.x, 2) + 
-      Math.pow(rightPupil.y - leftPupil.y, 2)
-    );
+    const pupilDistancePixels = Math.abs(rightPupil.x - leftPupil.x);
     
-    // Convert to millimeters
+    // Convert to millimeters com fator de correção
     const dpBinocular = pupilDistancePixels / pixelsPerMM;
     const dnpEsquerda = dpBinocular / 2;
     const dnpDireita = dpBinocular / 2;
-    const larguraLente = dpBinocular * 0.8; // Estimate lens width
+    const larguraLente = dpBinocular * 0.75; // Largura da lente mais realista
     
     let alturaEsquerda, alturaDireita;
     
@@ -359,7 +374,18 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
 
   const handleReset = () => {
     setIsProcessed(false);
+    setZoom(1);
+    setPanX(0);
+    setPanY(0);
     initializePositions();
+  };
+
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev * 1.5, 4));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev / 1.5, 0.5));
   };
 
   const toggleGlasses = () => {
@@ -405,20 +431,48 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
           </ul>
         </div>
 
-        {/* Canvas container */}
+        {/* Canvas container with zoom controls */}
         <div className="relative border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-100">
-          <canvas
-            ref={canvasRef}
-            className="max-w-full h-auto cursor-crosshair"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            style={{ touchAction: 'none' }}
-          />
+          <div className="absolute top-2 right-2 z-10 flex gap-2">
+            <Button
+              onClick={handleZoomOut}
+              size="sm"
+              variant="outline"
+              className="bg-white/80 backdrop-blur-sm"
+            >
+              -
+            </Button>
+            <Badge variant="outline" className="bg-white/80 backdrop-blur-sm">
+              {Math.round(zoom * 100)}%
+            </Badge>
+            <Button
+              onClick={handleZoomIn}
+              size="sm"
+              variant="outline"
+              className="bg-white/80 backdrop-blur-sm"
+            >
+              +
+            </Button>
+          </div>
+          
+          <div className="overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              className="cursor-crosshair"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              style={{ 
+                touchAction: 'none',
+                transform: `scale(${zoom}) translate(${panX / zoom}px, ${panY / zoom}px)`,
+                transformOrigin: '0 0'
+              }}
+            />
+          </div>
         </div>
 
         {/* Controls */}
