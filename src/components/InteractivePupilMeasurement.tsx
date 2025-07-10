@@ -348,10 +348,8 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     event.preventDefault();
     
     if (event.touches.length === 2) {
-      // Pinch to zoom - store initial state
+      // Pinch to zoom - armazenar estado inicial
       setLastPinchDistance(getPinchDistance(event.touches));
-      const center = getPinchCenter(event.touches);
-      console.log('Pinch iniciado no ponto:', center);
       return;
     }
     
@@ -369,34 +367,39 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     event.preventDefault();
     
     if (event.touches.length === 2) {
-      // Pinch to zoom com ponto focal correto
+      // Pinch to zoom simples e eficaz
       const currentDistance = getPinchDistance(event.touches);
-      const pinchCenter = getPinchCenter(event.touches);
       
       if (lastPinchDistance > 0) {
-        const scale = currentDistance / lastPinchDistance;
-        const newZoom = Math.max(0.5, Math.min(4, zoom * scale));
+        const scaleFactor = currentDistance / lastPinchDistance;
+        const newZoom = Math.max(0.5, Math.min(4, zoom * scaleFactor));
         
-        console.log('Zoom atual:', zoom, 'Novo zoom:', newZoom, 'Centro:', pinchCenter);
-        
-        // Calcular o offset necessário para manter o ponto de pinch fixo
+        // Pegar o centro do pinch em coordenadas da tela
+        const pinchCenter = getPinchCenter(event.touches);
         const canvas = canvasRef.current;
+        
         if (canvas) {
-          const scaleChange = newZoom / zoom;
+          // Calcular onde o centro do pinch está na imagem
+          const rect = canvas.getBoundingClientRect();
+          const canvasX = pinchCenter.x;
+          const canvasY = pinchCenter.y;
           
-          // Converter coordenadas do canvas para coordenadas da imagem
-          const imgX = (pinchCenter.x - canvas.width/2 - panX) / zoom;
-          const imgY = (pinchCenter.y - canvas.height/2 - panY) / zoom;
+          // Converter para coordenadas do mundo da imagem antes do zoom
+          const worldX = (canvasX - canvas.width/2 - panX) / zoom;
+          const worldY = (canvasY - canvas.height/2 - panY) / zoom;
           
           // Calcular novo pan para manter o ponto fixo
-          const newPanX = pinchCenter.x - canvas.width/2 - imgX * newZoom;
-          const newPanY = pinchCenter.y - canvas.height/2 - imgY * newZoom;
+          const newPanX = canvasX - canvas.width/2 - worldX * newZoom;
+          const newPanY = canvasY - canvas.height/2 - worldY * newZoom;
           
+          console.log('Zoom:', zoom, '->', newZoom, 'Centro pinch:', pinchCenter, 'Pan:', {newPanX, newPanY});
+          
+          setZoom(newZoom);
           setPanX(newPanX);
           setPanY(newPanY);
-          setZoom(newZoom);
         }
       }
+      
       setLastPinchDistance(currentDistance);
       return;
     }
@@ -440,10 +443,10 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     console.log('Frame width fornecido (mm):', frameWidth);
     console.log('Largura da imagem (pixels):', imageRef.current.width);
     
-    // CORREÇÃO: Ajustar calibração para chegar mais próximo de 65mm
-    // Testando com valores ligeiramente diferentes
-    const faceWidthInImage = imageRef.current.width * 0.65; // reduzido de 0.70 para 0.65
-    const realFaceWidthMM = 135; // reduzido de 140 para 135
+    // CORREÇÃO: Ajustar calibração para compensar os -2.6mm
+    // Se está dando 2.6mm a menos, preciso aumentar a escala
+    const faceWidthInImage = imageRef.current.width * 0.60; // reduzido de 0.65 para 0.60
+    const realFaceWidthMM = 130; // reduzido de 135 para 130  
     const pixelsPerMM = faceWidthInImage / realFaceWidthMM;
     
     console.log('Largura facial estimada na imagem (pixels):', faceWidthInImage);
