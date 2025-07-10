@@ -437,10 +437,10 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     console.log('Frame width fornecido (mm):', frameWidth);
     console.log('Largura da imagem (pixels):', imageRef.current.width);
     
-    // CORREÇÃO: Ajuste para compensar 53mm → 65mm
-    // Fator de correção: 65/53 = 1.226 - precisa aumentar significativamente
+    // CORREÇÃO: De 40mm para 65mm - fator 65/40 = 1.625
+    // Para AUMENTAR DP, preciso DIMINUIR realFaceWidthMM
     const faceWidthInImage = imageRef.current.width * 0.65; 
-    const realFaceWidthMM = 135 * 0.73; // ~98.5mm para aumentar de 53 para 65
+    const realFaceWidthMM = 135 * 0.45; // ~60mm para aumentar drasticamente
     const pixelsPerMM = faceWidthInImage / realFaceWidthMM;
     
     console.log('Largura facial estimada na imagem (pixels):', faceWidthInImage);
