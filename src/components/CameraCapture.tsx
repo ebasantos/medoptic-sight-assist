@@ -70,28 +70,34 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       const distance = calculateEstimatedDistance(mockScore);
       setEstimatedDistance(distance);
       
-      if (mockScore > 85) {
+      // Verificar se está na distância ideal (45-55cm) E com boa detecção facial
+      const isIdealDistance = distance >= 45 && distance <= 55;
+      const hasGoodDetection = mockScore > 85;
+      
+      if (hasGoodDetection && isIdealDistance) {
         setPositionFeedback('Posição perfeita! ✓');
-        setDistanceFeedback(`${distance}cm - Ideal ✓`);
+        setDistanceFeedback(`${distance}cm - Distância ideal ✓`);
         setIsOptimalPosition(true);
-      } else if (mockScore > 60) {
-        setPositionFeedback('Ajuste ligeiramente a posição');
-        if (distance > 70) {
-          setDistanceFeedback(`${distance}cm - Aproxime-se`);
-        } else if (distance < 50) {
-          setDistanceFeedback(`${distance}cm - Afaste-se`);
-        } else {
-          setDistanceFeedback(`${distance}cm - Boa distância`);
+      } else if (hasGoodDetection && !isIdealDistance) {
+        setPositionFeedback('Rosto bem posicionado');
+        if (distance > 55) {
+          setDistanceFeedback(`${distance}cm - Aproxime-se mais (ideal: 45-55cm)`);
+        } else if (distance < 45) {
+          setDistanceFeedback(`${distance}cm - Afaste-se um pouco (ideal: 45-55cm)`);
         }
         setIsOptimalPosition(false);
+      } else if (isIdealDistance && !hasGoodDetection) {
+        setPositionFeedback('Centralize melhor seu rosto');
+        setDistanceFeedback(`${distance}cm - Distância boa, ajuste posição`);
+        setIsOptimalPosition(false);
       } else {
-        setPositionFeedback('Centralize seu rosto');
-        if (distance > 80) {
-          setDistanceFeedback(`${distance}cm - Muito longe`);
-        } else if (distance < 40) {
-          setDistanceFeedback(`${distance}cm - Muito perto`);
+        setPositionFeedback('Ajuste posição e distância');
+        if (distance > 55) {
+          setDistanceFeedback(`${distance}cm - Aproxime-se (ideal: 45-55cm)`);
+        } else if (distance < 45) {
+          setDistanceFeedback(`${distance}cm - Afaste-se (ideal: 45-55cm)`);
         } else {
-          setDistanceFeedback(`${distance}cm - Centralize primeiro`);
+          setDistanceFeedback(`${distance}cm - Centralize o rosto`);
         }
         setIsOptimalPosition(false);
       }
