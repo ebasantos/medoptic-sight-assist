@@ -16,12 +16,12 @@ import { IVisionMeasurementSystem } from '@/components/IVisionMeasurementSystem'
 
 const MeasurementPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
   const [step, setStep] = useState<'camera' | 'measurements' | 'interactive'>('camera');
-  const [loading, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [measurementCalculated, setMeasurementCalculated] = useState(false);
   const [useInteractiveMode, setUseInteractiveMode] = useState(true);
@@ -245,7 +245,22 @@ const MeasurementPage = () => {
     }
   };
 
-  if (!user) {
+  // Show loading state while authentication is being verified
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600">Verificando autenticação...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show login prompt only if not loading and no user
+  if (!authLoading && !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -566,11 +581,11 @@ const MeasurementPage = () => {
 
               <Button 
                 onClick={handleSave}
-                disabled={loading || !formData.nomeCliente.trim() || !measurementCalculated}
+                disabled={saving || !formData.nomeCliente.trim() || !measurementCalculated}
                 className="w-full h-14 text-lg bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg"
               >
                 <Save className="h-5 w-5 mr-2" />
-                {loading ? 'Salvando...' : 'Salvar Aferição'}
+                {saving ? 'Salvando...' : 'Salvar Aferição'}
               </Button>
             </div>
           </div>
