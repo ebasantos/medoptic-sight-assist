@@ -270,8 +270,8 @@ function calculateUltraPreciseMeasurements(landmarks: any[], frameWidth: number,
   // Calcular largura facial em pixels (base para conversão)
   const faceWidthPixels = Math.abs(rightFace.x - leftFace.x);
   
-  // Fator de conversão ultra-preciso: Micro ajuste de 63.6 para 65mm
-  const REFERENCE_FACE_WIDTH_MM = 192; // Ajuste final: 188 * (65/63.6) = ~192
+  // Fator de conversão ultra-preciso: Voltando ao que funcionava (63.6mm) + ajuste mínimo
+  const REFERENCE_FACE_WIDTH_MM = 190; // Meio termo entre 188 (que dava 63.6) e 192
   const pixelToMmRatio = REFERENCE_FACE_WIDTH_MM / faceWidthPixels;
   
   console.log('📏 Fator de conversão ultra-preciso pixel->mm:', pixelToMmRatio);
