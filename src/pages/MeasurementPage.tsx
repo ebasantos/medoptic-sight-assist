@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import CameraCapture from '@/components/CameraCapture';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
-import { IVisionMeasurementSystem } from '@/components/IVisionMeasurementSystem';
+import { SimpleMeasurementSystem } from '@/components/SimpleMeasurementSystem';
 
 const MeasurementPage = () => {
   const navigate = useNavigate();
@@ -26,6 +26,7 @@ const MeasurementPage = () => {
   const [measurementCalculated, setMeasurementCalculated] = useState(false);
   const [useInteractiveMode, setUseInteractiveMode] = useState(true);
   const [interactiveMeasurements, setInteractiveMeasurements] = useState<any>(null);
+  const [glassesDetected, setGlassesDetected] = useState(false);
   
   const { isAnalyzing, measurements: aiMeasurements, error: analysisError, analyzeFacialMeasurements } = useFacialMeasurements();
   
@@ -49,6 +50,12 @@ const MeasurementPage = () => {
     setInteractiveMeasurements(measurementData);
     setMeasurementCalculated(true);
     setStep('measurements');
+  };
+
+  const handleMeasurementsChange = (measurementData: any) => {
+    console.log('Medições recebidas:', measurementData);
+    setInteractiveMeasurements(measurementData);
+    setMeasurementCalculated(true);
   };
 
   const handleAutoAnalysis = async () => {
@@ -348,11 +355,11 @@ const MeasurementPage = () => {
 
         {step === 'interactive' && capturedImage && (
           <div className="max-w-6xl mx-auto">
-            <IVisionMeasurementSystem
-              imageData={capturedImage}
-              hasGlasses={false}
-              onMeasurementsChange={handleInteractiveMeasurements}
-            />
+          <SimpleMeasurementSystem
+            imageData={capturedImage}
+            hasGlasses={glassesDetected}
+            onMeasurementsChange={handleMeasurementsChange}
+          />
           </div>
         )}
 
