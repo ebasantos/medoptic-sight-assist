@@ -319,7 +319,7 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     setIsPanning(false);
   };
 
-  // Touch event handlers with pinch-to-zoom
+  // Touch event handlers with pinch-to-zoom centered on pinch point
   const getPinchDistance = (touches: React.TouchList) => {
     if (touches.length < 2) return 0;
     const touch1 = touches[0];
@@ -328,6 +328,20 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
       Math.pow(touch2.clientX - touch1.clientX, 2) + 
       Math.pow(touch2.clientY - touch1.clientY, 2)
     );
+  };
+
+  const getPinchCenter = (touches: React.TouchList) => {
+    if (touches.length < 2) return { x: 0, y: 0 };
+    const touch1 = touches[0];
+    const touch2 = touches[1];
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((touch1.clientX + touch2.clientX) / 2) - rect.left,
+      y: ((touch1.clientY + touch2.clientY) / 2) - rect.top
+    };
   };
 
   const handleTouchStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
@@ -353,11 +367,30 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     event.preventDefault();
     
     if (event.touches.length === 2) {
-      // Pinch to zoom
+      // Pinch to zoom centered on pinch point
       const currentDistance = getPinchDistance(event.touches);
       if (lastPinchDistance > 0) {
         const scale = currentDistance / lastPinchDistance;
-        setZoom(prev => Math.max(0.5, Math.min(4, prev * scale)));
+        const pinchCenter = getPinchCenter(event.touches);
+        const canvas = canvasRef.current;
+        
+        if (canvas) {
+          // Calculate new zoom
+          const newZoom = Math.max(0.5, Math.min(4, zoom * scale));
+          
+          // Adjust pan to zoom towards pinch center
+          const zoomFactor = newZoom / zoom;
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          
+          // Calculate offset adjustment to keep pinch center in place
+          const deltaX = (pinchCenter.x - centerX) * (1 - zoomFactor);
+          const deltaY = (pinchCenter.y - centerY) * (1 - zoomFactor);
+          
+          setPanX(prev => prev + deltaX);
+          setPanY(prev => prev + deltaY);
+          setZoom(newZoom);
+        }
       }
       setLastPinchDistance(currentDistance);
       return;
@@ -402,11 +435,11 @@ export const InteractivePupilMeasurement: React.FC<InteractivePupilMeasurementPr
     console.log('Frame width fornecido (mm):', frameWidth);
     console.log('Largura da imagem (pixels):', imageRef.current.width);
     
-    // CORREÇÃO: Usar uma escala mais realista baseada na largura facial típica
-    // A largura facial média entre têmporas é cerca de 145mm (ajustado para melhor precisão)
-    // Assumindo que a face ocupa cerca de 75% da largura da imagem (ajustado)
-    const faceWidthInImage = imageRef.current.width * 0.75; // 75% da largura da imagem
-    const realFaceWidthMM = 145; // largura facial média em mm (ajustado)
+    // CORREÇÃO: Voltar à calibração que estava funcionando bem
+    // A largura facial média entre têmporas é cerca de 140mm
+    // Assumindo que a face ocupa cerca de 70% da largura da imagem
+    const faceWidthInImage = imageRef.current.width * 0.70; // 70% da largura da imagem (valor original)
+    const realFaceWidthMM = 140; // largura facial média em mm (valor original)
     const pixelsPerMM = faceWidthInImage / realFaceWidthMM;
     
     console.log('Largura facial estimada na imagem (pixels):', faceWidthInImage);
