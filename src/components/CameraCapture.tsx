@@ -24,6 +24,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   const [faceDetectionScore, setFaceDetectionScore] = useState(0);
   const [positionFeedback, setPositionFeedback] = useState<string>('');
   const [distanceFeedback, setDistanceFeedback] = useState<string>('');
+  const [estimatedDistance, setEstimatedDistance] = useState<number>(0);
   const [isOptimalPosition, setIsOptimalPosition] = useState(false);
   
   const {
@@ -42,6 +43,20 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     setCapturedImage
   } = useCamera({ onCapture });
 
+  // Função para calcular distância estimada baseada no tamanho do rosto
+  const calculateEstimatedDistance = (faceScore: number) => {
+    // Simular tamanho do rosto detectado (baseado no score)
+    const faceWidthInPixels = 100 + (faceScore * 2); // Simula largura facial em pixels
+    const averageFaceWidthMM = 140; // Largura média facial real em mm
+    const focalLengthPixels = 500; // Distância focal simulada da câmera
+    
+    // Fórmula: distância = (largura_real × distância_focal) / largura_em_pixels
+    const estimatedDistanceMM = (averageFaceWidthMM * focalLengthPixels) / faceWidthInPixels;
+    const estimatedDistanceCM = Math.round(estimatedDistanceMM / 10);
+    
+    return estimatedDistanceCM;
+  };
+
   // Simular detecção de posição em tempo real
   useEffect(() => {
     if (!isActive || !videoRef.current) return;
@@ -51,17 +66,33 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       const mockScore = Math.random() * 100;
       setFaceDetectionScore(mockScore);
       
+      // Calcular distância estimada
+      const distance = calculateEstimatedDistance(mockScore);
+      setEstimatedDistance(distance);
+      
       if (mockScore > 85) {
         setPositionFeedback('Posição perfeita! ✓');
-        setDistanceFeedback('Distância ideal ✓');
+        setDistanceFeedback(`${distance}cm - Ideal ✓`);
         setIsOptimalPosition(true);
       } else if (mockScore > 60) {
         setPositionFeedback('Ajuste ligeiramente a posição');
-        setDistanceFeedback('Aproxime-se um pouco mais');
+        if (distance > 70) {
+          setDistanceFeedback(`${distance}cm - Aproxime-se`);
+        } else if (distance < 50) {
+          setDistanceFeedback(`${distance}cm - Afaste-se`);
+        } else {
+          setDistanceFeedback(`${distance}cm - Boa distância`);
+        }
         setIsOptimalPosition(false);
       } else {
         setPositionFeedback('Centralize seu rosto');
-        setDistanceFeedback('Afaste-se um pouco');
+        if (distance > 80) {
+          setDistanceFeedback(`${distance}cm - Muito longe`);
+        } else if (distance < 40) {
+          setDistanceFeedback(`${distance}cm - Muito perto`);
+        } else {
+          setDistanceFeedback(`${distance}cm - Centralize primeiro`);
+        }
         setIsOptimalPosition(false);
       }
     }, 1000);
