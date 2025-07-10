@@ -271,7 +271,7 @@ function calculateUltraPreciseMeasurements(landmarks: any[], frameWidth: number,
   const faceWidthPixels = Math.abs(rightFace.x - leftFace.x);
   
   // Fator de conversão ultra-preciso: Valor ajustado conforme solicitado
-  const REFERENCE_FACE_WIDTH_MM = 192;
+  const REFERENCE_FACE_WIDTH_MM = 192.7;
   const pixelToMmRatio = REFERENCE_FACE_WIDTH_MM / faceWidthPixels;
   
   console.log('📏 Fator de conversão ultra-preciso pixel->mm:', pixelToMmRatio);
