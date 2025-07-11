@@ -69,13 +69,17 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
     }
   }, [processFaceImage, config]);
 
-  const handleVirtualCalibration = useCallback((pixelsPerMm: number) => {
-    setProgress(25);
-    // Simula a calibração diretamente no hook
-    calibrateWithCard('virtual-calibration');
-    setProgress(50);
-    setCurrentStep('face-capture');
-  }, [calibrateWithCard]);
+  const handleVirtualCalibration = useCallback(async (calibratedPixelsPerMm: number) => {
+    try {
+      setProgress(25);
+      // Usa diretamente o valor calibrado da régua virtual
+      await calibrateWithCard(calibratedPixelsPerMm);
+      setProgress(50);
+      setCurrentStep('face-capture');
+    } catch (err) {
+      config.onError?.(err);
+    }
+  }, [calibrateWithCard, config]);
 
   const handleRestart = useCallback(() => {
     reset();

@@ -23,14 +23,22 @@ export const useDNPMeasurement = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Calibração com cartão de referência (86×54 mm)
-  const calibrateWithCard = useCallback(async (imageData: string): Promise<void> => {
+  // Calibração com cartão de referência ou valor direto (régua virtual)
+  const calibrateWithCard = useCallback(async (imageDataOrValue: string | number): Promise<void> => {
     setIsProcessing(true);
     setError(null);
     
     try {
+      // Se for um número, é calibração direta da régua virtual
+      if (typeof imageDataOrValue === 'number') {
+        setPixelsPerMm(imageDataOrValue);
+        console.log(`Calibração virtual concluída: ${imageDataOrValue.toFixed(3)} pixels/mm`);
+        return;
+      }
+
+      // Calibração tradicional com imagem de cartão
       const img = new Image();
-      img.src = imageData;
+      img.src = imageDataOrValue;
       
       await new Promise((resolve, reject) => {
         img.onload = resolve;
@@ -49,7 +57,6 @@ export const useDNPMeasurement = () => {
       ctx.drawImage(img, 0, 0);
 
       // Detecção simples de bordas para o cartão
-      // Em produção, usar algoritmos mais sofisticados como Canny + Hough Transform
       const canvasImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const cardWidth = detectCardWidth(canvasImageData);
       

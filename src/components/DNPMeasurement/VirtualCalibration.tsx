@@ -50,21 +50,61 @@ export const VirtualCalibration: React.FC<Props> = ({ onCalibrationComplete, isP
     setIsDragging(point);
   }, []);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || !overlayRef.current) return;
+  const handleTouchStart = useCallback((point: 'start' | 'end') => (e: React.TouchEvent) => {
+    e.preventDefault();
+    setIsDragging(point);
+  }, []);
+
+  const getEventPosition = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!overlayRef.current) return { x: 0, y: 0 };
     
     const rect = overlayRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let clientX, clientY;
+    
+    if ('touches' in e) {
+      clientX = e.touches[0]?.clientX || e.changedTouches[0]?.clientX || 0;
+      clientY = e.touches[0]?.clientY || e.changedTouches[0]?.clientY || 0;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    
+    const { x, y } = getEventPosition(e);
     
     if (isDragging === 'start') {
       setStartPoint({ x, y });
     } else {
       setEndPoint({ x, y });
     }
-  }, [isDragging]);
+  }, [isDragging, getEventPosition]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    
+    const { x, y } = getEventPosition(e);
+    
+    if (isDragging === 'start') {
+      setStartPoint({ x, y });
+    } else {
+      setEndPoint({ x, y });
+    }
+  }, [isDragging, getEventPosition]);
 
   const handleMouseUp = useCallback(() => {
+    setIsDragging(null);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
     setIsDragging(null);
   }, []);
 
@@ -77,6 +117,7 @@ export const VirtualCalibration: React.FC<Props> = ({ onCalibrationComplete, isP
   const handleConfirmCalibration = () => {
     const pixelDistance = calculatePixelDistance();
     const pixelsPerMm = pixelDistance / realDistance;
+    console.log(`Calibração: ${pixelDistance}px = ${realDistance}mm => ${pixelsPerMm.toFixed(3)} pixels/mm`);
     setIsCalibrated(true);
     onCalibrationComplete(pixelsPerMm);
   };
@@ -118,10 +159,12 @@ export const VirtualCalibration: React.FC<Props> = ({ onCalibrationComplete, isP
         {isActive && (
           <div 
             ref={overlayRef}
-            className="absolute inset-0 pointer-events-auto"
+            className="absolute inset-0 pointer-events-auto touch-none"
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             <svg className="w-full h-full">
               {/* Linha principal da régua */}
@@ -172,43 +215,45 @@ export const VirtualCalibration: React.FC<Props> = ({ onCalibrationComplete, isP
               <circle
                 cx={startPoint.x}
                 cy={startPoint.y}
-                r="8"
+                r="12"
                 fill="#FF4444"
                 stroke="#FFF"
-                strokeWidth="2"
-                className="cursor-grab active:cursor-grabbing"
+                strokeWidth="3"
+                className="cursor-grab active:cursor-grabbing touch-manipulation"
                 onMouseDown={handleMouseDown('start')}
+                onTouchStart={handleTouchStart('start')}
               />
               <circle
                 cx={endPoint.x}
                 cy={endPoint.y}
-                r="8"
+                r="12"
                 fill="#FF4444"
                 stroke="#FFF"
-                strokeWidth="2"
-                className="cursor-grab active:cursor-grabbing"
+                strokeWidth="3"
+                className="cursor-grab active:cursor-grabbing touch-manipulation"
                 onMouseDown={handleMouseDown('end')}
+                onTouchStart={handleTouchStart('end')}
               />
             </svg>
             
-            {/* Controles */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-background/90 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center gap-4">
+            {/* Controles Mobile-Friendly */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-background/95 backdrop-blur-sm rounded-lg p-3 min-w-[280px]">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium">Distância real:</label>
+                  <label className="text-sm font-medium whitespace-nowrap">Distância real:</label>
                   <input
                     type="number"
                     value={realDistance}
                     onChange={(e) => setRealDistance(Number(e.target.value))}
-                    className="w-20 px-2 py-1 border rounded text-center"
+                    className="w-16 px-2 py-1 border rounded text-center text-sm"
                     min="10"
                     max="200"
                     step="1"
                   />
                   <span className="text-sm">mm</span>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  Pixels: {Math.round(rulerLength)}px
+                <div className="text-xs text-muted-foreground text-center md:text-left">
+                  Pixels: {Math.round(rulerLength)}px | Precisão: {rulerLength > 0 ? (rulerLength / realDistance).toFixed(2) : '0.00'} px/mm
                 </div>
               </div>
             </div>

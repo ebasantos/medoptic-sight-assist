@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,33 +13,24 @@ interface Props {
 
 export const FaceCapture: React.FC<Props> = ({ pixelsPerMm, onCaptureComplete, isProcessing }) => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const { 
+    videoRef,
+    canvasRef,
     isActive, 
     error: cameraError, 
     startCamera, 
-    stopCamera 
+    stopCamera,
+    capturePhoto 
   } = useCamera();
 
-  const capturePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
-
-    const imageData = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedImage(imageData);
-    stopCamera();
-  }, [stopCamera]);
+  const handleCapture = useCallback(() => {
+    const imageData = capturePhoto();
+    if (imageData) {
+      setCapturedImage(imageData);
+      stopCamera();
+    }
+  }, [capturePhoto, stopCamera]);
 
   const retakePhoto = useCallback(() => {
     setCapturedImage(null);
@@ -134,7 +125,7 @@ export const FaceCapture: React.FC<Props> = ({ pixelsPerMm, onCaptureComplete, i
               {isActive ? 'Câmera Ativa' : 'Iniciar Câmera'}
             </Button>
             <Button 
-              onClick={capturePhoto} 
+              onClick={handleCapture} 
               disabled={!isActive || isProcessing}
               variant="default"
             >
