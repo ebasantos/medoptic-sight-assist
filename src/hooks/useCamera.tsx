@@ -42,13 +42,29 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
         throw new Error('API de câmera não disponível neste navegador');
       }
 
-      // Verificar se o elemento de vídeo existe
-      if (!videoRef.current) {
-        console.error('Elemento de vídeo não encontrado');
-        throw new Error('Elemento de vídeo não encontrado');
-      }
+      // Aguardar o elemento de vídeo estar disponível
+      const checkVideoElement = () => {
+        return new Promise<HTMLVideoElement>((resolve, reject) => {
+          let attempts = 0;
+          const maxAttempts = 50; // 5 segundos máximo
+          
+          const check = () => {
+            if (videoRef.current) {
+              console.log('Elemento de vídeo encontrado');
+              resolve(videoRef.current);
+            } else if (attempts < maxAttempts) {
+              attempts++;
+              setTimeout(check, 100);
+            } else {
+              reject(new Error('Elemento de vídeo não encontrado após timeout'));
+            }
+          };
+          
+          check();
+        });
+      };
 
-      const video = videoRef.current;
+      const video = await checkVideoElement();
       console.log('Elemento de vídeo encontrado, solicitando stream...');
 
       // Parar stream anterior se existir

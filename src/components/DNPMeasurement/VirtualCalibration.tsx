@@ -34,6 +34,17 @@ export const VirtualCalibration: React.FC<Props> = ({ onCalibrationComplete, isP
     }
   }, [isActive, isCalibrated]);
 
+  // Auto-iniciar câmera quando componente monta
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!isActive && !cameraError) {
+        startCamera();
+      }
+    }, 500); // Delay para garantir que o elemento video seja renderizado
+
+    return () => clearTimeout(timer);
+  }, [startCamera, isActive, cameraError]);
+
   const handleMouseDown = useCallback((point: 'start' | 'end') => (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(point);
