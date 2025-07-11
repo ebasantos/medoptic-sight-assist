@@ -72,7 +72,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     const interval = setInterval(() => {
       // Gerar valores base com menos variação
       const baseScore = 88 + (Math.random() * 8); // 88-96% mais estável
-      const baseDistance = 25 + (Math.random() * 6 - 3); // 22-28cm
+      const baseDistance = 35 + (Math.random() * 4 - 2); // 33-37cm
       const baseHeight = 0.5 + (Math.random() * 0.1 - 0.05); // 0.45-0.55
       
       // Aplicar suavização exponencial para estabilizar
@@ -92,7 +92,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       setFaceHeightPosition(newStableHeight);
       
       // Verificar condições ideais com tolerâncias mais rigorosas
-      const isIdealDistance = newStableDistance >= 23 && newStableDistance <= 27;
+      const isIdealDistance = newStableDistance >= 33 && newStableDistance <= 37;
       const hasGoodDetection = newStableScore > 90;
       const isCorrectHeight = newStableHeight >= 0.48 && newStableHeight <= 0.52;
       
@@ -127,22 +127,22 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
           setDistanceFeedback(`${Math.round(newStableDistance)}cm - Melhore o enquadramento`);
         } else if (!isIdealDistance && !isCorrectHeight) {
           const distance = Math.round(newStableDistance);
-          if (distance > 27 && newStableHeight < 0.48) {
+          if (distance > 37 && newStableHeight < 0.48) {
             setPositionFeedback('Aproxime-se e abaixe a câmera');
-          } else if (distance > 27 && newStableHeight > 0.52) {
+          } else if (distance > 37 && newStableHeight > 0.52) {
             setPositionFeedback('Aproxime-se e levante a câmera');
-          } else if (distance < 23 && newStableHeight < 0.48) {
+          } else if (distance < 33 && newStableHeight < 0.48) {
             setPositionFeedback('Afaste-se e abaixe a câmera');
-          } else if (distance < 23 && newStableHeight > 0.52) {
+          } else if (distance < 33 && newStableHeight > 0.52) {
             setPositionFeedback('Afaste-se e levante a câmera');
           } else {
             setPositionFeedback('Ajuste distância e altura simultaneamente');
           }
-          setDistanceFeedback(`${distance}cm - Precisa estar entre 23-27cm`);
+          setDistanceFeedback(`${distance}cm - Precisa estar entre 33-37cm`);
         } else if (!isIdealDistance) {
           const distance = Math.round(newStableDistance);
-          setPositionFeedback(distance > 27 ? 'Aproxime-se mais da câmera' : 'Afaste-se um pouco da câmera');
-          setDistanceFeedback(`${distance}cm - Ideal: 25cm`);
+           setPositionFeedback(distance > 37 ? 'Aproxime-se mais da câmera' : 'Afaste-se um pouco da câmera');
+           setDistanceFeedback(`${distance}cm - Ideal: 35cm`);
         } else if (!isCorrectHeight) {
           if (newStableHeight < 0.48) {
             setPositionFeedback('Abaixe a câmera - rosto muito alto');
