@@ -26,6 +26,7 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
   const faceMeshRef = useRef<FaceMesh | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number>();
+  const lastValidDetection = useRef<Date>();
 
   // Inicializar MediaPipe FaceMesh
   const initializeFaceMesh = useCallback(async () => {
@@ -58,63 +59,98 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
           const imageWidth = results.image.width;
           const imageHeight = results.image.height;
           
-          // Calcular bounding box da face
-          const facePoints = landmarks.map(landmark => ({
-            x: landmark.x * imageWidth,
-            y: landmark.y * imageHeight
-          }));
+          // Usar landmarks específicos para medições mais precisas
+          // Landmark 10: topo da testa
+          // Landmark 152: queixo
+          // Landmark 234: orelha esquerda 
+          // Landmark 454: orelha direita
           
-          const minX = Math.min(...facePoints.map(p => p.x));
-          const maxX = Math.max(...facePoints.map(p => p.x));
-          const minY = Math.min(...facePoints.map(p => p.y));
-          const maxY = Math.max(...facePoints.map(p => p.y));
+          const foreheadTop = landmarks[10];
+          const chin = landmarks[152];
+          const leftEar = landmarks[234];
+          const rightEar = landmarks[454];
+          const noseTip = landmarks[1];
+          const leftEyeCenter = landmarks[468] || landmarks[133];
+          const rightEyeCenter = landmarks[473] || landmarks[362];
           
-          const faceWidth = maxX - minX;
-          const faceHeight = maxY - minY;
-          const faceCenterX = (minX + maxX) / 2;
-          const faceCenterY = (minY + maxY) / 2;
+          // Calcular dimensões reais da face usando landmarks específicos
+          const faceHeightPixels = Math.abs(chin.y - foreheadTop.y) * imageHeight;
+          const faceWidthPixels = Math.abs(rightEar.x - leftEar.x) * imageWidth;
+          
+          // Posição do centro da face
+          const faceCenterX = (leftEar.x + rightEar.x) / 2 * imageWidth;
+          const faceCenterY = (foreheadTop.y + chin.y) / 2 * imageHeight;
           
           // Calcular posições normalizadas
           const horizontalPosition = faceCenterX / imageWidth;
           const verticalPosition = faceCenterY / imageHeight;
           
-          // Calcular distância estimada baseada na largura da face
-          // Largura média de uma face humana: ~14cm
-          // Distância = (largura_real_cm * distancia_focal_pixels) / largura_face_pixels
-          const avgFaceWidthCm = 14;
-          const focalLengthPixels = imageWidth * 0.8; // Estimativa da distância focal
-          const estimatedDistance = Math.round((avgFaceWidthCm * focalLengthPixels) / faceWidth);
+          // Cálculo ultra preciso da distância usando múltiplas referências
+          const avgFaceHeightCm = 18.5; // Altura média do rosto humano (testa ao queixo)
+          const avgFaceWidthCm = 14.5;  // Largura média do rosto humano (orelha a orelha)
           
-          // Calcular confiança baseada na qualidade da detecção
-          const confidence = Math.min(100, Math.round(
-            (landmarks.length / 468) * 100 * // Proporção de landmarks detectados
-            (faceWidth / imageWidth) * 10    // Tamanho relativo da face
-          ));
+          // Usar a maior das duas medidas para mais precisão
+          const focalLengthPixels = Math.max(imageWidth, imageHeight) * 0.85;
           
-          setDetectionResult({
-            isDetected: true,
-            distance: Math.max(15, Math.min(100, estimatedDistance)), // Limitar entre 15-100cm
-            verticalPosition,
-            horizontalPosition,
-            confidence,
-            faceWidth,
-            faceHeight
-          });
+          const distanceFromHeight = (avgFaceHeightCm * focalLengthPixels) / faceHeightPixels;
+          const distanceFromWidth = (avgFaceWidthCm * focalLengthPixels) / faceWidthPixels;
           
-          console.log('📊 Face detectada:', {
-            distance: estimatedDistance,
-            verticalPos: verticalPosition.toFixed(2),
-            horizontalPos: horizontalPosition.toFixed(2),
-            confidence,
-            faceSize: `${Math.round(faceWidth)}x${Math.round(faceHeight)}`
-          });
+          // Usar média ponderada das duas medidas
+          const estimatedDistance = Math.round((distanceFromHeight * 0.6 + distanceFromWidth * 0.4));
+          
+          // Calcular confiança baseada em múltiplos fatores
+          const landmarkQuality = (landmarks.length / 468) * 100;
+          const faceSizeRatio = Math.min((faceWidthPixels / imageWidth) * 5, 1) * 100;
+          const symmetryScore = Math.max(0, 100 - Math.abs(horizontalPosition - 0.5) * 200);
+          
+          const confidence = Math.round(
+            (landmarkQuality * 0.4 + faceSizeRatio * 0.4 + symmetryScore * 0.2)
+          );
+          
+          // Validar se a detecção é consistente
+          const isConsistent = faceWidthPixels > 60 && faceHeightPixels > 80 && 
+                              faceWidthPixels < imageWidth * 0.8 && 
+                              faceHeightPixels < imageHeight * 0.9;
+          
+          if (isConsistent) {
+            lastValidDetection.current = new Date();
+            
+            setDetectionResult({
+              isDetected: true,
+              distance: Math.max(15, Math.min(150, estimatedDistance)),
+              verticalPosition,
+              horizontalPosition,
+              confidence: Math.min(100, confidence),
+              faceWidth: faceWidthPixels,
+              faceHeight: faceHeightPixels
+            });
+            
+            console.log('🎯 ULTRA PRECISO - Face detectada:', {
+              distance: `${estimatedDistance}cm`,
+              verticalPos: `${(verticalPosition * 100).toFixed(1)}%`,
+              horizontalPos: `${(horizontalPosition * 100).toFixed(1)}%`,
+              confidence: `${confidence}%`,
+              faceSize: `${Math.round(faceWidthPixels)}x${Math.round(faceHeightPixels)}px`,
+              distanceFromHeight: `${distanceFromHeight.toFixed(1)}cm`,
+              distanceFromWidth: `${distanceFromWidth.toFixed(1)}cm`,
+              landmarkQuality: `${landmarkQuality.toFixed(1)}%`,
+              symmetryScore: `${symmetryScore.toFixed(1)}%`
+            });
+          } else {
+            console.warn('⚠️ Detecção inconsistente ignorada');
+          }
         } else {
-          // Nenhuma face detectada
-          setDetectionResult(prev => ({
-            ...prev,
-            isDetected: false,
-            confidence: 0
-          }));
+          // Verificar se perdemos a detecção há muito tempo
+          const timeSinceLastDetection = lastValidDetection.current ? 
+            new Date().getTime() - lastValidDetection.current.getTime() : Infinity;
+          
+          if (timeSinceLastDetection > 500) { // 500ms sem detecção
+            setDetectionResult(prev => ({
+              ...prev,
+              isDetected: false,
+              confidence: 0
+            }));
+          }
         }
       });
 

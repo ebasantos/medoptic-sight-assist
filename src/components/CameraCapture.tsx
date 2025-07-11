@@ -90,62 +90,79 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     };
   }, [isInitialized, isActive, startDetection, stopDetection]);
 
-  // Processar resultados da detecção facial
+  // Processar resultados da detecção facial ULTRA PRECISO
   useEffect(() => {
-    const { isDetected, distance, verticalPosition, confidence } = detectionResult;
+    const { isDetected, distance, verticalPosition, horizontalPosition, confidence } = detectionResult;
     
     if (!isDetected) {
-      setPositionFeedback('Rosto não detectado');
+      setPositionFeedback('🔍 Rosto não detectado');
       setDistanceFeedback('Posicione-se na frente da câmera');
       setIsOptimalPosition(false);
       setStableFrames(0);
       return;
     }
 
-    // Verificar condições ideais
-    const isIdealDistance = distance >= 30 && distance <= 40;
-    const hasGoodDetection = confidence > 70;
-    const isCorrectHeight = verticalPosition >= 0.35 && verticalPosition <= 0.65;
+    // CRITÉRIOS ULTRA PRECISOS
+    const isIdealDistance = distance >= 32 && distance <= 38; // Faixa mais restrita
+    const hasExcellentDetection = confidence > 85; // Confiança alta
+    const isCorrectHeight = verticalPosition >= 0.42 && verticalPosition <= 0.58; // Mais preciso
+    const isCentered = horizontalPosition >= 0.45 && horizontalPosition <= 0.55; // Centralizado
     
-    const isPerfect = hasGoodDetection && isIdealDistance && isCorrectHeight;
+    const isPerfect = hasExcellentDetection && isIdealDistance && isCorrectHeight && isCentered;
     
     if (isPerfect) {
-      setPositionFeedback('Posição perfeita! ✓');
-      setDistanceFeedback(`${distance}cm - Ideal ✓`);
+      setPositionFeedback('🎯 POSIÇÃO PERFEITA!');
+      setDistanceFeedback(`✅ ${distance}cm - IDEAL`);
       setIsOptimalPosition(true);
-      setStableFrames(prev => Math.min(prev + 1, 5));
+      setStableFrames(prev => Math.min(prev + 1, 8)); // Mais frames para estabilidade
     } else {
       setIsOptimalPosition(false);
       setStableFrames(0);
       
-      if (!hasGoodDetection) {
-        setPositionFeedback('Detecção facial fraca');
-        setDistanceFeedback('Melhore a iluminação e enquadramento');
+      // Feedback detalhado e preciso
+      if (!hasExcellentDetection) {
+        setPositionFeedback('⚠️ Qualidade insuficiente');
+        setDistanceFeedback(`${confidence}% - Mínimo: 85%`);
       } else if (!isIdealDistance) {
-        if (distance > 40) {
-          setPositionFeedback('Muito longe - aproxime-se');
-          setDistanceFeedback(`${distance}cm - Ideal: 30-40cm`);
-        } else if (distance < 30) {
-          setPositionFeedback('Muito perto - afaste-se');
-          setDistanceFeedback(`${distance}cm - Ideal: 30-40cm`);
+        if (distance > 38) {
+          setPositionFeedback('📏 MUITO LONGE - Aproxime-se');
+          setDistanceFeedback(`${distance}cm - Ideal: 32-38cm`);
+        } else if (distance < 32) {
+          setPositionFeedback('📏 MUITO PERTO - Afaste-se');
+          setDistanceFeedback(`${distance}cm - Ideal: 32-38cm`);
+        }
+      } else if (!isCentered) {
+        if (horizontalPosition < 0.45) {
+          setPositionFeedback('⬅️ Mova para a DIREITA');
+          setDistanceFeedback(`${distance}cm - Centre-se`);
+        } else if (horizontalPosition > 0.55) {
+          setPositionFeedback('➡️ Mova para a ESQUERDA');
+          setDistanceFeedback(`${distance}cm - Centre-se`);
         }
       } else if (!isCorrectHeight) {
-        if (verticalPosition < 0.35) {
-          setPositionFeedback('Rosto muito alto - abaixe a câmera');
-          setDistanceFeedback(`${distance}cm - Centralize verticalmente`);
-        } else if (verticalPosition > 0.65) {
-          setPositionFeedback('Rosto muito baixo - levante a câmera');
-          setDistanceFeedback(`${distance}cm - Centralize verticalmente`);
+        if (verticalPosition < 0.42) {
+          setPositionFeedback('⬇️ ABAIXE a câmera');
+          setDistanceFeedback(`${distance}cm - Rosto muito alto`);
+        } else if (verticalPosition > 0.58) {
+          setPositionFeedback('⬆️ LEVANTE a câmera');
+          setDistanceFeedback(`${distance}cm - Rosto muito baixo`);
         }
       }
     }
     
-    console.log('📈 Status atual:', {
-      distance: `${distance}cm`,
-      verticalPos: verticalPosition.toFixed(2),
-      confidence: `${confidence}%`,
+    console.log('🎯 ANÁLISE ULTRA PRECISA:', {
+      distance: `${distance}cm (ideal: 32-38)`,
+      vertical: `${(verticalPosition * 100).toFixed(1)}% (ideal: 42-58%)`,
+      horizontal: `${(horizontalPosition * 100).toFixed(1)}% (ideal: 45-55%)`,
+      confidence: `${confidence}% (min: 85%)`,
       isPerfect,
-      stable: `${stableFrames}/5`
+      stable: `${stableFrames}/8`,
+      checks: {
+        distance: isIdealDistance ? '✅' : '❌',
+        height: isCorrectHeight ? '✅' : '❌',
+        center: isCentered ? '✅' : '❌',
+        quality: hasExcellentDetection ? '✅' : '❌'
+      }
     });
     
   }, [detectionResult]);
@@ -351,11 +368,26 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               </div>
             )}
             
-            {/* Contador de estabilidade */}
+            {/* Contador de estabilidade ULTRA PRECISO */}
             {isActive && isOptimalPosition && (
               <div className="absolute top-14 left-4">
-                <Badge className="bg-green-500/90 text-white border-0 backdrop-blur-sm">
-                  Estável: {stableFrames}/5
+                <Badge className={`${stableFrames >= 8 ? 'bg-green-600 animate-pulse' : 'bg-yellow-500'} text-white border-0 backdrop-blur-sm font-bold`}>
+                  🎯 Estável: {stableFrames}/8
+                </Badge>
+              </div>
+            )}
+            
+            {/* Indicadores de validação individual */}
+            {isActive && detectionResult.isDetected && (
+              <div className="absolute top-24 left-4 space-y-1">
+                <Badge className={`text-xs ${detectionResult.distance >= 32 && detectionResult.distance <= 38 ? 'bg-green-600' : 'bg-red-500'} text-white`}>
+                  📏 {detectionResult.distance}cm
+                </Badge>
+                <Badge className={`text-xs ${detectionResult.confidence > 85 ? 'bg-green-600' : 'bg-red-500'} text-white`}>
+                  🎯 {Math.round(detectionResult.confidence)}%
+                </Badge>
+                <Badge className={`text-xs ${detectionResult.verticalPosition >= 0.42 && detectionResult.verticalPosition <= 0.58 ? 'bg-green-600' : 'bg-red-500'} text-white`}>
+                  📐 {Math.round(detectionResult.verticalPosition * 100)}%
                 </Badge>
               </div>
             )}
@@ -365,15 +397,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
                 <Button 
                   onClick={handleCapture} 
-                  disabled={!isOptimalPosition}
+                  disabled={!isOptimalPosition || stableFrames < 8}
                   size="lg"
-                  className={`h-16 w-16 rounded-full shadow-2xl transition-all duration-300 ${
-                    isOptimalPosition 
-                      ? 'bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 scale-100' 
-                      : 'bg-gray-400 cursor-not-allowed scale-90'
+                  className={`h-20 w-20 rounded-full shadow-2xl transition-all duration-300 border-4 ${
+                    isOptimalPosition && stableFrames >= 8
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 scale-110 border-white shadow-green-500/50 animate-pulse' 
+                      : 'bg-gray-400 cursor-not-allowed scale-90 border-gray-300'
                   }`}
                 >
-                  <Camera className="h-6 w-6" />
+                  <Camera className="h-8 w-8" />
                 </Button>
               </div>
             )}
