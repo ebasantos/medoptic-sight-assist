@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Camera, AlertCircle, RotateCcw, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { useCamera } from '@/hooks/useCamera';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -16,18 +15,12 @@ interface CameraCaptureProps {
 const CameraCapture: React.FC<CameraCaptureProps> = ({
   onCapture,
   showGuides = true,
-  guideType = 'measurement',
   className = ''
 }) => {
   const isMobile = useIsMobile();
-  const [distance, setDistance] = useState<number>(0);
-  const [isGoodDistance, setIsGoodDistance] = useState(false);
-  const [isGoodHeight, setIsGoodHeight] = useState(false);
-  const [faceDetected, setFaceDetected] = useState(false);
   
   const {
     videoRef,
-    canvasRef,
     isActive,
     hasPermission,
     error,
@@ -37,77 +30,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     startCamera,
     stopCamera,
     switchCamera,
-    capturePhoto,
-    setCapturedImage
+    capturePhoto
   } = useCamera({ onCapture });
-
-  // Detecção facial simples usando análise de pixels
-  useEffect(() => {
-    if (!isActive || !videoRef.current) return;
-
-    const detectFace = () => {
-      const video = videoRef.current;
-      if (!video || video.readyState !== 4) return;
-
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      // Procurar pixels de pele na região central
-      let skinPixels = 0;
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const searchSize = 150;
-
-      for (let y = centerY - searchSize; y < centerY + searchSize; y += 4) {
-        for (let x = centerX - searchSize; x < centerX + searchSize; x += 4) {
-          if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
-            const i = (y * canvas.width + x) * 4;
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-
-            // Detecção básica de tom de pele
-            if (r > 95 && g > 40 && b > 20 && r > g && r > b) {
-              skinPixels++;
-            }
-          }
-        }
-      }
-
-      const detected = skinPixels > 100;
-      setFaceDetected(detected);
-
-      if (detected) {
-        // Estimar distância baseada no tamanho da região com pele
-        const faceSize = Math.sqrt(skinPixels);
-        // Calibrado empiricamente: faceSize ~40 = 35cm
-        const estimatedDistance = Math.round((40 / faceSize) * 35);
-        const finalDistance = Math.max(20, Math.min(60, estimatedDistance));
-        
-        setDistance(finalDistance);
-        setIsGoodDistance(finalDistance >= 30 && finalDistance <= 40);
-        
-        // Verificar altura: face deve estar no centro vertical (entre 40% e 60%)
-        const faceVerticalPos = centerY / canvas.height;
-        setIsGoodHeight(faceVerticalPos >= 0.4 && faceVerticalPos <= 0.6);
-      } else {
-        setDistance(0);
-        setIsGoodDistance(false);
-        setIsGoodHeight(false);
-      }
-    };
-
-    const interval = setInterval(detectFace, 500);
-    return () => clearInterval(interval);
-  }, [isActive]);
 
   const handleCapture = () => {
     console.log('📸 Capturando foto...');
@@ -117,8 +41,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       stopCamera();
     }
   };
-
-  const canTakePhoto = faceDetected && isGoodDistance && isGoodHeight;
 
   if (capturedImage) {
     return (
@@ -200,24 +122,28 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
             />
             
-            {/* Placeholder */}
+            {/* Botão Iniciar Câmera */}
             {!isActive && (
               <div className="flex items-center justify-center h-full text-white">
-                <div className="text-center">
-                  <Camera className="h-12 w-12 mx-auto mb-4" />
-                  <p className="text-lg">Pressione para ativar a câmera</p>
-                </div>
+                <Button 
+                  onClick={startCamera}
+                  size="lg"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Camera className="h-6 w-6 mr-2" />
+                  Ativar Câmera
+                </Button>
               </div>
             )}
             
-            {/* Guia simples */}
+            {/* Guia simples - apenas um círculo */}
             {showGuides && isActive && (
               <div className="absolute inset-0 pointer-events-none">
-                {/* Círculo simples para posicionamento */}
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                  <div className={`w-48 h-60 rounded-full border-4 ${
-                    canTakePhoto ? 'border-green-400' : 'border-yellow-400'
-                  }`} />
+                  <div className="w-48 h-60 rounded-full border-4 border-white opacity-50" />
+                </div>
+                <div className="absolute top-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm">
+                  Posicione o rosto no círculo
                 </div>
               </div>
             )}
@@ -234,38 +160,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               </Button>
             )}
             
-            {/* Status */}
-            {isActive && (
-              <div className="absolute top-4 left-4 space-y-2">
-                <Badge className={`${faceDetected ? 'bg-green-600' : 'bg-red-600'} text-white`}>
-                  {faceDetected ? '✓ Rosto detectado' : '✗ Sem rosto'}
-                </Badge>
-                
-                {faceDetected && (
-                  <>
-                    <Badge className={`${isGoodDistance ? 'bg-green-600' : 'bg-orange-600'} text-white block`}>
-                      {distance}cm {isGoodDistance ? '✓' : distance < 30 ? '(muito perto)' : '(muito longe)'}
-                    </Badge>
-                    
-                    <Badge className={`${isGoodHeight ? 'bg-green-600' : 'bg-orange-600'} text-white block`}>
-                      {isGoodHeight ? '✓ Altura OK' : '✗ Ajuste altura'}
-                    </Badge>
-                  </>
-                )}
-              </div>
-            )}
-            
-            {/* Botão capturar */}
+            {/* Botão capturar - SEMPRE disponível quando câmera ativa */}
             {isActive && (
               <Button 
                 onClick={handleCapture} 
-                disabled={!canTakePhoto}
                 size="lg"
-                className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 h-16 w-16 rounded-full ${
-                  canTakePhoto 
-                    ? 'bg-green-600 hover:bg-green-700 animate-pulse' 
-                    : 'bg-gray-400 cursor-not-allowed'
-                }`}
+                className="absolute bottom-4 left-1/2 transform -translate-x-1/2 h-16 w-16 rounded-full bg-green-600 hover:bg-green-700"
               >
                 <Camera className="h-6 w-6" />
               </Button>
@@ -280,9 +180,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
           <CardContent className="p-4">
             <div className="text-center text-sm text-blue-800">
               <p className="font-medium mb-2">Instruções:</p>
-              <p>• Posicione-se a 30-40cm da câmera</p>
-              <p>• Alinhe seu rosto com o círculo</p>
-              <p>• Mantenha a câmera na altura dos olhos</p>
+              <p>• Posicione-se a aproximadamente 35cm da câmera</p>
+              <p>• Alinhe seu rosto com o círculo branco</p>
+              <p>• Clique no botão verde para capturar</p>
             </div>
           </CardContent>
         </Card>
