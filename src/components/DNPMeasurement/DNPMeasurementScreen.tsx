@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Camera, CreditCard, Eye, CheckCircle, AlertCircle } from 'lucide-react';
-import { CardCalibration } from './CardCalibration';
+import { VirtualRuler } from './VirtualRuler';
 import { FaceCapture } from './FaceCapture';
 import { DNPResults } from './DNPResults';
 import { useDNPMeasurement } from './useDNPMeasurement';
@@ -29,10 +29,10 @@ interface Props {
   config?: DNPMeasurementConfig;
 }
 
-type MeasurementStep = 'calibration' | 'face-capture' | 'processing' | 'results';
+type MeasurementStep = 'virtual-calibration' | 'face-capture' | 'processing' | 'results';
 
 export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
-  const [currentStep, setCurrentStep] = useState<MeasurementStep>('calibration');
+  const [currentStep, setCurrentStep] = useState<MeasurementStep>('virtual-calibration');
   const [progress, setProgress] = useState(0);
   
   const {
@@ -69,16 +69,24 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
     }
   }, [processFaceImage, config]);
 
+  const handleVirtualCalibration = useCallback((pixelsPerMm: number) => {
+    setProgress(25);
+    // Simula a calibração diretamente no hook
+    calibrateWithCard('virtual-calibration');
+    setProgress(50);
+    setCurrentStep('face-capture');
+  }, [calibrateWithCard]);
+
   const handleRestart = useCallback(() => {
     reset();
-    setCurrentStep('calibration');
+    setCurrentStep('virtual-calibration');
     setProgress(0);
   }, [reset]);
 
   const getStepTitle = () => {
     switch (currentStep) {
-      case 'calibration':
-        return config.instructions?.step1 || 'Calibração com Cartão';
+      case 'virtual-calibration':
+        return config.instructions?.step1 || 'Calibração Virtual';
       case 'face-capture':
         return config.instructions?.step2 || 'Captura Facial';
       case 'processing':
@@ -90,7 +98,7 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
 
   const getStepIcon = () => {
     switch (currentStep) {
-      case 'calibration':
+      case 'virtual-calibration':
         return <CreditCard className="w-5 h-5" />;
       case 'face-capture':
         return <Eye className="w-5 h-5" />;
@@ -115,7 +123,7 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
               </div>
             </div>
             <Badge variant="outline">
-              Passo {currentStep === 'calibration' ? '1' : currentStep === 'face-capture' ? '2' : currentStep === 'processing' ? '3' : '4'} de 4
+              Passo {currentStep === 'virtual-calibration' ? '1' : currentStep === 'face-capture' ? '2' : currentStep === 'processing' ? '3' : '4'} de 4
             </Badge>
           </div>
           <Progress value={progress} className="w-full" />
@@ -137,10 +145,11 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
       {/* Step Content */}
       <Card>
         <CardContent className="pt-6">
-          {currentStep === 'calibration' && (
-            <CardCalibration
-              onCalibrationComplete={handleCardCalibration}
-              isProcessing={isProcessing}
+          {currentStep === 'virtual-calibration' && (
+            <VirtualRuler
+              onCalibrationComplete={handleVirtualCalibration}
+              videoWidth={640}
+              videoHeight={480}
             />
           )}
 
@@ -182,12 +191,12 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
                 Instruções de Qualidade
               </h4>
               <div className="grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
-                {currentStep === 'calibration' && (
+                {currentStep === 'virtual-calibration' && (
                   <>
-                    <div>• Use um cartão de crédito padrão (86×54 mm)</div>
-                    <div>• Mantenha o cartão bem alinhado e visível</div>
+                    <div>• Arraste as extremidades da régua para pontos de referência conhecidos</div>
+                    <div>• Ajuste a distância real em milímetros</div>
                     <div>• Certifique-se de boa iluminação</div>
-                    <div>• Evite sombras sobre o cartão</div>
+                    <div>• Use objetos de tamanho conhecido para referência</div>
                   </>
                 )}
                 {currentStep === 'face-capture' && (
