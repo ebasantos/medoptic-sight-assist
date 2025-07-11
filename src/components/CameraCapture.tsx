@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useCamera } from '@/hooks/useCamera';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useRealTimeFaceDetection } from '@/hooks/useRealTimeFaceDetection';
 
 interface CameraCaptureProps {
   onCapture: (imageData: string) => void;
@@ -21,17 +22,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   className = ''
 }) => {
   const isMobile = useIsMobile();
-  const [faceDetectionScore, setFaceDetectionScore] = useState(0);
   const [positionFeedback, setPositionFeedback] = useState<string>('');
   const [distanceFeedback, setDistanceFeedback] = useState<string>('');
-  const [estimatedDistance, setEstimatedDistance] = useState<number>(0);
-  const [faceHeightPosition, setFaceHeightPosition] = useState<number>(0.5);
   const [isOptimalPosition, setIsOptimalPosition] = useState(false);
-  
-  // Estados para estabilização
-  const [stableScore, setStableScore] = useState(0);
-  const [stableDistance, setStableDistance] = useState(0);
-  const [stableHeight, setStableHeight] = useState(0.5);
   const [stableFrames, setStableFrames] = useState(0);
   
   const {
@@ -50,6 +43,15 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     setCapturedImage
   } = useCamera({ onCapture });
 
+  // Hook de detecção facial real
+  const { 
+    detectionResult, 
+    isInitialized, 
+    initializeFaceMesh, 
+    startDetection, 
+    stopDetection 
+  } = useRealTimeFaceDetection(videoRef);
+
   // Função para calcular distância estimada baseada no tamanho do rosto
   const calculateEstimatedDistance = (faceScore: number) => {
     // Simular tamanho do rosto detectado (baseado no score)
@@ -64,93 +66,89 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     return estimatedDistanceCM;
   };
 
-  // Detecção real de posição - sem oscilações automáticas
+  // Inicializar detecção facial quando câmera ativa
   useEffect(() => {
-    if (!isActive || !videoRef.current) return;
+    if (isActive) {
+      console.log('🎥 Câmera ativada - inicializando detecção facial...');
+      initializeFaceMesh();
+    } else {
+      stopDetection();
+    }
+  }, [isActive, initializeFaceMesh, stopDetection]);
 
-    const interval = setInterval(() => {
-      const video = videoRef.current;
-      if (!video) return;
+  // Iniciar detecção quando MediaPipe estiver pronto
+  useEffect(() => {
+    if (isInitialized && isActive) {
+      console.log('🔍 Iniciando detecção facial em tempo real...');
+      startDetection();
+    }
+    
+    return () => {
+      if (isInitialized) {
+        stopDetection();
+      }
+    };
+  }, [isInitialized, isActive, startDetection, stopDetection]);
 
-      // Simular detecção facial real baseada em características do vídeo
-      // Em uma implementação real, isso usaria MediaPipe ou similar
-      const videoWidth = video.videoWidth || 640;
-      const videoHeight = video.videoHeight || 480;
+  // Processar resultados da detecção facial
+  useEffect(() => {
+    const { isDetected, distance, verticalPosition, confidence } = detectionResult;
+    
+    if (!isDetected) {
+      setPositionFeedback('Rosto não detectado');
+      setDistanceFeedback('Posicione-se na frente da câmera');
+      setIsOptimalPosition(false);
+      setStableFrames(0);
+      return;
+    }
+
+    // Verificar condições ideais
+    const isIdealDistance = distance >= 30 && distance <= 40;
+    const hasGoodDetection = confidence > 70;
+    const isCorrectHeight = verticalPosition >= 0.35 && verticalPosition <= 0.65;
+    
+    const isPerfect = hasGoodDetection && isIdealDistance && isCorrectHeight;
+    
+    if (isPerfect) {
+      setPositionFeedback('Posição perfeita! ✓');
+      setDistanceFeedback(`${distance}cm - Ideal ✓`);
+      setIsOptimalPosition(true);
+      setStableFrames(prev => Math.min(prev + 1, 5));
+    } else {
+      setIsOptimalPosition(false);
+      setStableFrames(0);
       
-      // Calcular "tamanho do rosto" baseado na resolução disponível
-      // Valores mais altos = mais próximo, valores mais baixos = mais longe
-      const faceAreaRatio = Math.min(videoWidth, videoHeight) / 640; // Normalizar
-      
-      // Simular posição do rosto no frame (centro = ideal)
-      const faceX = 0.5; // Centro horizontal (seria detectado via ML)
-      const faceY = 0.5; // Centro vertical (seria detectado via ML)
-      
-      // Calcular score de detecção baseado na qualidade do vídeo
-      const detectionScore = Math.min(95, 60 + (faceAreaRatio * 30));
-      
-      // Calcular distância estimada baseada no "tamanho do rosto"
-      const estimatedDistanceCm = Math.round(50 / faceAreaRatio); // Fórmula simplificada
-      
-      // Aplicar suavização apenas para evitar picos, mas manter valores reais
-      const smoothingFactor = 0.2;
-      
-      const newStableScore = stableScore * (1 - smoothingFactor) + detectionScore * smoothingFactor;
-      const newStableDistance = stableDistance * (1 - smoothingFactor) + estimatedDistanceCm * smoothingFactor;
-      const newStableHeight = stableHeight * (1 - smoothingFactor) + faceY * smoothingFactor;
-      
-      setStableScore(newStableScore);
-      setStableDistance(newStableDistance);
-      setStableHeight(newStableHeight);
-      
-      // Usar valores estabilizados
-      setFaceDetectionScore(Math.round(newStableScore));
-      setEstimatedDistance(Math.round(newStableDistance));
-      setFaceHeightPosition(newStableHeight);
-      
-      // Verificar condições REAIS para posição ideal
-      const isIdealDistance = newStableDistance >= 30 && newStableDistance <= 40; // Faixa real de 30-40cm
-      const hasGoodDetection = newStableScore > 75; // Score mínimo real
-      const isCorrectHeight = newStableHeight >= 0.4 && newStableHeight <= 0.6; // Range real de altura
-      
-      // Só marca como posição ótima se TODAS as condições estão atendidas
-      const isPerfect = hasGoodDetection && isIdealDistance && isCorrectHeight;
-      
-      if (isPerfect) {
-        setPositionFeedback('Posição perfeita! ✓');
-        setDistanceFeedback(`${Math.round(newStableDistance)}cm - Ideal ✓`);
-        setIsOptimalPosition(true);
-        setStableFrames(prev => Math.min(prev + 1, 4));
-      } else {
-        setIsOptimalPosition(false);
-        setStableFrames(0);
-        
-        // Feedback específico baseado na condição que falha
-        if (!hasGoodDetection) {
-          setPositionFeedback('Rosto não detectado claramente');
-          setDistanceFeedback('Melhore a iluminação e enquadramento');
-        } else if (!isIdealDistance) {
-          const distance = Math.round(newStableDistance);
-          if (distance > 40) {
-            setPositionFeedback('Muito longe - aproxime-se da câmera');
-            setDistanceFeedback(`${distance}cm - Ideal: 30-40cm`);
-          } else if (distance < 30) {
-            setPositionFeedback('Muito perto - afaste-se da câmera');
-            setDistanceFeedback(`${distance}cm - Ideal: 30-40cm`);
-          }
-        } else if (!isCorrectHeight) {
-          if (newStableHeight < 0.4) {
-            setPositionFeedback('Rosto muito alto - abaixe a câmera');
-            setDistanceFeedback(`${Math.round(newStableDistance)}cm - Centralize verticalmente`);
-          } else if (newStableHeight > 0.6) {
-            setPositionFeedback('Rosto muito baixo - levante a câmera');
-            setDistanceFeedback(`${Math.round(newStableDistance)}cm - Centralize verticalmente`);
-          }
+      if (!hasGoodDetection) {
+        setPositionFeedback('Detecção facial fraca');
+        setDistanceFeedback('Melhore a iluminação e enquadramento');
+      } else if (!isIdealDistance) {
+        if (distance > 40) {
+          setPositionFeedback('Muito longe - aproxime-se');
+          setDistanceFeedback(`${distance}cm - Ideal: 30-40cm`);
+        } else if (distance < 30) {
+          setPositionFeedback('Muito perto - afaste-se');
+          setDistanceFeedback(`${distance}cm - Ideal: 30-40cm`);
+        }
+      } else if (!isCorrectHeight) {
+        if (verticalPosition < 0.35) {
+          setPositionFeedback('Rosto muito alto - abaixe a câmera');
+          setDistanceFeedback(`${distance}cm - Centralize verticalmente`);
+        } else if (verticalPosition > 0.65) {
+          setPositionFeedback('Rosto muito baixo - levante a câmera');
+          setDistanceFeedback(`${distance}cm - Centralize verticalmente`);
         }
       }
-    }, 500); // Intervalo menor para responsividade
-
-    return () => clearInterval(interval);
-  }, [isActive, stableScore, stableDistance, stableHeight]);
+    }
+    
+    console.log('📈 Status atual:', {
+      distance: `${distance}cm`,
+      verticalPos: verticalPosition.toFixed(2),
+      confidence: `${confidence}%`,
+      isPerfect,
+      stable: `${stableFrames}/5`
+    });
+    
+  }, [detectionResult]);
 
   // Removido - agora usamos apenas o sistema interativo
 
@@ -357,7 +355,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
             {isActive && isOptimalPosition && (
               <div className="absolute top-14 left-4">
                 <Badge className="bg-green-500/90 text-white border-0 backdrop-blur-sm">
-                  Estável: {stableFrames}/4
+                  Estável: {stableFrames}/5
                 </Badge>
               </div>
             )}
@@ -386,11 +384,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Score de detecção */}
               <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
-                <Zap className={`h-4 w-4 ${faceDetectionScore > 60 ? 'text-green-600' : 'text-yellow-600'}`} />
+                <Zap className={`h-4 w-4 ${detectionResult.confidence > 60 ? 'text-green-600' : 'text-yellow-600'}`} />
                 <div className="flex-1">
                   <div className="text-xs font-medium text-gray-600">Detecção Facial</div>
-                  <div className={`text-sm font-bold ${faceDetectionScore > 60 ? 'text-green-700' : 'text-yellow-700'}`}>
-                    {Math.round(faceDetectionScore)}%
+                  <div className={`text-sm font-bold ${detectionResult.confidence > 60 ? 'text-green-700' : 'text-yellow-700'}`}>
+                    {Math.round(detectionResult.confidence)}%
                   </div>
                 </div>
               </div>
@@ -417,19 +415,35 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
                 </div>
               </div>
               
-              {/* Feedback de altura */}
-              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border sm:col-span-3">
-                <div className={`h-4 w-4 rounded-full ${
-                  faceHeightPosition >= 0.45 && faceHeightPosition <= 0.55 ? 'bg-green-600' : 'bg-yellow-600'
-                }`} />
+              {/* Distância estimada */}
+              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
+                <Eye className={`h-4 w-4 ${detectionResult.distance >= 30 && detectionResult.distance <= 40 ? 'text-green-600' : 'text-orange-600'}`} />
                 <div className="flex-1">
-                  <div className="text-xs font-medium text-gray-600">Altura da Câmera</div>
-                  <div className={`text-xs font-medium ${
-                    faceHeightPosition >= 0.45 && faceHeightPosition <= 0.55 ? 'text-green-700' : 'text-yellow-700'
-                  }`}>
-                    {faceHeightPosition < 0.45 ? 'Abaixe a câmera - rosto muito alto' :
-                     faceHeightPosition > 0.55 ? 'Levante a câmera - rosto muito baixo' :
-                     'Altura ideal ✓'}
+                  <div className="text-xs font-medium text-gray-600">Distância</div>
+                  <div className={`text-sm font-bold ${detectionResult.distance >= 30 && detectionResult.distance <= 40 ? 'text-green-700' : 'text-orange-700'}`}>
+                    {detectionResult.distance}cm
+                  </div>
+                </div>
+              </div>
+
+              {/* Posição vertical */}
+              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
+                <Camera className={`h-4 w-4 ${detectionResult.verticalPosition >= 0.35 && detectionResult.verticalPosition <= 0.65 ? 'text-green-600' : 'text-blue-600'}`} />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-gray-600">Posição Vertical</div>
+                  <div className={`text-sm font-bold ${detectionResult.verticalPosition >= 0.35 && detectionResult.verticalPosition <= 0.65 ? 'text-green-700' : 'text-blue-700'}`}>
+                    {Math.round(detectionResult.verticalPosition * 100)}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Status geral */}
+              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
+                <CheckCircle className={`h-4 w-4 ${isOptimalPosition ? 'text-green-600' : 'text-gray-400'}`} />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-gray-600">Status</div>
+                  <div className={`text-sm font-bold ${isOptimalPosition ? 'text-green-700' : 'text-gray-600'}`}>
+                    {isOptimalPosition ? 'Pronto' : 'Ajustar'}
                   </div>
                 </div>
               </div>
