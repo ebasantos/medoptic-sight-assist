@@ -36,6 +36,7 @@ export const useFaceMeshDetection = () => {
     setIsLoading(true);
     
     try {
+      console.log('🔍 Iniciando detecção facial...');
       const faceMesh = initializeFaceMesh();
       
       return new Promise((resolve, reject) => {
@@ -43,10 +44,12 @@ export const useFaceMeshDetection = () => {
         img.crossOrigin = 'anonymous';
         
         img.onload = () => {
+          console.log('🖼️ Imagem carregada:', img.width, 'x', img.height);
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           
           if (!ctx) {
+            console.error('❌ Falha ao obter contexto do canvas');
             reject(new Error('Failed to get canvas context'));
             return;
           }
@@ -56,9 +59,11 @@ export const useFaceMeshDetection = () => {
           ctx.drawImage(img, 0, 0);
 
           faceMesh.onResults((results) => {
+            console.log('🎯 Resultados da detecção:', results);
             setIsLoading(false);
             
             if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+              console.log('✅ Face detectada com', results.multiFaceLandmarks[0].length, 'landmarks');
               const landmarks = results.multiFaceLandmarks[0];
               
               // Convert normalized coordinates to pixel coordinates
@@ -70,15 +75,24 @@ export const useFaceMeshDetection = () => {
               
               resolve(pixelLandmarks);
             } else {
+              console.log('⚠️ Nenhuma face detectada');
               resolve(null);
             }
           });
 
           // Send the image to MediaPipe
-          faceMesh.send({ image: canvas });
+          console.log('📤 Enviando imagem para MediaPipe...');
+          try {
+            faceMesh.send({ image: canvas });
+          } catch (sendError) {
+            console.error('💥 Erro ao enviar para MediaPipe:', sendError);
+            setIsLoading(false);
+            reject(sendError);
+          }
         };
 
-        img.onerror = () => {
+        img.onerror = (error) => {
+          console.error('💥 Erro ao carregar imagem:', error);
           setIsLoading(false);
           reject(new Error('Failed to load image'));
         };
@@ -87,7 +101,7 @@ export const useFaceMeshDetection = () => {
       });
     } catch (error) {
       setIsLoading(false);
-      console.error('Face detection error:', error);
+      console.error('💥 Erro geral na detecção facial:', error);
       throw error;
     }
   }, [initializeFaceMesh]);
