@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Camera, CreditCard, Eye, CheckCircle, AlertCircle } from 'lucide-react';
-import { VirtualRuler } from './VirtualRuler';
+import { VirtualCalibration } from './VirtualCalibration';
 import { FaceCapture } from './FaceCapture';
 import { DNPResults } from './DNPResults';
 import { useDNPMeasurement } from './useDNPMeasurement';
@@ -146,10 +146,9 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
       <Card>
         <CardContent className="pt-6">
           {currentStep === 'virtual-calibration' && (
-            <VirtualRuler
+            <VirtualCalibration
               onCalibrationComplete={handleVirtualCalibration}
-              videoWidth={640}
-              videoHeight={480}
+              isProcessing={isProcessing}
             />
           )}
 
