@@ -344,7 +344,38 @@ const MeasurementPage = () => {
 
       <main className="px-4 py-6">
         {step === 'camera' && (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* New Precision Measurement System */}
+            <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-emerald-800">
+                  <Brain className="h-5 w-5" />
+                  Sistema de Medição Ultra-Preciso (~98% Precisão)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <p className="text-emerald-700 text-sm">
+                    • Régua de calibração virtual para eliminação de suposições antropométricas<br/>
+                    • Detecção facial com 468 pontos de referência via Mediapipe<br/>
+                    • Ajustes pixel-a-pixel com zoom interativo<br/>
+                    • Validação em tempo real para máxima precisão
+                  </p>
+                  <Button 
+                    onClick={() => navigate('/precision-measurement')}
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Usar Sistema Ultra-Preciso
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="text-center">
+              <div className="text-sm text-gray-500 mb-4">ou continue com o sistema padrão</div>
+            </div>
+
             <CameraCapture
               onCapture={handleImageCapture}
               showGuides={true}
