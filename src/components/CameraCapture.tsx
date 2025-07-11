@@ -1,12 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { Camera, AlertCircle, RotateCcw, CheckCircle, Eye, Zap } from 'lucide-react';
+import { Camera, AlertCircle, RotateCcw, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useCamera } from '@/hooks/useCamera';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useRealTimeFaceDetection } from '@/hooks/useRealTimeFaceDetection';
 
 interface CameraCaptureProps {
   onCapture: (imageData: string) => void;
@@ -22,10 +20,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   className = ''
 }) => {
   const isMobile = useIsMobile();
-  const [positionFeedback, setPositionFeedback] = useState<string>('');
-  const [distanceFeedback, setDistanceFeedback] = useState<string>('');
-  const [isOptimalPosition, setIsOptimalPosition] = useState(false);
-  const [stableFrames, setStableFrames] = useState(0);
+  const [distance, setDistance] = useState<number>(0);
+  const [isGoodDistance, setIsGoodDistance] = useState(false);
+  const [isGoodHeight, setIsGoodHeight] = useState(false);
+  const [faceDetected, setFaceDetected] = useState(false);
   
   const {
     videoRef,
@@ -43,143 +41,84 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     setCapturedImage
   } = useCamera({ onCapture });
 
-  // Hook de detecção facial real
-  const { 
-    detectionResult, 
-    isInitialized, 
-    initializeFaceMesh, 
-    startDetection, 
-    stopDetection 
-  } = useRealTimeFaceDetection(videoRef);
-
-  // Função para calcular distância estimada baseada no tamanho do rosto
-  const calculateEstimatedDistance = (faceScore: number) => {
-    // Simular tamanho do rosto detectado (baseado no score)
-    const faceWidthInPixels = 100 + (faceScore * 2); // Simula largura facial em pixels
-    const averageFaceWidthMM = 140; // Largura média facial real em mm
-    const focalLengthPixels = 500; // Distância focal simulada da câmera
-    
-    // Fórmula: distância = (largura_real × distância_focal) / largura_em_pixels
-    const estimatedDistanceMM = (averageFaceWidthMM * focalLengthPixels) / faceWidthInPixels;
-    const estimatedDistanceCM = Math.round(estimatedDistanceMM / 10);
-    
-    return estimatedDistanceCM;
-  };
-
-  // Inicializar detecção facial quando câmera ativa
+  // Detecção facial simples usando análise de pixels
   useEffect(() => {
-    if (isActive) {
-      console.log('🎥 Câmera ativada - inicializando detecção facial...');
-      initializeFaceMesh();
-    } else {
-      stopDetection();
-    }
-  }, [isActive, initializeFaceMesh, stopDetection]);
+    if (!isActive || !videoRef.current) return;
 
-  // Iniciar detecção quando MediaPipe estiver pronto
-  useEffect(() => {
-    if (isInitialized && isActive) {
-      console.log('🔍 Iniciando detecção facial em tempo real...');
-      startDetection();
-    }
-    
-    return () => {
-      if (isInitialized) {
-        stopDetection();
+    const detectFace = () => {
+      const video = videoRef.current;
+      if (!video || video.readyState !== 4) return;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Procurar pixels de pele na região central
+      let skinPixels = 0;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const searchSize = 150;
+
+      for (let y = centerY - searchSize; y < centerY + searchSize; y += 4) {
+        for (let x = centerX - searchSize; x < centerX + searchSize; x += 4) {
+          if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+            const i = (y * canvas.width + x) * 4;
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Detecção básica de tom de pele
+            if (r > 95 && g > 40 && b > 20 && r > g && r > b) {
+              skinPixels++;
+            }
+          }
+        }
+      }
+
+      const detected = skinPixels > 100;
+      setFaceDetected(detected);
+
+      if (detected) {
+        // Estimar distância baseada no tamanho da região com pele
+        const faceSize = Math.sqrt(skinPixels);
+        // Calibrado empiricamente: faceSize ~40 = 35cm
+        const estimatedDistance = Math.round((40 / faceSize) * 35);
+        const finalDistance = Math.max(20, Math.min(60, estimatedDistance));
+        
+        setDistance(finalDistance);
+        setIsGoodDistance(finalDistance >= 30 && finalDistance <= 40);
+        
+        // Verificar altura: face deve estar no centro vertical (entre 40% e 60%)
+        const faceVerticalPos = centerY / canvas.height;
+        setIsGoodHeight(faceVerticalPos >= 0.4 && faceVerticalPos <= 0.6);
+      } else {
+        setDistance(0);
+        setIsGoodDistance(false);
+        setIsGoodHeight(false);
       }
     };
-  }, [isInitialized, isActive, startDetection, stopDetection]);
 
-  // Processar resultados da detecção facial ULTRA PRECISO
-  useEffect(() => {
-    const { isDetected, distance, verticalPosition, horizontalPosition, confidence } = detectionResult;
-    
-    if (!isDetected) {
-      setPositionFeedback('🔍 Rosto não detectado');
-      setDistanceFeedback('Posicione-se na frente da câmera');
-      setIsOptimalPosition(false);
-      setStableFrames(0);
-      return;
-    }
-
-    // CRITÉRIOS ULTRA PRECISOS
-    const isIdealDistance = distance >= 32 && distance <= 38; // Faixa mais restrita
-    const hasExcellentDetection = confidence > 85; // Confiança alta
-    const isCorrectHeight = verticalPosition >= 0.42 && verticalPosition <= 0.58; // Mais preciso
-    const isCentered = horizontalPosition >= 0.45 && horizontalPosition <= 0.55; // Centralizado
-    
-    const isPerfect = hasExcellentDetection && isIdealDistance && isCorrectHeight && isCentered;
-    
-    if (isPerfect) {
-      setPositionFeedback('🎯 POSIÇÃO PERFEITA!');
-      setDistanceFeedback(`✅ ${distance}cm - IDEAL`);
-      setIsOptimalPosition(true);
-      setStableFrames(prev => Math.min(prev + 1, 8)); // Mais frames para estabilidade
-    } else {
-      setIsOptimalPosition(false);
-      setStableFrames(0);
-      
-      // Feedback detalhado e preciso
-      if (!hasExcellentDetection) {
-        setPositionFeedback('⚠️ Qualidade insuficiente');
-        setDistanceFeedback(`${confidence}% - Mínimo: 85%`);
-      } else if (!isIdealDistance) {
-        if (distance > 38) {
-          setPositionFeedback('📏 MUITO LONGE - Aproxime-se');
-          setDistanceFeedback(`${distance}cm - Ideal: 32-38cm`);
-        } else if (distance < 32) {
-          setPositionFeedback('📏 MUITO PERTO - Afaste-se');
-          setDistanceFeedback(`${distance}cm - Ideal: 32-38cm`);
-        }
-      } else if (!isCentered) {
-        if (horizontalPosition < 0.45) {
-          setPositionFeedback('⬅️ Mova para a DIREITA');
-          setDistanceFeedback(`${distance}cm - Centre-se`);
-        } else if (horizontalPosition > 0.55) {
-          setPositionFeedback('➡️ Mova para a ESQUERDA');
-          setDistanceFeedback(`${distance}cm - Centre-se`);
-        }
-      } else if (!isCorrectHeight) {
-        if (verticalPosition < 0.42) {
-          setPositionFeedback('⬇️ ABAIXE a câmera');
-          setDistanceFeedback(`${distance}cm - Rosto muito alto`);
-        } else if (verticalPosition > 0.58) {
-          setPositionFeedback('⬆️ LEVANTE a câmera');
-          setDistanceFeedback(`${distance}cm - Rosto muito baixo`);
-        }
-      }
-    }
-    
-    console.log('🎯 ANÁLISE ULTRA PRECISA:', {
-      distance: `${distance}cm (ideal: 32-38)`,
-      vertical: `${(verticalPosition * 100).toFixed(1)}% (ideal: 42-58%)`,
-      horizontal: `${(horizontalPosition * 100).toFixed(1)}% (ideal: 45-55%)`,
-      confidence: `${confidence}% (min: 85%)`,
-      isPerfect,
-      stable: `${stableFrames}/8`,
-      checks: {
-        distance: isIdealDistance ? '✅' : '❌',
-        height: isCorrectHeight ? '✅' : '❌',
-        center: isCentered ? '✅' : '❌',
-        quality: hasExcellentDetection ? '✅' : '❌'
-      }
-    });
-    
-  }, [detectionResult]);
-
-  // Removido - agora usamos apenas o sistema interativo
+    const interval = setInterval(detectFace, 500);
+    return () => clearInterval(interval);
+  }, [isActive]);
 
   const handleCapture = () => {
-    console.log('📸 Iniciando captura...');
+    console.log('📸 Capturando foto...');
     const result = capturePhoto();
     if (result) {
-      console.log('✅ Foto capturada - usando sistema interativo');
-      // Não desenhar linha aqui - será feito no componente interativo
+      console.log('✅ Foto capturada com sucesso');
       stopCamera();
-    } else {
-      console.error('❌ Falha na captura da foto');
     }
   };
+
+  const canTakePhoto = faceDetected && isGoodDistance && isGoodHeight;
 
   if (capturedImage) {
     return (
@@ -189,9 +128,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
             <div className="rounded-lg overflow-hidden bg-white shadow-lg">
               <img 
                 src={capturedImage} 
-                alt="Foto capturada com linha de medição" 
+                alt="Foto capturada" 
                 className="w-full h-auto object-contain max-h-[70vh]"
-                style={{ display: 'block' }}
               />
             </div>
             <div className="mt-4 flex items-center justify-center gap-2">
@@ -200,16 +138,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
             </div>
           </CardContent>
         </Card>
-        <div className="flex gap-2">
-          <Button 
-            onClick={() => window.location.reload()} 
-            variant="outline" 
-            className="flex-1 h-12"
-          >
-            <Camera className="h-4 w-4 mr-2" />
-            Nova Foto
-          </Button>
-        </div>
+        <Button 
+          onClick={() => window.location.reload()} 
+          variant="outline" 
+          className="w-full h-12"
+        >
+          <Camera className="h-4 w-4 mr-2" />
+          Nova Foto
+        </Button>
       </div>
     );
   }
@@ -221,7 +157,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2 text-red-800">Erro ao Acessar Câmera</h3>
           <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={startCamera} variant="outline" className="border-red-300 text-red-700 hover:bg-red-100">
+          <Button onClick={startCamera} variant="outline">
             Tentar Novamente
           </Button>
         </CardContent>
@@ -236,11 +172,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
           <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2 text-amber-800">Permissão Necessária</h3>
           <p className="text-amber-700 mb-4">
-            Para usar esta funcionalidade, é necessário permitir o acesso à câmera do seu dispositivo.
+            Permita o acesso à câmera para continuar.
           </p>
           <Button onClick={startCamera} className="bg-amber-600 hover:bg-amber-700">
             <Camera className="h-4 w-4 mr-2" />
-            Permitir Acesso à Câmera
+            Permitir Câmera
           </Button>
         </CardContent>
       </Card>
@@ -249,15 +185,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Área principal da câmera com design inovador */}
-      <Card className="overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 border-2 border-blue-200">
+      <Card className="overflow-hidden">
         <CardContent className="p-2">
-          <div 
-            className={`relative rounded-xl overflow-hidden bg-gray-900 ${
-              isMobile ? 'aspect-[3/4]' : 'aspect-video'
-            }`}
-          >
-            {/* Elemento de vídeo */}
+          <div className={`relative rounded-lg overflow-hidden bg-gray-900 ${
+            isMobile ? 'aspect-[3/4]' : 'aspect-video'
+          }`}>
+            {/* Vídeo */}
             <video
               ref={videoRef}
               autoPlay
@@ -267,285 +200,90 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
               style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
             />
             
-            {/* Placeholder quando câmera não está ativa */}
+            {/* Placeholder */}
             {!isActive && (
               <div className="flex items-center justify-center h-full text-white">
                 <div className="text-center">
-                  <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Camera className="h-10 w-10" />
-                  </div>
-                  <p className="text-lg font-medium">Pressione para ativar a câmera</p>
-                  <p className="text-sm text-gray-300 mt-2">Para uma medição precisa</p>
+                  <Camera className="h-12 w-12 mx-auto mb-4" />
+                  <p className="text-lg">Pressione para ativar a câmera</p>
                 </div>
               </div>
             )}
             
-            {/* Guias visuais avançados */}
+            {/* Guia simples */}
             {showGuides && isActive && (
-              <>
-                {/* Moldura principal de posicionamento */}
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* Oval de posicionamento facial */}
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                    <div 
-                      className={`relative ${
-                        isMobile ? 'w-52 h-64' : 'w-64 h-80'
-                      } rounded-full border-4 transition-colors duration-300 ${
-                        isOptimalPosition 
-                          ? 'border-green-400 shadow-lg shadow-green-400/50' 
-                          : 'border-yellow-400 shadow-lg shadow-yellow-400/30'
-                      }`}
-                      style={{
-                        background: isOptimalPosition 
-                          ? 'radial-gradient(ellipse, rgba(34, 197, 94, 0.1) 0%, transparent 70%)'
-                          : 'radial-gradient(ellipse, rgba(234, 179, 8, 0.1) 0%, transparent 70%)'
-                      }}
-                    >
-                      {/* Linha horizontal para alinhamento dos olhos */}
-                      <div 
-                        className={`absolute left-1/4 right-1/4 h-0.5 transition-colors duration-300 ${
-                          isOptimalPosition ? 'bg-green-400' : 'bg-yellow-400'
-                        }`}
-                        style={{ top: '30%' }}
-                      />
-                      
-                      {/* Marcadores de posição dos olhos */}
-                      <div className="absolute left-1/4 top-[30%] transform -translate-x-1/2 -translate-y-1/2">
-                        <div className={`w-3 h-3 rounded-full ${isOptimalPosition ? 'bg-green-400' : 'bg-yellow-400'}`} />
-                      </div>
-                      <div className="absolute right-1/4 top-[30%] transform translate-x-1/2 -translate-y-1/2">
-                        <div className={`w-3 h-3 rounded-full ${isOptimalPosition ? 'bg-green-400' : 'bg-yellow-400'}`} />
-                      </div>
-                      
-                      {/* Linha para boca/nariz */}
-                      <div 
-                        className={`absolute left-1/3 right-1/3 h-0.5 transition-colors duration-300 ${
-                          isOptimalPosition ? 'bg-green-400' : 'bg-yellow-400'
-                        }`}
-                        style={{ top: '65%' }}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Cantos de enquadramento */}
-                  <div className="absolute top-4 left-4">
-                    <div className={`w-8 h-8 border-l-4 border-t-4 ${isOptimalPosition ? 'border-green-400' : 'border-yellow-400'}`} />
-                  </div>
-                  <div className="absolute top-4 right-4">
-                    <div className={`w-8 h-8 border-r-4 border-t-4 ${isOptimalPosition ? 'border-green-400' : 'border-yellow-400'}`} />
-                  </div>
-                  <div className="absolute bottom-4 left-4">
-                    <div className={`w-8 h-8 border-l-4 border-b-4 ${isOptimalPosition ? 'border-green-400' : 'border-yellow-400'}`} />
-                  </div>
-                  <div className="absolute bottom-4 right-4">
-                    <div className={`w-8 h-8 border-r-4 border-b-4 ${isOptimalPosition ? 'border-green-400' : 'border-yellow-400'}`} />
-                  </div>
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Círculo simples para posicionamento */}
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                  <div className={`w-48 h-60 rounded-full border-4 ${
+                    canTakePhoto ? 'border-green-400' : 'border-yellow-400'
+                  }`} />
                 </div>
-              </>
+              </div>
             )}
             
-            {/* Botão para trocar câmera */}
+            {/* Botão trocar câmera */}
             {isActive && hasMultipleCameras && (
-              <div className="absolute top-4 right-4">
-                <Button
-                  onClick={switchCamera}
-                  size="sm"
-                  className="bg-black/70 hover:bg-black/90 text-white border-0 backdrop-blur-sm"
-                >
-                  <RotateCcw className="h-4 w-4 mr-1" />
-                  {facingMode === 'user' ? 'Traseira' : 'Frontal'}
-                </Button>
-              </div>
-            )}
-            
-            {/* Indicador de status com design moderno */}
-            {isActive && (
-              <div className="absolute top-4 left-4">
-                <Badge className="bg-black/70 text-white border-0 backdrop-blur-sm">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${isOptimalPosition ? 'bg-green-400 animate-pulse' : 'bg-yellow-400 animate-pulse'}`} />
-                  {isOptimalPosition ? 'Perfeito!' : 'Ajuste posição'}
-                </Badge>
-              </div>
-            )}
-            
-            {/* Contador de estabilidade ULTRA PRECISO */}
-            {isActive && isOptimalPosition && (
-              <div className="absolute top-14 left-4">
-                <Badge className={`${stableFrames >= 8 ? 'bg-green-600 animate-pulse' : 'bg-yellow-500'} text-white border-0 backdrop-blur-sm font-bold`}>
-                  🎯 Estável: {stableFrames}/8
-                </Badge>
-              </div>
-            )}
-            
-            {/* Indicadores de validação individual */}
-            {isActive && detectionResult.isDetected && (
-              <div className="absolute top-24 left-4 space-y-1">
-                <Badge className={`text-xs ${detectionResult.distance >= 32 && detectionResult.distance <= 38 ? 'bg-green-600' : 'bg-red-500'} text-white`}>
-                  📏 {detectionResult.distance}cm
-                </Badge>
-                <Badge className={`text-xs ${detectionResult.confidence > 85 ? 'bg-green-600' : 'bg-red-500'} text-white`}>
-                  🎯 {Math.round(detectionResult.confidence)}%
-                </Badge>
-                <Badge className={`text-xs ${detectionResult.verticalPosition >= 0.42 && detectionResult.verticalPosition <= 0.58 ? 'bg-green-600' : 'bg-red-500'} text-white`}>
-                  📐 {Math.round(detectionResult.verticalPosition * 100)}%
-                </Badge>
-              </div>
-            )}
-            
-            {/* Botão de captura sobreposto ao vídeo */}
-            {isActive && (
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                <Button 
-                  onClick={handleCapture} 
-                  disabled={!isOptimalPosition || stableFrames < 8}
-                  size="lg"
-                  className={`h-20 w-20 rounded-full shadow-2xl transition-all duration-300 border-4 ${
-                    isOptimalPosition && stableFrames >= 8
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 scale-110 border-white shadow-green-500/50 animate-pulse' 
-                      : 'bg-gray-400 cursor-not-allowed scale-90 border-gray-300'
-                  }`}
-                >
-                  <Camera className="h-8 w-8" />
-                </Button>
-              </div>
-            )}
-          </div>
-          
-          {/* Feedback em tempo real */}
-          {isActive && (
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Score de detecção */}
-              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
-                <Zap className={`h-4 w-4 ${detectionResult.confidence > 60 ? 'text-green-600' : 'text-yellow-600'}`} />
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-gray-600">Detecção Facial</div>
-                  <div className={`text-sm font-bold ${detectionResult.confidence > 60 ? 'text-green-700' : 'text-yellow-700'}`}>
-                    {Math.round(detectionResult.confidence)}%
-                  </div>
-                </div>
-              </div>
-              
-              {/* Feedback de posição */}
-              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
-                <Eye className={`h-4 w-4 ${isOptimalPosition ? 'text-green-600' : 'text-yellow-600'}`} />
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-gray-600">Posição</div>
-                  <div className={`text-xs font-medium ${isOptimalPosition ? 'text-green-700' : 'text-yellow-700'}`}>
-                    {positionFeedback}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Feedback de distância */}
-              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
-                <Camera className={`h-4 w-4 ${isOptimalPosition ? 'text-green-600' : 'text-yellow-600'}`} />
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-gray-600">Distância</div>
-                  <div className={`text-xs font-medium ${isOptimalPosition ? 'text-green-700' : 'text-yellow-700'}`}>
-                    {distanceFeedback}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Distância estimada */}
-              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
-                <Eye className={`h-4 w-4 ${detectionResult.distance >= 30 && detectionResult.distance <= 40 ? 'text-green-600' : 'text-orange-600'}`} />
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-gray-600">Distância</div>
-                  <div className={`text-sm font-bold ${detectionResult.distance >= 30 && detectionResult.distance <= 40 ? 'text-green-700' : 'text-orange-700'}`}>
-                    {detectionResult.distance}cm
-                  </div>
-                </div>
-              </div>
-
-              {/* Posição vertical */}
-              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
-                <Camera className={`h-4 w-4 ${detectionResult.verticalPosition >= 0.35 && detectionResult.verticalPosition <= 0.65 ? 'text-green-600' : 'text-blue-600'}`} />
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-gray-600">Posição Vertical</div>
-                  <div className={`text-sm font-bold ${detectionResult.verticalPosition >= 0.35 && detectionResult.verticalPosition <= 0.65 ? 'text-green-700' : 'text-blue-700'}`}>
-                    {Math.round(detectionResult.verticalPosition * 100)}%
-                  </div>
-                </div>
-              </div>
-
-              {/* Status geral */}
-              <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
-                <CheckCircle className={`h-4 w-4 ${isOptimalPosition ? 'text-green-600' : 'text-gray-400'}`} />
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-gray-600">Status</div>
-                  <div className={`text-sm font-bold ${isOptimalPosition ? 'text-green-700' : 'text-gray-600'}`}>
-                    {isOptimalPosition ? 'Pronto' : 'Ajustar'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Canvas oculto para captura */}
-      <canvas ref={canvasRef} className="hidden" />
-
-      {/* Controles com design moderno */}
-      <div className="flex gap-3">
-        {!isActive ? (
-          <Button 
-            onClick={startCamera} 
-            className="flex-1 h-14 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
-          >
-            <Camera className="h-5 w-5 mr-2" />
-            Ativar Câmera
-          </Button>
-        ) : (
-          <>
-            <Button 
-              onClick={stopCamera} 
-              variant="outline" 
-              className="h-14 px-6 border-2"
-            >
-              Parar
-            </Button>
-            {hasMultipleCameras && (
-              <Button 
-                onClick={switchCamera} 
-                variant="outline" 
-                className="h-14 px-6 border-2"
+              <Button
+                onClick={switchCamera}
+                size="sm"
+                className="absolute top-4 right-4 bg-black/70 hover:bg-black/90"
               >
-                <RotateCcw className="h-4 w-4 mr-2" />
+                <RotateCcw className="h-4 w-4 mr-1" />
                 Trocar
               </Button>
             )}
-            <Button 
-              onClick={handleCapture} 
-              disabled={!isOptimalPosition}
-              className={`flex-1 h-14 text-lg shadow-lg transition-all duration-300 ${
-                isOptimalPosition 
-                  ? 'bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700' 
-                  : 'bg-gray-400 cursor-not-allowed'
-              }`}
-            >
-              <Camera className="h-5 w-5 mr-2" />
-              {isOptimalPosition ? 'Capturar Foto' : 'Posicione-se Corretamente'}
-            </Button>
-          </>
-        )}
-      </div>
+            
+            {/* Status */}
+            {isActive && (
+              <div className="absolute top-4 left-4 space-y-2">
+                <Badge className={`${faceDetected ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+                  {faceDetected ? '✓ Rosto detectado' : '✗ Sem rosto'}
+                </Badge>
+                
+                {faceDetected && (
+                  <>
+                    <Badge className={`${isGoodDistance ? 'bg-green-600' : 'bg-orange-600'} text-white block`}>
+                      {distance}cm {isGoodDistance ? '✓' : distance < 30 ? '(muito perto)' : '(muito longe)'}
+                    </Badge>
+                    
+                    <Badge className={`${isGoodHeight ? 'bg-green-600' : 'bg-orange-600'} text-white block`}>
+                      {isGoodHeight ? '✓ Altura OK' : '✗ Ajuste altura'}
+                    </Badge>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {/* Botão capturar */}
+            {isActive && (
+              <Button 
+                onClick={handleCapture} 
+                disabled={!canTakePhoto}
+                size="lg"
+                className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 h-16 w-16 rounded-full ${
+                  canTakePhoto 
+                    ? 'bg-green-600 hover:bg-green-700 animate-pulse' 
+                    : 'bg-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <Camera className="h-6 w-6" />
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       
-      {/* Dicas de posicionamento */}
+      {/* Instruções simples */}
       {isActive && (
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-4">
-            <h4 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              Dicas para uma foto perfeita
-            </h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Posicione seu rosto dentro do oval amarelo/verde</li>
-              <li>• Alinhe seus olhos com a linha horizontal</li>
-              <li>• Mantenha uma distância de aproximadamente 25cm da tela</li>
-              <li>• Aguarde o indicador ficar verde antes de capturar</li>
-            </ul>
+            <div className="text-center text-sm text-blue-800">
+              <p className="font-medium mb-2">Instruções:</p>
+              <p>• Posicione-se a 30-40cm da câmera</p>
+              <p>• Alinhe seu rosto com o círculo</p>
+              <p>• Mantenha a câmera na altura dos olhos</p>
+            </div>
           </CardContent>
         </Card>
       )}
