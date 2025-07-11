@@ -24,6 +24,8 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
   
   const detectionIntervalRef = useRef<number>();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stabilizationBuffer = useRef<FaceDetectionResult[]>([]);
+  const lastStableResult = useRef<FaceDetectionResult | null>(null);
 
   // Simular detecção facial usando análise de pixels
   const detectFaceInFrame = useCallback(() => {
@@ -97,32 +99,66 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
         // Estimar tamanho da face baseado na distribuição de pixels de pele
         const estimatedFaceSize = Math.sqrt(skinPixels) * 8; // Heurística
         
-        // Calcular distância baseada no tamanho estimado da face
-        const avgFaceWidthCm = 14;
-        const focalLengthPixels = canvas.width * 0.7;
+        // Calcular distância baseada no tamanho estimado da face - CALIBRADO PARA 35CM
+        const avgFaceWidthCm = 15; // Largura real média da face
+        const focalLengthPixels = canvas.width * 1.4; // Ajustado para resultar em ~35cm na distância ideal
         const estimatedDistance = Math.round((avgFaceWidthCm * focalLengthPixels) / estimatedFaceSize);
         
-        // Simular posição vertical e horizontal baseada na distribuição de pixels
-        const verticalPosition = 0.45 + (Math.random() - 0.5) * 0.2; // Simular variação
-        const horizontalPosition = 0.48 + (Math.random() - 0.5) * 0.1;
-        
-        setDetectionResult({
+        // Criar resultado preliminar
+        const preliminaryResult: FaceDetectionResult = {
           isDetected: true,
-          distance: Math.max(20, Math.min(60, estimatedDistance)),
-          verticalPosition,
-          horizontalPosition,
-          confidence: Math.min(95, Math.max(70, Math.round(skinPercentage * 3))),
+          distance: Math.max(25, Math.min(80, estimatedDistance)),
+          verticalPosition: 0.45 + (Math.random() - 0.5) * 0.05, // Menor variação
+          horizontalPosition: 0.48 + (Math.random() - 0.5) * 0.03, // Menor variação
+          confidence: Math.min(95, Math.max(75, Math.round(skinPercentage * 2.5))),
           faceWidth: estimatedFaceSize,
           faceHeight: estimatedFaceSize * 1.3
-        });
+        };
         
-        console.log('🎯 Face detectada (análise de pixels):', {
-          skinPercentage: `${skinPercentage.toFixed(1)}%`,
-          distance: `${estimatedDistance}cm`,
-          confidence: `${Math.round(skinPercentage * 3)}%`,
-          faceSize: `${Math.round(estimatedFaceSize)}px`
-        });
+        // Adicionar ao buffer de estabilização
+        stabilizationBuffer.current.push(preliminaryResult);
+        if (stabilizationBuffer.current.length > 5) {
+          stabilizationBuffer.current.shift(); // Manter apenas os últimos 5 resultados
+        }
+        
+        // Calcular médias estáveis
+        if (stabilizationBuffer.current.length >= 3) {
+          const avgDistance = stabilizationBuffer.current.reduce((sum, r) => sum + r.distance, 0) / stabilizationBuffer.current.length;
+          const avgVertical = stabilizationBuffer.current.reduce((sum, r) => sum + r.verticalPosition, 0) / stabilizationBuffer.current.length;
+          const avgHorizontal = stabilizationBuffer.current.reduce((sum, r) => sum + r.horizontalPosition, 0) / stabilizationBuffer.current.length;
+          const avgConfidence = stabilizationBuffer.current.reduce((sum, r) => sum + r.confidence, 0) / stabilizationBuffer.current.length;
+          
+          const stableResult: FaceDetectionResult = {
+            isDetected: true,
+            distance: Math.round(avgDistance),
+            verticalPosition: avgVertical,
+            horizontalPosition: avgHorizontal,
+            confidence: Math.round(avgConfidence),
+            faceWidth: estimatedFaceSize,
+            faceHeight: estimatedFaceSize * 1.3
+          };
+          
+          // Só atualizar se houve mudança significativa
+          if (!lastStableResult.current || 
+              Math.abs(lastStableResult.current.distance - stableResult.distance) > 2 ||
+              Math.abs(lastStableResult.current.verticalPosition - stableResult.verticalPosition) > 0.02) {
+            
+            lastStableResult.current = stableResult;
+            setDetectionResult(stableResult);
+            
+            console.log('🎯 Face estabilizada:', {
+              skinPercentage: `${skinPercentage.toFixed(1)}%`,
+              distance: `${stableResult.distance}cm`,
+              verticalPos: `${(stableResult.verticalPosition * 100).toFixed(1)}%`,
+              confidence: `${stableResult.confidence}%`,
+              faceSize: `${Math.round(estimatedFaceSize)}px`
+            });
+          }
+        }
       } else {
+        // Limpar buffer quando não há detecção
+        stabilizationBuffer.current = [];
+        
         setDetectionResult(prev => ({
           ...prev,
           isDetected: false,
@@ -153,10 +189,10 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
   const startDetection = useCallback(() => {
     if (!isInitialized) return;
     
-    console.log('🔍 Iniciando detecção em tempo real...');
+    console.log('🔍 Iniciando detecção estabilizada...');
     
-    // Detectar a cada 200ms para performance
-    detectionIntervalRef.current = window.setInterval(detectFaceInFrame, 200);
+    // Detectar a cada 300ms para melhor estabilização
+    detectionIntervalRef.current = window.setInterval(detectFaceInFrame, 300);
   }, [isInitialized, detectFaceInFrame]);
 
   const stopDetection = useCallback(() => {
