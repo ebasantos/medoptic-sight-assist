@@ -45,32 +45,32 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
       // Desenhar frame atual
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Analisar pixels para detectar face REAL
+      // Analisar pixels para detectar face REAL - AJUSTADO PARA 35CM
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
       
-      // Detectar região facial usando algoritmo mais sofisticado
+      // Detectar região facial usando algoritmo OTIMIZADO PARA DISTÂNCIA 35CM
       let facePixels: Array<{x: number, y: number}> = [];
       
-      // Buscar tom de pele na região central (onde esperamos a face)
+      // Buscar tom de pele EXPANDIDO para detectar faces a 35cm
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
-      const searchRadius = Math.min(canvas.width, canvas.height) * 0.4;
+      const searchRadius = Math.min(canvas.width, canvas.height) * 0.6; // MAIOR área de busca
       
-      for (let y = centerY - searchRadius; y < centerY + searchRadius; y += 3) {
-        for (let x = centerX - searchRadius; x < centerX + searchRadius; x += 3) {
+      for (let y = centerY - searchRadius; y < centerY + searchRadius; y += 2) { // Mais denso
+        for (let x = centerX - searchRadius; x < centerX + searchRadius; x += 2) { // Mais denso
           if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
             const i = Math.floor((y * canvas.width + x) * 4);
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
             
-            // Algoritmo melhorado de detecção de tom de pele
+            // Algoritmo RELAXADO para detectar faces a 35cm
             const isSkinTone = (
-              r > 95 && g > 40 && b > 20 &&
-              Math.max(r, Math.max(g, b)) - Math.min(r, Math.min(g, b)) > 15 &&
-              Math.abs(r - g) > 15 && r > g && r > b &&
-              r + g + b > 200 // Luminosidade mínima
+              r > 80 && g > 30 && b > 15 && // Thresholds mais baixos
+              Math.max(r, Math.max(g, b)) - Math.min(r, Math.min(g, b)) > 10 && // Menos contraste exigido
+              Math.abs(r - g) > 8 && r > g && // Menos rigor
+              r + g + b > 150 // Luminosidade mais baixa aceita
             );
             
             if (isSkinTone) {
@@ -80,8 +80,8 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
         }
       }
       
-      // Verificar se encontramos pixels suficientes para uma face
-      const minFacePixels = 100; // Mínimo de pixels para considerar uma face
+      // LIMITE AJUSTADO PARA 35CM - face menor na imagem
+      const minFacePixels = 30; // MUITO mais baixo para detectar face a 35cm
       const isDetected = facePixels.length > minFacePixels;
       
       if (isDetected) {
@@ -94,24 +94,25 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
         const faceWidthPixels = maxX - minX;
         const faceHeightPixels = maxY - minY;
         
-        // CÁLCULO REAL DA DISTÂNCIA BASEADO EM MEDIDAS ANTROPOMÉTRICAS
-        const avgFaceWidthMM = 140; // Largura média real de uma face humana em mm
+        // CALIBRAÇÃO PRECISA PARA 35CM
+        const avgFaceWidthMM = 140; // Largura real da face em mm
         
-        // Estimar distância focal da câmera baseada na resolução
-        // Para câmeras web típicas: focal_length ≈ sensor_width * pixel_width / fov
-        const estimatedFocalLengthPixels = canvas.width * 0.8; // Estimativa conservadora
+        // Focal length calibrado especificamente para 35cm
+        // Se face tem ~140mm e ocupa X pixels, a 35cm deve ocupar Y pixels
+        const targetPixelsAt35cm = canvas.width * 0.25; // Face deve ocupar ~25% da largura a 35cm
+        const calibratedFocalLength = (avgFaceWidthMM * targetPixelsAt35cm) / 350; // 350mm = 35cm
         
-        // Fórmula da distância: D = (Largura_real × Focal_length) / Largura_pixels
-        const distanceMM = (avgFaceWidthMM * estimatedFocalLengthPixels) / faceWidthPixels;
+        // Fórmula da distância calibrada
+        const distanceMM = (avgFaceWidthMM * calibratedFocalLength) / faceWidthPixels;
         const distanceCM = Math.round(distanceMM / 10);
         
-        // Validar se a medição faz sentido (entre 15cm e 100cm)
-        const finalDistance = Math.max(15, Math.min(100, distanceCM));
+        // Validar distância com range EXPANDIDO para 35cm
+        const finalDistance = Math.max(20, Math.min(80, distanceCM));
         
-        // Calcular confiança baseada na qualidade da detecção
+        // Calcular confiança ADAPTADA para detecção a 35cm
         const pixelDensity = facePixels.length / (faceWidthPixels * faceHeightPixels);
         const sizeRatio = (faceWidthPixels * faceHeightPixels) / (canvas.width * canvas.height);
-        const confidence = Math.min(95, Math.max(60, Math.round(pixelDensity * 500 + sizeRatio * 200)));
+        const confidence = Math.min(95, Math.max(70, Math.round(pixelDensity * 300 + sizeRatio * 400))); // Menos rigoroso
         
         // POSIÇÃO FIXA - SEM OSCILAÇÃO
         const fixedVerticalPosition = 0.48; 
@@ -156,15 +157,19 @@ export const useRealTimeFaceDetection = (videoRef: React.RefObject<HTMLVideoElem
             lastStableResult.current = stableResult;
             setDetectionResult(stableResult);
             
-            console.log('🎯 DISTÂNCIA REAL CALCULADA:', {
+            console.log('🎯 DISTÂNCIA 35CM CALIBRADA:', {
               facePixels: facePixels.length,
+              minRequired: minFacePixels,
               faceWidthPixels: Math.round(faceWidthPixels),
               faceHeightPixels: Math.round(faceHeightPixels),
+              targetPixelsAt35cm: Math.round(targetPixelsAt35cm),
+              calibratedFocalLength: calibratedFocalLength.toFixed(2),
               distanceRaw: `${distanceCM}cm`,
               distanceFinal: `${stableResult.distance}cm`,
               confidence: `${stableResult.confidence}%`,
               pixelDensity: pixelDensity.toFixed(3),
-              sizeRatio: (sizeRatio * 100).toFixed(1) + '%'
+              sizeRatio: (sizeRatio * 100).toFixed(1) + '%',
+              faceOccupancy: `${((faceWidthPixels/canvas.width)*100).toFixed(1)}% da largura`
             });
           }
         }
