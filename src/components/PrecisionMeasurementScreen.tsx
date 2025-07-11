@@ -28,13 +28,15 @@ export interface MeasurementResults {
 interface PrecisionMeasurementScreenProps {
   onMeasurementsComplete?: (results: MeasurementResults) => void;
   onCancel?: () => void;
+  initialImage?: string | null;
 }
 
 export const PrecisionMeasurementScreen: React.FC<PrecisionMeasurementScreenProps> = ({
   onMeasurementsComplete,
-  onCancel
+  onCancel,
+  initialImage
 }) => {
-  const [image, setImage] = useState<string | null>(null);
+  const [image, setImage] = useState<string | null>(initialImage || null);
   const [calibrationDistance, setCalibrationDistance] = useState<number>(32); // Default inner canthal distance
   const [calibrationPoints, setCalibrationPoints] = useState<[{ x: number; y: number }, { x: number; y: number }] | null>(null);
   const [measurements, setMeasurements] = useState<MeasurementResults | null>(null);

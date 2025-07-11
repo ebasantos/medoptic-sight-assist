@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Camera, Brain, AlertTriangle, CheckCircle, Glasses, Eye, Sparkles } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Brain, AlertTriangle, CheckCircle, Glasses, Eye, Sparkles, Target, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import CameraCapture from '@/components/CameraCapture';
 import { useFacialMeasurements } from '@/hooks/useFacialMeasurements';
 import { InteractivePupilMeasurement } from '@/components/InteractivePupilMeasurement';
+import { PrecisionMeasurementScreen, MeasurementResults } from '@/components/PrecisionMeasurementScreen';
 
 const MeasurementPage = () => {
   const navigate = useNavigate();
@@ -20,18 +21,27 @@ const MeasurementPage = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  const [step, setStep] = useState<'camera' | 'measurements' | 'interactive'>('camera');
+  const [step, setStep] = useState<'method-selection' | 'camera' | 'measurements' | 'interactive' | 'precision'>('method-selection');
+  const [measurementMethod, setMeasurementMethod] = useState<'standard' | 'precision' | null>(null);
   const [saving, setSaving] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [measurementCalculated, setMeasurementCalculated] = useState(false);
   const [useInteractiveMode, setUseInteractiveMode] = useState(true);
   const [interactiveMeasurements, setInteractiveMeasurements] = useState<any>(null);
+  const [precisionMeasurements, setPrecisionMeasurements] = useState<MeasurementResults | null>(null);
   const [glassesDetected, setGlassesDetected] = useState(false);
   
   const { isAnalyzing, measurements: aiMeasurements, error: analysisError, analyzeFacialMeasurements } = useFacialMeasurements();
   
-  // Use interactive measurements if available, otherwise use AI measurements
-  const measurements = interactiveMeasurements || aiMeasurements;
+  // Use precision measurements first, then interactive, then AI measurements
+  const measurements = precisionMeasurements ? {
+    dpBinocular: precisionMeasurements.dnpMm,
+    dnpEsquerda: precisionMeasurements.dpLeftMm,
+    dnpDireita: precisionMeasurements.dpRightMm,
+    alturaEsquerda: precisionMeasurements.heightLeftMm,
+    alturaDireita: precisionMeasurements.heightRightMm,
+    larguraLente: precisionMeasurements.dnpMm / 2
+  } : interactiveMeasurements || aiMeasurements;
   
   const [formData, setFormData] = useState({
     nomeCliente: '',
@@ -41,7 +51,11 @@ const MeasurementPage = () => {
   const handleImageCapture = (imageData: string) => {
     console.log('Imagem capturada na página de medição');
     setCapturedImage(imageData);
-    setStep(useInteractiveMode ? 'interactive' : 'measurements');
+    if (measurementMethod === 'precision') {
+      setStep('precision');
+    } else {
+      setStep(useInteractiveMode ? 'interactive' : 'measurements');
+    }
     setMeasurementCalculated(false);
   };
 
@@ -56,6 +70,21 @@ const MeasurementPage = () => {
     console.log('Medições recebidas:', measurementData);
     setInteractiveMeasurements(measurementData);
     setMeasurementCalculated(true);
+  };
+
+  const handlePrecisionMeasurements = (results: MeasurementResults) => {
+    console.log('Medições de precisão recebidas:', results);
+    setPrecisionMeasurements(results);
+    setMeasurementCalculated(true);
+    setStep('measurements');
+  };
+
+  const handleMethodSelection = (method: 'standard' | 'precision') => {
+    setMeasurementMethod(method);
+    setStep('camera');
+    setPrecisionMeasurements(null);
+    setInteractiveMeasurements(null);
+    setMeasurementCalculated(false);
   };
 
   const handleAutoAnalysis = async () => {
@@ -295,8 +324,9 @@ const MeasurementPage = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  if (step === 'measurements') setStep('interactive');
-                  else if (step === 'interactive') setStep('camera');
+                  if (step === 'measurements') setStep(measurementMethod === 'precision' ? 'precision' : 'interactive');
+                  else if (step === 'interactive' || step === 'precision') setStep('camera');
+                  else if (step === 'camera') setStep('method-selection');
                   else navigate('/optica');
                 }}
                 className="border-blue-200 hover:bg-blue-50"
@@ -306,76 +336,156 @@ const MeasurementPage = () => {
               </Button>
               <div>
                 <h1 className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-gray-900`}>
-                  {step === 'camera' ? 'Captura de Foto' : 
-                   step === 'interactive' ? 'Medição Interativa' : 'Dados da Aferição'}
+                  {step === 'method-selection' ? 'Escolha o Método' :
+                   step === 'camera' ? 'Captura de Foto' : 
+                   step === 'interactive' ? 'Medição Interativa' : 
+                   step === 'precision' ? 'Sistema Ultra-Preciso' : 'Dados da Aferição'}
                 </h1>
                 {!isMobile && (
                   <p className="text-sm text-gray-600">
-                    {step === 'camera' ? 'Posicione o cliente para uma foto padronizada' : 
-                     step === 'interactive' ? 'Ajuste manualmente as posições das pupilas' : 'Análise automática com IA'}
+                    {step === 'method-selection' ? 'Selecione entre o sistema padrão ou ultra-preciso' :
+                     step === 'camera' ? 'Posicione o cliente para uma foto padronizada' : 
+                     step === 'interactive' ? 'Ajuste manualmente as posições das pupilas' :
+                     step === 'precision' ? 'Sistema de precisão com régua virtual de calibração' : 'Análise automática com IA'}
                   </p>
                 )}
               </div>
             </div>
-            <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-              <Sparkles className="w-3 h-3 mr-1" />
-              IA Ativa
+            <Badge className={`${measurementMethod === 'precision' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-blue-600 to-purple-600'} text-white`}>
+              {measurementMethod === 'precision' ? (
+                <>
+                  <Target className="w-3 h-3 mr-1" />
+                  Ultra-Preciso (~98%)
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  IA Padrão
+                </>
+              )}
             </Badge>
           </div>
           
-          <div className="mt-4">
-            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span className={step === 'camera' ? 'text-blue-600 font-medium' : ''}>Captura</span>
-              <span className={step === 'interactive' ? 'text-blue-600 font-medium' : ''}>Ajuste</span>
-              <span className={step === 'measurements' ? 'text-blue-600 font-medium' : ''}>Medições</span>
+          {step !== 'method-selection' && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                <span className={step === 'camera' ? 'text-blue-600 font-medium' : ''}>Captura</span>
+                <span className={step === 'interactive' || step === 'precision' ? 'text-blue-600 font-medium' : ''}>
+                  {measurementMethod === 'precision' ? 'Calibração' : 'Ajuste'}
+                </span>
+                <span className={step === 'measurements' ? 'text-blue-600 font-medium' : ''}>Medições</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
+                  style={{ 
+                    width: step === 'camera' ? '33%' : 
+                           step === 'interactive' || step === 'precision' ? '66%' : '100%' 
+                  }}
+                />
+              </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-                style={{ 
-                  width: step === 'camera' ? '33%' : 
-                         step === 'interactive' ? '66%' : '100%' 
-                }}
-              />
-            </div>
-          </div>
+          )}
         </div>
       </header>
 
       <main className="px-4 py-6">
-        {step === 'camera' && (
-          <div className="max-w-2xl mx-auto space-y-6">
-            {/* New Precision Measurement System */}
-            <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-emerald-800">
-                  <Brain className="h-5 w-5" />
-                  Sistema de Medição Ultra-Preciso (~98% Precisão)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <p className="text-emerald-700 text-sm">
-                    • Régua de calibração virtual para eliminação de suposições antropométricas<br/>
-                    • Detecção facial com 468 pontos de referência via Mediapipe<br/>
-                    • Ajustes pixel-a-pixel com zoom interativo<br/>
-                    • Validação em tempo real para máxima precisão
-                  </p>
-                  <Button 
-                    onClick={() => navigate('/precision-measurement')}
-                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Usar Sistema Ultra-Preciso
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="text-center">
-              <div className="text-sm text-gray-500 mb-4">ou continue com o sistema padrão</div>
+        {step === 'method-selection' && (
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Escolha seu Método de Medição</h2>
+              <p className="text-gray-600">Selecione o sistema que melhor atende suas necessidades de precisão</p>
             </div>
 
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Standard System */}
+              <Card className="relative hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-blue-300" 
+                    onClick={() => handleMethodSelection('standard')}>
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+                      <Brain className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-blue-800">Sistema Padrão IA</CardTitle>
+                      <p className="text-sm text-gray-600">Rápido e confiável</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>Medição automática via IA</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>Ajustes manuais interativos</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>Processo rápido (~2 minutos)</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>Precisão: ~90-95%</span>
+                    </div>
+                  </div>
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                    <Brain className="h-4 w-4 mr-2" />
+                    Usar Sistema Padrão
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Precision System */}
+              <Card className="relative hover:shadow-lg transition-shadow cursor-pointer border-2 border-emerald-200 hover:border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50" 
+                    onClick={() => handleMethodSelection('precision')}>
+                <div className="absolute top-3 right-3">
+                  <Badge className="bg-emerald-600 text-white">NOVO</Badge>
+                </div>
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-emerald-600 rounded-full flex items-center justify-center">
+                      <Target className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-emerald-800">Sistema Ultra-Preciso</CardTitle>
+                      <p className="text-sm text-emerald-600">Máxima precisão</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-emerald-600" />
+                      <span>Régua de calibração virtual</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-emerald-600" />
+                      <span>468 pontos faciais Mediapipe</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-emerald-600" />
+                      <span>Ajustes pixel-a-pixel com zoom</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-emerald-600" />
+                      <span className="font-semibold">Precisão: ~98%</span>
+                    </div>
+                  </div>
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
+                    <Target className="h-4 w-4 mr-2" />
+                    Usar Sistema Ultra-Preciso
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {step === 'camera' && (
+          <div className="max-w-2xl mx-auto">
             <CameraCapture
               onCapture={handleImageCapture}
               showGuides={true}
@@ -384,7 +494,14 @@ const MeasurementPage = () => {
           </div>
         )}
 
-        {step === 'interactive' && capturedImage && (
+        {step === 'precision' && capturedImage && (
+          <PrecisionMeasurementScreen
+            onMeasurementsComplete={handlePrecisionMeasurements}
+            initialImage={capturedImage}
+          />
+        )}
+
+        {step === 'interactive' && capturedImage && measurementMethod === 'standard' && (
           <div className="max-w-6xl mx-auto">
           <InteractivePupilMeasurement
             imageData={capturedImage}
@@ -466,14 +583,26 @@ const MeasurementPage = () => {
                         <div className="flex-1">
                           <h4 className="font-bold text-purple-900 mb-2">Medição Interativa (Recomendado)</h4>
                           <p className="text-purple-700 mb-4">
-                            Ajuste manualmente as posições das pupilas para máxima precisão nas medidas.
+                            {measurementMethod === 'precision' ? 
+                              'Use o sistema ultra-preciso com régua de calibração virtual para máxima precisão.' :
+                              'Ajuste manualmente as posições das pupilas para máxima precisão nas medidas.'
+                            }
                           </p>
                           <Button 
-                            onClick={() => setStep('interactive')}
+                            onClick={() => setStep(measurementMethod === 'precision' ? 'precision' : 'interactive')}
                             className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                           >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Usar Medição Interativa
+                            {measurementMethod === 'precision' ? (
+                              <>
+                                <Target className="h-4 w-4 mr-2" />
+                                Usar Sistema Ultra-Preciso
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Usar Medição Interativa
+                              </>
+                            )}
                           </Button>
                         </div>
                       </div>
