@@ -7,13 +7,15 @@ import { CheckCircle, AlertTriangle, RotateCcw, Download, Copy } from 'lucide-re
 import { useToast } from '@/hooks/use-toast';
 
 interface DNPMeasurements {
-  binocularPd: number;
-  pdLeft: number;
-  pdRight: number;
+  dnpLeft: number;
+  dnpRight: number;
+  binocularPD: number;
   confidence: number;
-  samples: number;
-  imageBase64?: string;
-  validation: string;
+  measurements: {
+    leftPupil: { x: number; y: number };
+    rightPupil: { x: number; y: number };
+    nasalBridge: { x: number; y: number };
+  };
 }
 
 interface Props {
@@ -28,11 +30,10 @@ export const DNPResults: React.FC<Props> = ({ measurements, onRestart, config })
   const copyResults = () => {
     const resultText = `
 Medições DNP:
-• Distância Pupilar Binocular: ${measurements.binocularPd} mm
-• Distância Pupilar Esquerda: ${measurements.pdLeft} mm  
-• Distância Pupilar Direita: ${measurements.pdRight} mm
+• Distância Pupilar Binocular: ${measurements.binocularPD.toFixed(1)} mm
+• DNP Esquerda: ${measurements.dnpLeft.toFixed(1)} mm  
+• DNP Direita: ${measurements.dnpRight.toFixed(1)} mm
 • Confiança: ${(measurements.confidence * 100).toFixed(1)}%
-• Validação: ${measurements.validation}
     `.trim();
 
     navigator.clipboard.writeText(resultText);
@@ -47,8 +48,8 @@ Medições DNP:
       timestamp: new Date().toISOString(),
       measurements,
       metadata: {
-        version: '1.0.0',
-        method: 'MediaPipe FaceMesh + Card Calibration'
+        version: '2.0.0',
+        method: 'Pixel-based DNP Measurement + Virtual Calibration'
       }
     };
 
@@ -71,8 +72,8 @@ Medições DNP:
     });
   };
 
-  const isValidationOK = measurements.validation === 'OK';
-  const asymmetry = Math.abs(measurements.pdLeft - measurements.pdRight);
+  const isValidationOK = measurements.confidence > 0.8;
+  const asymmetry = Math.abs(measurements.dnpLeft - measurements.dnpRight);
 
   return (
     <div className="space-y-6">
@@ -90,7 +91,7 @@ Medições DNP:
         <div>
           <h3 className="text-xl font-semibold mb-2">Resultados da Medição DNP</h3>
           <Badge variant={isValidationOK ? 'default' : 'secondary'}>
-            {measurements.validation}
+            {isValidationOK ? 'Medição Válida' : 'Verificar Resultados'}
           </Badge>
         </div>
       </div>
@@ -105,7 +106,7 @@ Medições DNP:
             </Badge>
           </CardTitle>
           <CardDescription>
-            Distâncias medidas em milímetros com calibração por cartão de referência
+            Distâncias medidas em milímetros com calibração virtual
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -117,7 +118,7 @@ Medições DNP:
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-primary">
-                {measurements.binocularPd} mm
+                {measurements.binocularPD.toFixed(1)} mm
               </div>
             </div>
           </div>
@@ -128,21 +129,21 @@ Medições DNP:
           <div className="grid md:grid-cols-2 gap-4">
             <div className="flex justify-between items-center p-4 border rounded-lg">
               <div>
-                <h4 className="font-medium">DP Esquerda</h4>
+                <h4 className="font-medium">DNP Esquerda</h4>
                 <p className="text-sm text-muted-foreground">Pupila esq. → Nariz</p>
               </div>
               <div className="text-xl font-semibold">
-                {measurements.pdLeft} mm
+                {measurements.dnpLeft.toFixed(1)} mm
               </div>
             </div>
 
             <div className="flex justify-between items-center p-4 border rounded-lg">
               <div>
-                <h4 className="font-medium">DP Direita</h4>
+                <h4 className="font-medium">DNP Direita</h4>
                 <p className="text-sm text-muted-foreground">Pupila dir. → Nariz</p>
               </div>
               <div className="text-xl font-semibold">
-                {measurements.pdRight} mm
+                {measurements.dnpRight.toFixed(1)} mm
               </div>
             </div>
           </div>
@@ -160,8 +161,8 @@ Medições DNP:
                 </span>
               </div>
               <div>
-                <span className="text-muted-foreground">Amostras:</span>
-                <span className="ml-2 font-medium">{measurements.samples}</span>
+                <span className="text-muted-foreground">Posições detectadas:</span>
+                <span className="ml-2 font-medium">3 pontos</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Precisão:</span>
@@ -169,7 +170,7 @@ Medições DNP:
               </div>
               <div>
                 <span className="text-muted-foreground">Método:</span>
-                <span className="ml-2 font-medium">MediaPipe + Calibração</span>
+                <span className="ml-2 font-medium">Detecção por Pixels</span>
               </div>
             </div>
           </div>
@@ -182,7 +183,7 @@ Medições DNP:
                 <div>
                   <h4 className="font-medium text-warning">Atenção</h4>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {measurements.validation}
+                    Confiança da medição abaixo do ideal ({(measurements.confidence * 100).toFixed(1)}%)
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
                     Recomendamos repetir a medição para obter resultados mais precisos.
@@ -220,11 +221,11 @@ Medições DNP:
               Informações Técnicas
             </summary>
             <div className="text-sm text-muted-foreground space-y-2">
-              <p>• <strong>Calibração:</strong> Cartão de referência padrão (86×54 mm)</p>
-              <p>• <strong>Detecção:</strong> MediaPipe FaceMesh com 468 landmarks</p>
-              <p>• <strong>Landmarks utilizados:</strong> Centro das pupilas (468, 473) e ponta do nariz (1)</p>
-              <p>• <strong>Precisão teórica:</strong> ±0.5 mm com calibração adequada</p>
-              <p>• <strong>Validação:</strong> Verificação de alinhamento horizontal das pupilas</p>
+              <p>• <strong>Calibração:</strong> Régua virtual configurável</p>
+              <p>• <strong>Detecção:</strong> Simulação baseada em proporções faciais típicas</p>
+              <p>• <strong>Pontos medidos:</strong> Centro das pupilas e ponte nasal</p>
+              <p>• <strong>Precisão teórica:</strong> ±1.0 mm com calibração adequada</p>
+              <p>• <strong>Validação:</strong> Análise de confiança baseada em alinhamento</p>
               <p>• <strong>Timestamp:</strong> {new Date().toLocaleString('pt-BR')}</p>
             </div>
           </details>

@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Camera, CreditCard, Eye, CheckCircle, AlertCircle } from 'lucide-react';
 import { VirtualCalibration } from './VirtualCalibration';
-import { FaceCapture } from './FaceCapture';
+import { ProfessionalFaceCapture } from './ProfessionalFaceCapture';
 import { DNPResults } from './DNPResults';
-import { useDNPMeasurement } from './useDNPMeasurement';
+import { useSimpleDNPMeasurement } from '@/hooks/useSimpleDNPMeasurement';
 
 interface DNPMeasurementConfig {
   apiKey?: string;
@@ -35,57 +35,43 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
   const [currentStep, setCurrentStep] = useState<MeasurementStep>('virtual-calibration');
   const [progress, setProgress] = useState(0);
   
-  const {
-    pixelsPerMm,
-    measurements,
-    isProcessing,
-    error,
-    calibrateWithCard,
-    processFaceImage,
-    reset
-  } = useDNPMeasurement();
+  const [pixelsPerMm, setPixelsPerMm] = useState<number | null>(null);
+  const [measurements, setMeasurements] = useState<any>(null);
+  const { measureDNP, isProcessing, error } = useSimpleDNPMeasurement();
 
-  const handleCardCalibration = useCallback(async (imageData: string) => {
+  const handleVirtualCalibration = useCallback(async (calibratedPixelsPerMm: number) => {
     try {
       setProgress(25);
-      await calibrateWithCard(imageData);
+      setPixelsPerMm(calibratedPixelsPerMm);
       setProgress(50);
       setCurrentStep('face-capture');
     } catch (err) {
       config.onError?.(err);
     }
-  }, [calibrateWithCard, config]);
+  }, [config]);
 
   const handleFaceCapture = useCallback(async (imageData: string) => {
+    if (!pixelsPerMm) return;
+    
     try {
       setProgress(75);
       setCurrentStep('processing');
-      const result = await processFaceImage(imageData);
+      const result = await measureDNP(imageData, pixelsPerMm);
+      setMeasurements(result);
       setProgress(100);
       setCurrentStep('results');
       config.onComplete?.(result);
     } catch (err) {
       config.onError?.(err);
     }
-  }, [processFaceImage, config]);
-
-  const handleVirtualCalibration = useCallback(async (calibratedPixelsPerMm: number) => {
-    try {
-      setProgress(25);
-      // Usa diretamente o valor calibrado da régua virtual
-      await calibrateWithCard(calibratedPixelsPerMm);
-      setProgress(50);
-      setCurrentStep('face-capture');
-    } catch (err) {
-      config.onError?.(err);
-    }
-  }, [calibrateWithCard, config]);
+  }, [measureDNP, pixelsPerMm, config]);
 
   const handleRestart = useCallback(() => {
-    reset();
+    setPixelsPerMm(null);
+    setMeasurements(null);
     setCurrentStep('virtual-calibration');
     setProgress(0);
-  }, [reset]);
+  }, []);
 
   const getStepTitle = () => {
     switch (currentStep) {
@@ -157,7 +143,7 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
           )}
 
           {currentStep === 'face-capture' && (
-            <FaceCapture
+            <ProfessionalFaceCapture
               pixelsPerMm={pixelsPerMm}
               onCaptureComplete={handleFaceCapture}
               isProcessing={isProcessing}
