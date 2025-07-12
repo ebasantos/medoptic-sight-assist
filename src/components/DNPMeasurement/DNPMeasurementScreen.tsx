@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Camera, CreditCard, Eye, CheckCircle, AlertCircle } from 'lucide-react';
 import { VirtualCalibration } from './VirtualCalibration';
-import { ProfessionalFaceCapture } from './ProfessionalFaceCapture';
+import { PrecisionFaceCapture } from './PrecisionFaceCapture';
 import { DNPResults } from './DNPResults';
-import { useSimpleDNPMeasurement } from '@/hooks/useSimpleDNPMeasurement';
+import { useCriticalDNPMeasurement } from '@/hooks/useCriticalDNPMeasurement';
 
 interface DNPMeasurementConfig {
   apiKey?: string;
@@ -37,7 +37,7 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
   
   const [pixelsPerMm, setPixelsPerMm] = useState<number | null>(null);
   const [measurements, setMeasurements] = useState<any>(null);
-  const { measureDNP, isProcessing, error } = useSimpleDNPMeasurement();
+  const { measureDNP, isProcessing, error } = useCriticalDNPMeasurement();
 
   const handleVirtualCalibration = useCallback(async (calibratedPixelsPerMm: number) => {
     try {
@@ -143,7 +143,7 @@ export const DNPMeasurementScreen: React.FC<Props> = ({ config = {} }) => {
           )}
 
           {currentStep === 'face-capture' && (
-            <ProfessionalFaceCapture
+            <PrecisionFaceCapture
               pixelsPerMm={pixelsPerMm}
               onCaptureComplete={handleFaceCapture}
               isProcessing={isProcessing}
