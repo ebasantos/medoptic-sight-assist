@@ -1,11 +1,11 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface UseCameraProps {
   onCapture?: (imageData: string) => void;
+  timeout?: number; // Timeout personalizado em ms
 }
 
-export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
+export const useCamera = ({ onCapture, timeout = 10000 }: UseCameraProps = {}) => {
   const [isActive, setIsActive] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -13,139 +13,219 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Detectar câmeras disponíveis
+  // Limpar timeout anterior
+  const clearCurrentTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  // Detectar câmeras disponíveis com timeout
   const detectCameras = useCallback(async () => {
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
+      // Timeout para detecção de câmeras
+      const detectPromise = navigator.mediaDevices.enumerateDevices();
+      const timeoutPromise = new Promise<MediaDeviceInfo[]>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout ao detectar câmeras')), 5000);
+      });
+
+      const devices = await Promise.race([detectPromise, timeoutPromise]);
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       setAvailableCameras(videoDevices);
       setHasMultipleCameras(videoDevices.length > 1);
       console.log('Câmeras detectadas:', videoDevices.length);
+      return videoDevices;
     } catch (err) {
       console.warn('Erro ao detectar câmeras:', err);
+      return [];
     }
+  }, []);
+
+  // Aguardar elemento de vídeo estar pronto
+  const waitForVideoElement = useCallback((): Promise<HTMLVideoElement> => {
+    return new Promise((resolve, reject) => {
+      if (videoRef.current) {
+        resolve(videoRef.current);
+        return;
+      }
+
+      let attempts = 0;
+      const maxAttempts = 30; // 3 segundos
+      
+      const checkElement = () => {
+        if (videoRef.current) {
+          console.log('Elemento de vídeo encontrado');
+          resolve(videoRef.current);
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(checkElement, 100);
+        } else {
+          reject(new Error('Elemento de vídeo não encontrado'));
+        }
+      };
+      
+      checkElement();
+    });
+  }, []);
+
+  // Aguardar vídeo carregar completamente
+  const waitForVideoLoad = useCallback((video: HTMLVideoElement): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+        resolve();
+        return;
+      }
+
+      const onLoadedData = () => {
+        console.log('Metadata carregada - dimensões:', video.videoWidth, 'x', video.videoHeight);
+        video.removeEventListener('loadeddata', onLoadedData);
+        video.removeEventListener('error', onError);
+        resolve();
+      };
+
+      const onError = (err: Event) => {
+        video.removeEventListener('loadeddata', onLoadedData);
+        video.removeEventListener('error', onError);
+        reject(new Error('Erro ao carregar vídeo'));
+      };
+
+      video.addEventListener('loadeddata', onLoadedData);
+      video.addEventListener('error', onError);
+
+      // Timeout para carregamento do vídeo
+      setTimeout(() => {
+        video.removeEventListener('loadeddata', onLoadedData);
+        video.removeEventListener('error', onError);
+        reject(new Error('Timeout ao carregar vídeo'));
+      }, 8000);
+    });
   }, []);
 
   const startCamera = useCallback(async () => {
     try {
+      setIsLoading(true);
       setError(null);
       setHasPermission(null);
+      clearCurrentTimeout();
+
       console.log('Tentando iniciar câmera...', facingMode);
       
-      // Verificar se getUserMedia está disponível
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('API de câmera não disponível neste navegador');
+      // Verificar suporte do navegador
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Câmera não suportada neste navegador');
       }
 
-      // Aguardar o elemento de vídeo estar disponível
-      const checkVideoElement = () => {
-        return new Promise<HTMLVideoElement>((resolve, reject) => {
-          let attempts = 0;
-          const maxAttempts = 50; // 5 segundos máximo
-          
-          const check = () => {
-            if (videoRef.current) {
-              console.log('Elemento de vídeo encontrado');
-              resolve(videoRef.current);
-            } else if (attempts < maxAttempts) {
-              attempts++;
-              setTimeout(check, 100);
-            } else {
-              reject(new Error('Elemento de vídeo não encontrado após timeout'));
-            }
-          };
-          
-          check();
-        });
-      };
-
-      const video = await checkVideoElement();
-      console.log('Elemento de vídeo encontrado, solicitando stream...');
-
-      // Parar stream anterior se existir
+      // Parar stream anterior
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
 
-      // Detectar câmeras disponíveis
+      // Aguardar elemento de vídeo com timeout
+      const video = await Promise.race([
+        waitForVideoElement(),
+        new Promise<never>((_, reject) => {
+          timeoutRef.current = setTimeout(() => {
+            reject(new Error('Timeout: elemento de vídeo não encontrado'));
+          }, 5000);
+        })
+      ]);
+
+      clearCurrentTimeout();
+
+      // Detectar câmeras
       await detectCameras();
 
-      // Solicitar permissão para usar a câmera com o facingMode correto
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Configurações otimizadas para menor latência
+      const constraints: MediaStreamConstraints = {
         video: {
           facingMode: facingMode,
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 }
+          width: { ideal: 720, min: 480 },
+          height: { ideal: 480, min: 360 },
+          frameRate: { ideal: 30, min: 15 }
         },
         audio: false
+      };
+
+      // Solicitar stream com timeout
+      const streamPromise = navigator.mediaDevices.getUserMedia(constraints);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutRef.current = setTimeout(() => {
+          reject(new Error('Timeout ao acessar câmera'));
+        }, timeout);
       });
 
-      console.log('Stream obtido:', stream);
-      console.log('Tracks do stream:', stream.getTracks());
-      streamRef.current = stream;
+      const stream = await Promise.race([streamPromise, timeoutPromise]);
+      clearCurrentTimeout();
 
-      console.log('Configurando elemento de vídeo...');
-      
-      // Definir o stream como fonte do vídeo
+      console.log('Stream obtido:', stream.getTracks().length, 'tracks');
+      streamRef.current = stream;
       video.srcObject = stream;
+
+      // Aguardar vídeo carregar com timeout
+      await Promise.race([
+        waitForVideoLoad(video),
+        new Promise<never>((_, reject) => {
+          timeoutRef.current = setTimeout(() => {
+            reject(new Error('Timeout ao carregar vídeo'));
+          }, 8000);
+        })
+      ]);
+
+      clearCurrentTimeout();
+
+      // Reproduzir vídeo
+      await video.play();
       
-      // Aguardar o vídeo carregar e então reproduzir
-      video.onloadedmetadata = () => {
-        console.log('Metadata carregada - dimensões:', video.videoWidth, 'x', video.videoHeight);
-        
-        // Tentar reproduzir o vídeo
-        video.play()
-          .then(() => {
-            console.log('Vídeo iniciado com sucesso');
-            setIsActive(true);
-            setHasPermission(true);
-          })
-          .catch((playError) => {
-            console.error('Erro ao reproduzir vídeo:', playError);
-            setError(`Erro ao reproduzir vídeo: ${playError.message}`);
-          });
-      };
-      
-      video.onerror = (err) => {
-        console.error('Erro no elemento de vídeo:', err);
-        setError('Erro ao carregar vídeo');
-      };
+      console.log('Câmera iniciada com sucesso');
+      setIsActive(true);
+      setHasPermission(true);
+      setIsLoading(false);
 
     } catch (err) {
-      console.error('Erro ao acessar a câmera:', err);
+      clearCurrentTimeout();
+      setIsLoading(false);
       setHasPermission(false);
       setIsActive(false);
       
-      // Limpar stream em caso de erro
+      // Limpar recursos
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
       
+      console.error('Erro ao iniciar câmera:', err);
+      
       if (err instanceof Error) {
         if (err.name === 'NotAllowedError') {
-          setError('Permissão para usar a câmera foi negada. Por favor, permita o acesso à câmera.');
+          setError('Acesso à câmera negado. Permita o acesso e tente novamente.');
         } else if (err.name === 'NotFoundError') {
-          setError('Nenhuma câmera foi encontrada no dispositivo.');
+          setError('Nenhuma câmera encontrada no dispositivo.');
         } else if (err.name === 'NotReadableError') {
-          setError('A câmera está sendo usada por outro aplicativo.');
+          setError('Câmera está sendo usada por outro aplicativo.');
+        } else if (err.message.includes('Timeout')) {
+          setError('Timeout ao conectar com a câmera. Tente novamente.');
         } else {
-          setError(`Erro ao acessar a câmera: ${err.message}`);
+          setError(`Erro: ${err.message}`);
         }
       } else {
-        setError('Erro desconhecido ao acessar a câmera');
+        setError('Erro desconhecido ao acessar câmera');
       }
     }
-  }, [facingMode, detectCameras]);
+  }, [facingMode, detectCameras, timeout, waitForVideoElement, waitForVideoLoad, clearCurrentTimeout]);
 
   const stopCamera = useCallback(() => {
     console.log('Parando câmera...');
+    clearCurrentTimeout();
+    setIsLoading(false);
     
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
@@ -161,31 +241,28 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
     }
     
     setIsActive(false);
-  }, []);
+  }, [clearCurrentTimeout]);
 
   const switchCamera = useCallback(async () => {
     if (!hasMultipleCameras) return;
     
     console.log('Trocando câmera...');
+    const wasActive = isActive;
+    
+    if (wasActive) {
+      stopCamera();
+    }
+    
     const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(newFacingMode);
     
-    // Se a câmera estiver ativa, reiniciar com a nova configuração
-    if (isActive) {
-      stopCamera();
-      // Pequeno delay para garantir que a câmera anterior foi liberada
+    if (wasActive) {
+      // Pequeno delay para liberar recursos
       setTimeout(() => {
-        setFacingMode(newFacingMode);
-      }, 100);
+        startCamera();
+      }, 500);
     }
-  }, [facingMode, hasMultipleCameras, isActive, stopCamera]);
-
-  // Reiniciar câmera quando facingMode mudar
-  useEffect(() => {
-    if (isActive && streamRef.current) {
-      startCamera();
-    }
-  }, [facingMode]);
+  }, [facingMode, hasMultipleCameras, isActive, stopCamera, startCamera]);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current || !isActive) {
@@ -202,43 +279,35 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
       return null;
     }
 
-    // Verificar se o vídeo tem dimensões válidas
     if (video.videoWidth === 0 || video.videoHeight === 0) {
-      console.error('Vídeo não possui dimensões válidas');
+      console.error('Vídeo sem dimensões válidas');
       return null;
     }
 
     console.log('Capturando foto...');
 
-    // Configurar o canvas com as dimensões do vídeo
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
-    // Desenhar o frame atual do vídeo no canvas
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Converter para base64
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    const imageData = canvas.toDataURL('image/jpeg', 0.85);
     setCapturedImage(imageData);
     
     console.log('Foto capturada com sucesso');
     
-    // Chamar callback se fornecido
-    if (onCapture) {
-      onCapture(imageData);
-    }
-
+    onCapture?.(imageData);
     return imageData;
   }, [isActive, onCapture]);
 
-  // Limpar recursos quando o componente for desmontado
+  // Limpar recursos ao desmontar
   useEffect(() => {
     return () => {
+      clearCurrentTimeout();
       stopCamera();
     };
-  }, [stopCamera]);
+  }, [stopCamera, clearCurrentTimeout]);
 
-  // Detectar câmeras quando o hook é inicializado
+  // Inicializar detecção de câmeras
   useEffect(() => {
     detectCameras();
   }, [detectCameras]);
@@ -252,6 +321,7 @@ export const useCamera = ({ onCapture }: UseCameraProps = {}) => {
     capturedImage,
     facingMode,
     hasMultipleCameras,
+    isLoading,
     startCamera,
     stopCamera,
     switchCamera,

@@ -41,11 +41,12 @@ export const PrecisionFaceCapture: React.FC<Props> = ({
     videoRef: cameraVideoRef,
     canvasRef,
     isActive, 
+    isLoading,
     error: cameraError, 
     startCamera, 
     stopCamera,
     capturePhoto 
-  } = useCamera();
+  } = useCamera({ timeout: 15000 }); // Timeout mais longo para casos difíceis
 
   // Simular análise de qualidade em tempo real
   const analyzeQuality = useCallback(() => {
@@ -311,10 +312,25 @@ export const PrecisionFaceCapture: React.FC<Props> = ({
             
             {/* Error Overlay */}
             {cameraError && (
+              <div className="absolute inset-0 bg-background/90 flex items-center justify-center">
+                <div className="text-center p-6 bg-white rounded-lg shadow-lg max-w-md">
+                  <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                  <p className="font-medium text-red-800 mb-2">Erro na Câmera</p>
+                  <p className="text-sm text-red-600 mb-4">{cameraError}</p>
+                  <Button onClick={startCamera} variant="outline" size="sm">
+                    Tentar Novamente
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Loading Overlay */}
+            {isLoading && (
               <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                <div className="text-center text-destructive">
-                  <p className="font-medium">Erro na câmera</p>
-                  <p className="text-sm">{cameraError}</p>
+                <div className="text-center text-primary">
+                  <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                  <p className="font-medium">Conectando com a câmera...</p>
+                  <p className="text-sm text-muted-foreground">Aguarde alguns instantes</p>
                 </div>
               </div>
             )}
@@ -328,18 +344,23 @@ export const PrecisionFaceCapture: React.FC<Props> = ({
       <div className="flex gap-3 justify-center">
         {!capturedImage ? (
           <>
-            <Button onClick={startCamera} disabled={isActive || isProcessing}>
+            <Button 
+              onClick={startCamera} 
+              disabled={isActive || isProcessing || isLoading}
+              variant="outline"
+            >
               <Camera className="w-4 h-4 mr-2" />
-              {isActive ? 'Câmera Ativa' : 'Iniciar Verificação'}
+              {isLoading ? 'Conectando...' : isActive ? 'Câmera Ativa' : 'Iniciar Verificação'}
             </Button>
             <Button 
               onClick={startCountdown} 
-              disabled={!isActive || isProcessing || !allChecksPass || countdown !== null}
+              disabled={!isActive || isProcessing || !allChecksPass || countdown !== null || isLoading}
               variant="default"
               className={allChecksPass ? 'bg-green-600 hover:bg-green-700' : ''}
             >
               <Camera className="w-4 h-4 mr-2" />
-              {countdown ? `Capturando em ${countdown}...` : 
+              {isLoading ? 'Conectando...' : 
+               countdown ? `Capturando em ${countdown}...` : 
                allChecksPass ? 'Captura de Precisão' : 'Aguarde Validação'}
             </Button>
           </>
